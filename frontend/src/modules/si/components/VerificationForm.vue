@@ -185,11 +185,12 @@ async function save() {
     return
   } else {
     try {
-      await store.addCalibrationHistory(siId.value!, {
-        calibration_date: form.receiptDate,
-        calibrator: form.verifier,
+      await store.addVerification({
+        siId: siId.value,
+        transferDate: form.transferDate,
+        receiptDate: form.receiptDate,
+        verifier: form.verifier,
         result: form.result,
-        notes: `Передано: ${form.transferDate}`,
       })
       close()
       window.dispatchEvent(new Event('verification-saved'))
