@@ -1,0 +1,58 @@
+{
+  "name": "techtrack-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "run-p type-check \"build-only {@}\" --",
+    "preview": "vite preview",
+    "build-only": "vite build",
+    "type-check": "vue-tsc --build",
+    "format": "prettier --write --experimental-cli src/"
+  },
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "file-saver": "^2.0.5",
+    "html2canvas": "^1.4.1",
+    "json-editor-vue": "^0.18.1",
+    "jsoneditor": "^10.4.3",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.33",
+    "vue-json-editor": "^1.4.3",
+    "vue-router": "^5.0.6",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@tsconfig/node24": "^24.0.4",
+    "@types/chart.js": "^2.9.41",
+    "@types/file-saver": "^2.0.7",
+    "@types/node": "^24.12.2",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "@vue/tsconfig": "^0.9.1",
+    "npm-run-all2": "^8.0.4",
+    "prettier": "3.8.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10",
+    "vite-plugin-vue-devtools": "^8.1.1",
+    "vue-tsc": "^3.2.6"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "description": "This template should help get you started developing with Vue 3 in Vite.",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DenisRub/TechTrack-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/DenisRub/TechTrack-app/issues"
+  },
+  "homepage": "https://github.com/DenisRub/TechTrack-app#readme"
+}
