@@ -5,14 +5,14 @@
       <div v-for="(cond, idx) in conditions" :key="idx" class="filter-row">
         <select v-model="cond.field">
           <option value="name">Наименование</option>
-          <option value="type">Тип</option>
+          <option value="status">Статус</option>
           <option value="location">Местоположение</option>
-          <option value="createdAt">Дата создания</option>
-          <option value="updatedAt">Дата обновления</option>
+          <option value="manufacturer">Производитель</option>
+          <option value="model">Модель</option>
         </select>
         <select v-model="cond.operator">
-          <option value="eq">Равно</option>
           <option value="contains">Содержит</option>
+          <option value="eq">Равно</option>
           <option value="gt">Больше</option>
           <option value="lt">Меньше</option>
         </select>

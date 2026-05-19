@@ -1,38 +1,54 @@
 export interface EquipmentNode {
-  id: number;
+  node_id: number;
   name: string;
   type: 'aggregate' | 'block';
-  parentId?: number | null;
-  subsystem?: string;
+  parent_id?: number | null;
+  subsystem_id?: number;
   manufacturer?: string;
   model?: string;
-  serialNumber?: string;
-  inventoryNumber?: string;
-  isSI?: boolean;
-  condition?: string;
-  resource?: string;
+  serial_number?: string;
+  inventory_number?: string;
+  is_si?: boolean;
+  status?: string;
   location?: string;
   note?: string;
-  parameters?: string;               // <- новое поле
+  parameters?: Record<string, any>;
   characteristics?: Record<string, any>;
-  createdAt: string;
-  updatedAt: string;
-  isDeleted: boolean;
+  operation_mode?: string;
+  commission_date?: string;
+  installed_in_node?: number | null;
+  created_at: string;
+  updated_at: string;
+  is_deleted: boolean;
 }
 
 export interface Resource {
-  id: number;
-  nodeId: number;
+  resource_id: number;
+  node_id: number;
   name: string;
   value: string | number;
   unit?: string;
-  updatedAt: string;
+  registration_date: string;
+  resource_params: Record<string, any>;
+  note?: string;
+  created_at: string;
+  updated_at: string;
 }
+
 export interface NodeType {
-  id: number;
+  node_type_id: number;
   name: string;
-  characteristicsTemplate: Record<string, any>;
-  allowedChildTypeIds?: number[]; // ID видов, которые можно устанавливать
-  createdAt: string;
-  updatedAt: string;
+  characteristics_template: Record<string, any>;
+  allowed_child_type_ids?: number[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MovementHistory {
+  history_id: number;
+  node_id: number;
+  from_location?: string;
+  to_location: string;
+  created_at: string;
+  user_name?: string;
 }

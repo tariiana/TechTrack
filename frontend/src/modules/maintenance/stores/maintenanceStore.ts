@@ -37,24 +37,15 @@ export const useMaintenanceStore = defineStore('maintenance', () => {
     await fetchPlans();
   }
 
-  async function fetchTasks(filters?: { node_id?: string; status_id?: number; type_id?: number }) {
-    const params = new URLSearchParams();
-    if (filters?.node_id) params.append('node_id', filters.node_id);
-    if (filters?.status_id) params.append('status_id', String(filters.status_id));
-    if (filters?.type_id) params.append('type_id', String(filters.type_id));
-    const query = params.toString() ? `?${params.toString()}` : '';
-    tasks.value = await apiFetch(`/maintenance/tasks${query}`);
-  }
-
   async function createTask(data: any) {
     return await apiFetch('/maintenance/tasks', { method: 'POST', body: JSON.stringify(data) });
   }
 
-  async function updateTask(id: string, data: any) {
+  async function updateTask(id: number, data: any) {
     return await apiFetch(`/maintenance/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   }
 
-  async function deleteTask(id: string) {
+  async function deleteTask(id: number) {
     await apiFetch(`/maintenance/tasks/${id}`, { method: 'DELETE' });
   }
 
@@ -74,7 +65,6 @@ export const useMaintenanceStore = defineStore('maintenance', () => {
     createPlan,
     updatePlan,
     deletePlan,
-    fetchTasks,
     createTask,
     updateTask,
     deleteTask,

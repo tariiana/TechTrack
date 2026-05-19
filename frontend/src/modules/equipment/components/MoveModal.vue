@@ -32,20 +32,23 @@ function open(nodeData: any) {
   error.value = '';
   visible.value = true;
 }
+
 function close() { visible.value = false; }
+
 async function move() {
   if (!newLocation.value.trim()) {
     error.value = 'Введите новое местоположение';
     return;
   }
   try {
-    // Обновляем местоположение узла через API (история перемещений создаётся на бэкенде автоматически)
     await store.updateNode(node.value.node_id, { location: newLocation.value });
     close();
     emit('moved');
+    window.dispatchEvent(new Event('node-saved'));
   } catch (err: any) {
     error.value = err.message || 'Ошибка при перемещении';
   }
 }
+
 defineExpose({ open });
 </script>

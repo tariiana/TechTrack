@@ -11,14 +11,60 @@
 
     <div class="card-detail-grid">
       <div class="detail-col">
-        <div class="detail-row"><div class="detail-label">Тип</div><div class="detail-value">{{ instrument.typeName || '-' }}</div><div class="detail-label">Марка</div><div class="detail-value">{{ instrument.model || '-' }}</div></div>
-        <div class="detail-row"><div class="detail-label">Производитель</div><div class="detail-value">{{ instrument.manufacturer || '-' }}</div><div class="detail-label">Дата производства</div><div class="detail-value">{{ instrument.productionDate || '-' }}</div></div>
-        <div class="detail-row"><div class="detail-label">Узел</div><div class="detail-value">{{ instrument.nodeName || '-' }}</div><div class="detail-label">Статус</div><div class="detail-value" :class="{ 'status-disabled': instrument.status === 'выведено' }">{{ instrument.status || '-' }}</div></div>
-        <div class="detail-row"><div class="detail-label">Размещение</div><div class="detail-value">{{ instrument.location || '-' }}</div><div class="detail-label">Основные параметры</div><div class="detail-value">{{ instrument.mainParams || '-' }}</div></div>
-        <div class="detail-row"><div class="detail-label">Дата сдачи в поверку</div><div class="detail-value">{{ formatDate(instrument.transferDate) || '-' }}</div><div class="detail-label">Дата получения из поверки</div><div class="detail-value">{{ formatDate(instrument.receiptDate) || '-' }}</div></div>
-        <div class="detail-row"><div class="detail-label">Дата последней поверки</div><div class="detail-value">{{ lastVerificationDate ? formatDate(lastVerificationDate) : '-' }}</div><div class="detail-label">Дата следующей поверки</div><div class="detail-value"><template v-if="nextVerificationDate">{{ formatDate(nextVerificationDate) }}<span v-if="isWarning && instrument.status !== 'выведено'" class="warning-badge">(менее 30 дней)</span></template><template v-else>-</template></div></div>
-        <div class="detail-row"><div class="detail-label">Межповерочный интервал</div><div class="detail-value">{{ instrument.verificationInterval }} год(а)</div><div class="detail-label">Поверитель</div><div class="detail-value">{{ instrument.verifier || '-' }}</div></div>
-        <div class="detail-row"><div class="detail-label">Табельный номер</div><div class="detail-value">{{ instrument.tabNumber || '-' }}</div><div class="detail-label">Примечание</div><div class="detail-value">{{ instrument.notes || '-' }}</div></div>
+        <div class="detail-row">
+          <div class="detail-label">Тип</div>
+          <div class="detail-value">{{ instrument.typeName || '-' }}</div>
+          <div class="detail-label">Марка</div>
+          <div class="detail-value">{{ instrument.model || '-' }}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Производитель</div>
+          <div class="detail-value">{{ instrument.manufacturer || '-' }}</div>
+          <div class="detail-label">Дата производства</div>
+          <div class="detail-value">{{ instrument.productionDate || '-' }}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Узел</div>
+          <div class="detail-value">{{ instrument.nodeName || '-' }}</div>
+          <div class="detail-label">Статус</div>
+          <div class="detail-value" :class="{ 'status-disabled': instrument.status === 'выведено' }">{{ instrument.status || '-' }}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Размещение</div>
+          <div class="detail-value">{{ instrument.location || '-' }}</div>
+          <div class="detail-label">Основные параметры</div>
+          <div class="detail-value">
+            <pre v-if="instrument.mainParams && Object.keys(instrument.mainParams).length > 0">{{ JSON.stringify(instrument.mainParams, null, 2) }}</pre>
+            <span v-else>-</span>
+          </div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Дата сдачи в поверку</div>
+          <div class="detail-value">{{ formatDate(instrument.transferDate) || '-' }}</div>
+          <div class="detail-label">Дата получения из поверки</div>
+          <div class="detail-value">{{ formatDate(instrument.receiptDate) || '-' }}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Дата последней поверки</div>
+          <div class="detail-value">{{ lastVerificationDate ? formatDate(lastVerificationDate) : '-' }}</div>
+          <div class="detail-label">Дата следующей поверки</div>
+          <div class="detail-value">
+            <template v-if="nextVerificationDate">{{ formatDate(nextVerificationDate) }}<span v-if="isWarning && instrument.status !== 'выведено'" class="warning-badge">(менее 30 дней)</span></template>
+            <template v-else>-</template>
+          </div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Межповерочный интервал</div>
+          <div class="detail-value">{{ instrument.verificationInterval }} год(а)</div>
+          <div class="detail-label">Поверитель</div>
+          <div class="detail-value">{{ instrument.verifier || '-' }}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Табельный номер</div>
+          <div class="detail-value">{{ instrument.tabNumber || '-' }}</div>
+          <div class="detail-label">Примечание</div>
+          <div class="detail-value">{{ instrument.notes || '-' }}</div>
+        </div>
       </div>
     </div>
 
@@ -105,5 +151,14 @@ onMounted(() => { loadData(); window.addEventListener('si-saved', refresh); wind
 .status-disabled { color: #999; font-style: italic; }
 .result-bad { color: #c0392b; font-weight: 500; }
 .warning-badge { background-color: #e67e22; color: white; border-radius: 4px; padding: 2px 6px; font-size: 10px; margin-left: 8px; }
+pre {
+  background: #f8f9fa;
+  padding: 8px;
+  border-radius: 4px;
+  margin: 0;
+  font-size: 12px;
+  overflow-x: auto;
+  max-width: 100%;
+}
 @media (max-width: 768px) { .detail-row { grid-template-columns: 1fr 1fr; gap: 8px; } }
 </style>

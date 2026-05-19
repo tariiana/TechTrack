@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { apiFetch } from '@/api/client';
 
 export const useEquipmentStore = defineStore('equipment', () => {
@@ -8,6 +8,20 @@ export const useEquipmentStore = defineStore('equipment', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
   const filterParams = ref({ search: '', status: '', subsystem_id: '', node_type_id: '' });
+
+  // Отфильтрованные узлы (computed для реактивности)
+  const filteredNodes = computed(() => {
+    let list = nodes.value;
+    const params = filterParams.value;
+    if (params.search) {
+      const s = params.search.toLowerCase();
+      list = list.filter((n: any) => n.name?.toLowerCase().includes(s));
+    }
+    if (params.status) {
+      list = list.filter((n: any) => n.status === params.status);
+    }
+    return list;
+  });
 
   async function fetchNodes() {
     isLoading.value = true;
@@ -52,18 +66,21 @@ export const useEquipmentStore = defineStore('equipment', () => {
   async function createNode(nodeData: any) {
     const newItem = await apiFetch('/nodes', { method: 'POST', body: JSON.stringify(nodeData) });
     await fetchNodes();
+    await fetchTree();
     return newItem;
   }
 
   async function updateNode(id: string, nodeData: any) {
     const updated = await apiFetch(`/nodes/${id}`, { method: 'PUT', body: JSON.stringify(nodeData) });
     await fetchNodes();
+    await fetchTree();
     return updated;
   }
 
   async function writeOffNode(id: string) {
     await apiFetch(`/nodes/${id}/write-off`, { method: 'DELETE' });
     await fetchNodes();
+    await fetchTree();
   }
 
   function setFilterParams(params: any) {
@@ -72,7 +89,8 @@ export const useEquipmentStore = defineStore('equipment', () => {
   }
 
   return {
-    nodes,
+    nodes: filteredNodes,
+    rawNodes: nodes,
     tree,
     isLoading,
     error,

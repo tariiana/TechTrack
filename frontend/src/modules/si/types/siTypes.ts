@@ -13,7 +13,7 @@ export interface MeasuringInstrument {
   typeId?: number
   typeName?: string
   location?: string
-  mainParams?: string
+  mainParams?: Record<string, any>  // изменено на JSON объект
   productionDate?: string
   transferDate?: string
   receiptDate?: string
@@ -23,7 +23,7 @@ export interface MeasuringInstrument {
   nextVerificationDate?: string
   verifier?: string
   notes?: string
-  subsystemId: number
+  subsystemId?: number
   additionalData?: any
   isDeleted: boolean
 }

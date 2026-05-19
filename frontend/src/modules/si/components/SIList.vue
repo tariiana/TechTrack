@@ -146,9 +146,16 @@ function formatCell(si: any, key: ColumnKey): string {
     return date ? formatDate(date) : '-';
   }
   if (key === 'verificationInterval') return `${si.verificationInterval} год`;
+  if (key === 'mainParams') {
+    // Для отображения в таблице показываем краткую версию
+    if (si.mainParams && Object.keys(si.mainParams).length > 0) {
+      const params = Object.entries(si.mainParams).slice(0, 2);
+      return params.map(([k, v]) => `${k}: ${v}`).join(', ') + (Object.keys(si.mainParams).length > 2 ? '...' : '');
+    }
+    return '-';
+  }
   const value = si[key];
-  if (value === undefined || value === null) return '-';
-  return String(value);
+  return value === undefined || value === null ? '-' : String(value);
 }
 
 const siFormRef = ref();
@@ -170,36 +177,78 @@ const canEdit = computed(() => {
 
 function getDaysLeft(si: any): number {
   if (si.status === 'выведено') return Infinity;
+  
   const nextDate = getNextVerificationDate(si.id);
   if (!nextDate) return Infinity;
-  return getDaysUntilVerification(nextDate);
+  
+  const days = getDaysUntilVerification(nextDate);
+  return days;
 }
 
 function getPriority(si: any): number {
   if (si.status === 'выведено') return 3;
+  
   const daysLeft = getDaysLeft(si);
-  if (daysLeft < 0) return 0;
-  if (daysLeft <= 30) return 1;
-  return 2;
+  if (daysLeft < 0) return 0;      // просроченные (красные)
+  if (daysLeft <= 30) return 1;    // скоро (жёлтые)
+  return 2;                         // нормальные
 }
 
 const sortedList = computed(() => {
   let list = [...store.instruments];
+  
   list.sort((a, b) => {
-    const priorityA = getPriority(a), priorityB = getPriority(b);
-    if (priorityA !== priorityB) return priorityA - priorityB;
+    // Сначала сортируем по приоритету
+    const priorityA = getPriority(a);
+    const priorityB = getPriority(b);
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+    
+    // Внутри одной группы (просроченные, скоро, нормальные) сортируем по убыванию критичности
+    // Чем меньше дней (или чем больше просрочка), тем выше в списке
+    if (priorityA === 0) {
+      // Просроченные: чем больше просрочка, тем выше (чем меньше число, тем выше)
+      const daysA = getDaysLeft(a);
+      const daysB = getDaysLeft(b);
+      return daysA - daysB;
+    }
+    
+    if (priorityA === 1) {
+      // Скоро: чем меньше дней, тем выше
+      const daysA = getDaysLeft(a);
+      const daysB = getDaysLeft(b);
+      return daysA - daysB;
+    }
+    
+    // Для нормальных и списанных — сортируем по выбранному полю
     const field = sortField.value;
-    let valA: any = a[field], valB: any = b[field];
-    if (field === 'lastVerificationDate') { valA = getLastVerificationDate(a.id); valB = getLastVerificationDate(b.id); }
-    if (field === 'nextVerificationDate') { valA = getNextVerificationDate(a.id); valB = getNextVerificationDate(b.id); }
+    let valA: any = a[field];
+    let valB: any = b[field];
+    
+    if (field === 'lastVerificationDate') {
+      valA = getLastVerificationDate(a.id);
+      valB = getLastVerificationDate(b.id);
+    }
+    if (field === 'nextVerificationDate') {
+      valA = getNextVerificationDate(a.id);
+      valB = getNextVerificationDate(b.id);
+    }
+    
     if (valA === undefined || valA === null) valA = '';
     if (valB === undefined || valB === null) valB = '';
-    if (typeof valA === 'number' && typeof valB === 'number') return sortDir.value === 'asc' ? valA - valB : valB - valA;
-    const strA = String(valA).toLowerCase(), strB = String(valB).toLowerCase();
+    
+    if (typeof valA === 'number' && typeof valB === 'number') {
+      return sortDir.value === 'asc' ? valA - valB : valB - valA;
+    }
+    
+    const strA = String(valA).toLowerCase();
+    const strB = String(valB).toLowerCase();
     if (strA < strB) return sortDir.value === 'asc' ? -1 : 1;
     if (strA > strB) return sortDir.value === 'asc' ? 1 : -1;
     return 0;
   });
+  
   return list;
 });
 
@@ -218,11 +267,11 @@ function onSearchInput() {
 function resetFilters() { filters.value = { search: '', status: '' }; if (searchTimer) clearTimeout(searchTimer); applyFilters(); }
 
 function getRowClass(si: any): string {
-  if (si.status === 'выведено') return 'disabled-row';
+  if (si.status === 'выведено') return 'disabled-row';      // серый
   const days = getDaysLeft(si);
-  if (days < 0) return 'expired-row';
-  if (days <= 30) return 'warning-row';
-  return '';
+  if (days < 0) return 'expired-row';                       // красный
+  if (days <= 30) return 'warning-row';                     // жёлтый
+  return '';                                                // обычный
 }
 
 function getDaysWord(days: number): string {
@@ -268,6 +317,9 @@ onMounted(() => {
 .actions-cell { white-space: nowrap; }
 .actions-cell .btn { margin-right: 4px; }
 .warning-row { background-color: #fff3e0; }
+.warning-row:hover { background-color: #ffe8c7; }
 .expired-row { background-color: #ffe0e0; }
+.expired-row:hover { background-color: #ffd0d0; }
 .disabled-row { background-color: #f0f0f0; color: #999; opacity: 0.7; }
+.disabled-row:hover { background-color: #e8e8e8; }
 </style>

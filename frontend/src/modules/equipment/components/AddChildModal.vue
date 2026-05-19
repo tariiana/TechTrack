@@ -32,15 +32,14 @@ const error = ref('');
 
 const availableNodes = computed(() => {
   if (!parentId.value) return [];
-  // Все узлы, которые не списаны, не являются родителем и не уже в составе
-  const existingChildIds = store.nodes
-    .filter((n: any) => n.installed_in_node === parentId.value)
-    .map((n: any) => n.node_id);
-  return store.nodes.filter((n: any) => 
-    !n.write_off_date && 
+  const existingChildIds = store.rawNodes
+    ?.filter((n: any) => n.installed_in_node === parentId.value)
+    .map((n: any) => n.node_id) || [];
+  return store.rawNodes?.filter((n: any) => 
+    n.status !== 'списан' && 
     n.node_id !== parentId.value && 
     !existingChildIds.includes(n.node_id)
-  );
+  ) || [];
 });
 
 function open(pId: string) {
@@ -56,7 +55,6 @@ async function add() {
     return;
   }
   try {
-    // Обновляем дочерний узел: устанавливаем installed_in_node = parentId
     await store.updateNode(selectedChildId.value, { installed_in_node: parentId.value });
     close();
     window.dispatchEvent(new Event('equipment-saved'));

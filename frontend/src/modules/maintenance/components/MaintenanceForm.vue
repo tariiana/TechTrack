@@ -141,9 +141,7 @@ async function save() {
         start_date: form.startDate,
         end_date: form.endDate,
       };
-      // Создаём план через store.createPlan
       const newPlan = await store.createPlan(planData);
-      // Если нужно автоматически сгенерировать задачи, вызываем store.generatePlan
       if (newPlan && newPlan.plan_id) {
         await store.generatePlan(form.startDate, form.endDate);
         autoMessage.value = `План создан! Задачи сгенерированы автоматически.`;

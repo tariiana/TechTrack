@@ -49,9 +49,18 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th @click="sortBy('name')">Название плана</th>
-            <th @click="sortBy('startDate')">Дата начала</th>
-            <th @click="sortBy('endDate')">Дата окончания</th>
+            <th @click="sortBy('name')">
+              Название плана
+              <span class="sort-icon" v-if="sortField === 'name'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+            </th>
+            <th @click="sortBy('startDate')">
+              Дата начала
+              <span class="sort-icon" v-if="sortField === 'startDate'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+            </th>
+            <th @click="sortBy('endDate')">
+              Дата окончания
+              <span class="sort-icon" v-if="sortField === 'endDate'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+            </th>
             <th>Действия</th>
           </tr>
         </thead>
@@ -146,10 +155,7 @@ const filteredAndSortedPlans = computed(() => {
   return list
 })
 
-function applyFilters() {
-  // computed обновляется автоматически
-}
-
+function applyFilters() {}
 function resetFilters() {
   searchQuery.value = ''
   dateFrom.value = ''
@@ -174,7 +180,7 @@ async function deletePlan(id: string) {
 }
 
 function refresh() {
-  // реактивно
+  store.fetchPlans()
 }
 
 // Экспорт
@@ -223,6 +229,7 @@ function handleClickOutside(event: MouseEvent) {
 }
 
 onMounted(() => {
+  store.fetchPlans()
   document.addEventListener('click', handleClickOutside)
 })
 
@@ -232,5 +239,23 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* стили без изменений */
+.button-group { display: flex; gap: 10px; position: relative; }
+.dropdown { position: relative; }
+.dropdown-menu {
+  position: absolute; top: 100%; left: 0; margin-top: 4px;
+  background: white; border: 1px solid #e0e4e8; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 100; min-width: 220px;
+}
+.dropdown-item {
+  display: block; width: 100%; padding: 8px 12px; text-align: left;
+  background: none; border: none; cursor: pointer; font-size: 14px;
+}
+.dropdown-item:hover { background-color: #f0f2f5; }
+.filter-panel {
+  background: #f8f9fa; border: 1px solid #e0e4e8;
+  border-radius: 8px; padding: 15px; margin-bottom: 20px;
+}
+.filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.filter-label { font-size: 14px; color: #6c757d; }
+.sort-icon { margin-left: 5px; font-size: 12px; color: #2c5f8a; }
 </style>

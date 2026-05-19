@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div style="margin-top: 20px">
     <div class="resource-header">
       <h3>Ресурсы</h3>
       <div class="resource-actions">
@@ -9,30 +9,32 @@
     </div>
 
     <div v-if="isLoading" class="loading">Загрузка...</div>
-    <table v-else-if="resources.length" class="data-table">
-      <thead>
-        <tr>
-          <th>Наименование</th>
-          <th>Значение</th>
-          <th>Ед. изм.</th>
-          <th>Обновлено</th>
-          <th v-if="canEdit">Действия</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="res in resources" :key="res.resource_id">
-          <td>{{ res.name }}</td>
-          <td>{{ res.value }}</td>
-          <td>{{ res.unit || '-' }}</td>
-          <td>{{ formatDate(res.updated_at || res.updatedAt) }}</td>
-          <td v-if="canEdit">
-            <button class="btn btn-sm btn-secondary" @click="$emit('edit', res)">✏️</button>
-            <button class="btn btn-sm btn-danger" @click="deleteResource(res.resource_id)">🗑️</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-    <div v-else class="empty-message">Ресурсы не добавлены</div>
+    <div v-else-if="resources.length === 0" class="empty-message">Ресурсы не добавлены</div>
+    <div v-else class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Наименование</th>
+            <th>Значение</th>
+            <th>Ед. изм.</th>
+            <th>Обновлено</th>
+            <th v-if="canEdit">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="res in resources" :key="res.resource_id">
+            <td>{{ res.name }}</td>
+            <td>{{ res.value }}</td>
+            <td>{{ res.unit || '-' }}</td>
+            <td>{{ formatDate(res.updated_at || res.created_at) }}</td>
+            <td v-if="canEdit">
+              <button class="btn btn-sm btn-secondary" @click="$emit('edit', res)">✏️</button>
+              <button class="btn btn-sm btn-danger" @click="deleteResource(res.resource_id)">🗑️</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
 
@@ -42,7 +44,7 @@ import { useRouter } from 'vue-router';
 import { useResourcesStore } from '@/modules/resources/stores/resourcesStore';
 import { formatDate } from '@/utils/dateUtils';
 
-const props = defineProps<{ nodeId: string }>();
+const props = defineProps<{ nodeId: number }>();
 const emit = defineEmits(['add', 'edit']);
 const router = useRouter();
 const resourcesStore = useResourcesStore();
@@ -60,7 +62,8 @@ const canEdit = computed(() => {
 async function loadResources() {
   isLoading.value = true;
   try {
-    resources.value = await resourcesStore.fetchResourcesForNode(props.nodeId);
+    // Преобразуем number в string
+    resources.value = await resourcesStore.fetchResourcesForNode(String(props.nodeId));
   } catch (err) {
     console.error('Ошибка загрузки ресурсов:', err);
     resources.value = [];
@@ -70,12 +73,13 @@ async function loadResources() {
 }
 
 function goToResources() {
-  router.push({ path: '/resources', query: { nodeId: props.nodeId } });
+  router.push({ path: '/resources', query: { nodeId: String(props.nodeId) } });
 }
 
-async function deleteResource(id: string) {
+async function deleteResource(id: number) {
   if (confirm('Удалить ресурс?')) {
-    await resourcesStore.deleteResource(id);
+    // Преобразуем number в string
+    await resourcesStore.deleteResource(String(id));
     await loadResources();
     window.dispatchEvent(new Event('resource-saved'));
   }
@@ -96,7 +100,7 @@ onUnmounted(() => {
 
 watch(() => props.nodeId, () => {
   loadResources();
-});
+}, { immediate: true });
 </script>
 
 <style scoped>

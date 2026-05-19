@@ -36,16 +36,26 @@ export const useUsersStore = defineStore('users', () => {
     return newUser;
   }
 
-  async function updateUser(id: string, userData: any) {
+  async function updateUser(id: number, userData: any) {
     const updated = await apiFetch(`/users/${id}`, { method: 'PUT', body: JSON.stringify(userData) });
     await fetchUsers();
     return updated;
   }
 
-  async function deleteUser(id: string) {
+  async function deleteUser(id: number) {
     await apiFetch(`/users/${id}`, { method: 'DELETE' });
     await fetchUsers();
   }
 
-  return { users, roles, isLoading, error, fetchUsers, fetchRoles, createUser, updateUser, deleteUser };
+  return {
+    users,
+    roles,
+    isLoading,
+    error,
+    fetchUsers,
+    fetchRoles,
+    createUser,
+    updateUser,
+    deleteUser,
+  };
 });

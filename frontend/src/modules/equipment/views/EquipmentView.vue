@@ -11,5 +11,6 @@ import EquipmentList from '../components/EquipmentList.vue';
 <style scoped>
 .equipment-view {
   width: 100%;
+  padding: 0;
 }
 </style>
