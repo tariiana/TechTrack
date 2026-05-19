@@ -19,11 +19,11 @@
       <!-- Фильтр -->
       <div v-if="showFilterPanel" class="filter-panel">
         <div class="filter-row">
-          <input v-model="filters.resourceName" placeholder="Наименование" class="form-control" />
-          <input v-model="filters.mark" placeholder="Марка" class="form-control" />
-          <input v-model="filters.registrationNumber" placeholder="Учётный №" class="form-control" />
-          <input type="date" v-model="filters.dateFrom" placeholder="Дата от" class="form-control" />
-          <input type="date" v-model="filters.dateTo" placeholder="Дата до" class="form-control" />
+          <input v-model="filters.resourceName" placeholder="Наименование" class="form-control">
+          <input v-model="filters.mark" placeholder="Марка" class="form-control">
+          <input v-model="filters.registrationNumber" placeholder="Учётный №" class="form-control">
+          <input type="date" v-model="filters.dateFrom" placeholder="Дата от" class="form-control">
+          <input type="date" v-model="filters.dateTo" placeholder="Дата до" class="form-control">
           <button class="btn btn-primary btn-sm" @click="applyFilters">Найти</button>
           <button class="btn btn-secondary btn-sm" @click="resetFilters">Сбросить</button>
         </div>
@@ -46,7 +46,7 @@
               <td v-for="col in visibleColumns" :key="col.key">{{ formatCell(m, col.key) }}</td>
               <td class="actions-cell">
                 <button class="btn btn-sm btn-secondary" @click="editMeasurement(m)">✏️</button>
-                <button class="btn btn-sm btn-danger" @click="deleteMeasurement(m.id)">🗑️</button>
+                <button class="btn btn-sm btn-danger" @click="confirmDeleteMeasurement(m.id)">🗑️</button>
               </td>
             </tr>
             <tr v-if="filteredAndSortedMeasurements.length === 0">
@@ -67,7 +67,7 @@
     <div class="modal-content" style="width: 400px">
       <div class="modal-header">Настройка колонок</div>
       <div v-for="col in allColumns" :key="col.key" style="margin-bottom: 8px">
-        <label><input type="checkbox" v-model="selectedColumns" :value="col.key" /> {{ col.label }}</label>
+        <label><input type="checkbox" v-model="selectedColumns" :value="col.key"> {{ col.label }}</label>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" @click="showColumnSettings = false">Закрыть</button>
@@ -76,17 +76,20 @@
   </div>
 
   <AddMeasurementModal ref="editModalRef" @saved="refresh" />
+  <ConfirmDialog ref="confirmDialog" />
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useResourcesStore } from '../stores/resourcesStore';
 import AddMeasurementModal from './AddMeasurementModal.vue';
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import { formatDate } from '@/utils/dateUtils';
 import * as XLSX from 'xlsx';
 
 const store = useResourcesStore();
 const editModalRef = ref();
+const confirmDialog = ref();
 const visible = ref(false);
 const measurements = ref<any[]>([]);
 const exportDropdownOpen = ref(false);
@@ -114,19 +117,12 @@ const selectedColumns = ref(allColumns.map(c => c.key));
 const visibleColumns = computed(() => allColumns.filter(c => selectedColumns.value.includes(c.key)));
 
 function getParametersSummary(measurement: any): string {
-  const resourceParams = store.getParametersForResource(measurement.resourceId);
-  const mainParamNames = resourceParams.filter(p => p.isMain).map(p => p.name);
-  if (mainParamNames.length === 0) return '-';
+  const params = measurement.parameters || {};
   const parts: string[] = [];
-  for (const name of mainParamNames) {
-    let key = '';
-    if (name === 'Напряжение') key = 'U';
-    else if (name === 'Внутреннее сопротивление') key = 'R';
-    else if (name === 'Ёмкость' || name === 'Емкость') key = 'E';
-    else if (name === 'C') key = 'C';
-    else key = name;
-    const value = measurement.parameters?.[key];
-    if (value !== undefined && value !== null) parts.push(`${key}=${value}`);
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      parts.push(`${key}=${value}`);
+    }
   }
   return parts.length ? parts.join('; ') : '-';
 }
@@ -185,23 +181,69 @@ const filteredAndSortedMeasurements = computed(() => {
   return list;
 });
 
-function loadMeasurements() { measurements.value = [...store.measurements]; }
-function open() { loadMeasurements(); visible.value = true; }
+async function loadMeasurements() {
+  await store.fetchResources();
+  const allResources = store.resources;
+  const allMeasurements: any[] = [];
+  for (const res of allResources) {
+    const measurementsList = res.resource_params?.measurements || [];
+    for (const m of measurementsList) {
+      allMeasurements.push({
+        id: m.id,
+        resourceId: res.resource_id,
+        resourceName: res.name,
+        mark: res.mark,
+        registrationNumber: res.registration_number,
+        measurementDate: m.date,
+        parameters: m.parameters || {},
+      });
+    }
+  }
+  allMeasurements.sort((a, b) => new Date(b.measurementDate).getTime() - new Date(a.measurementDate).getTime());
+  measurements.value = allMeasurements;
+}
+
+async function open() {
+  await loadMeasurements();
+  visible.value = true;
+}
+
 function close() { visible.value = false; exportDropdownOpen.value = false; }
 function editMeasurement(m: any) { editModalRef.value?.open(m); }
-function deleteMeasurement(id: number) { if (confirm('Удалить измерение?')) { store.deleteMeasurement(id); loadMeasurements(); } }
+async function confirmDeleteMeasurement(id: number) {
+  const ok = await confirmDialog.value?.show('Удаление', 'Удалить измерение?');
+  if (ok) {
+    await deleteMeasurement(id);
+  }
+}
+async function deleteMeasurement(id: number) {
+  for (const res of store.resources) {
+    const measurementsList = res.resource_params?.measurements || [];
+    const index = measurementsList.findIndex((m: any) => m.id === id);
+    if (index !== -1) {
+      measurementsList.splice(index, 1);
+      await store.updateResource(res.resource_id, { resource_params: { ...res.resource_params, measurements: measurementsList } });
+      break;
+    }
+  }
+  await loadMeasurements();
+}
 function refresh() { loadMeasurements(); }
 function applyFilters() {}
-function resetFilters() { filters.value = { resourceName: '', mark: '', registrationNumber: '', dateFrom: '', dateTo: '' }; }
+function resetFilters() {
+  filters.value = { resourceName: '', mark: '', registrationNumber: '', dateFrom: '', dateTo: '' };
+}
 
 function getExportData() {
-  return filteredAndSortedMeasurements.value.map(m => ({
-    'Наименование': m.resourceName || '-',
-    'Марка': m.mark || '-',
-    'Учётный №': m.registrationNumber || '-',
-    'Дата измерения': formatDate(m.measurementDate),
-    'Параметры (основные)': getParametersSummary(m),
-  }));
+  return filteredAndSortedMeasurements.value.map(m => {
+    return {
+      'Наименование': m.resourceName || '-',
+      'Марка': m.mark || '-',
+      'Учётный №': m.registrationNumber || '-',
+      'Дата измерения': formatDate(m.measurementDate),
+      'Параметры (основные)': getParametersSummary(m),
+    };
+  });
 }
 
 function exportToExcel() {
@@ -217,7 +259,9 @@ function exportToExcel() {
 function exportToWord() {
   const data = getExportData();
   if (data.length === 0) { alert('Нет данных для экспорта'); return; }
-  const headers = Object.keys(data[0]);
+  const firstItem = data[0];
+  if (!firstItem) return;
+  const headers = Object.keys(firstItem);
   let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Журнал измерений</title>`;
   html += `<style>body{font-family:Arial;} table{border-collapse:collapse;width:100%} th,td{border:1px solid #000;padding:6px;text-align:left}</style></head><body>`;
   html += `<h1>Журнал измерения остаточных ресурсов</h1><p>Дата: ${new Date().toLocaleDateString()}</p>`;
@@ -226,16 +270,22 @@ function exportToWord() {
   html += `</tr></thead><tbody>`;
   for (const row of data) {
     html += `<tr>`;
-    for (const h of headers) html += `<td>${row[h]}</td>`;
+    for (const h of headers) {
+      const value = (row as any)[h] || '-';
+      html += `<td>${value}</td>`;
+    }
     html += `</tr>`;
   }
   html += `</tbody></table></body></html>`;
   const blob = new Blob([html], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
+  link.href = url;
   link.download = `Журнал_измерений_${new Date().toISOString().slice(0, 10)}.doc`;
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(link);
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
   exportDropdownOpen.value = false;
 }
 

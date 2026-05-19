@@ -47,7 +47,7 @@ import { formatDate } from '@/utils/dateUtils';
 const props = defineProps<{ nodeId: number }>();
 const emit = defineEmits(['add', 'edit']);
 const router = useRouter();
-const resourcesStore = useResourcesStore();
+const store = useResourcesStore();
 
 const resources = ref<any[]>([]);
 const isLoading = ref(false);
@@ -62,8 +62,8 @@ const canEdit = computed(() => {
 async function loadResources() {
   isLoading.value = true;
   try {
-    // Преобразуем number в string
-    resources.value = await resourcesStore.fetchResourcesForNode(String(props.nodeId));
+    // props.nodeId уже number, передаём как есть
+    resources.value = await store.fetchResourcesForNode(props.nodeId);
   } catch (err) {
     console.error('Ошибка загрузки ресурсов:', err);
     resources.value = [];
@@ -78,8 +78,7 @@ function goToResources() {
 
 async function deleteResource(id: number) {
   if (confirm('Удалить ресурс?')) {
-    // Преобразуем number в string
-    await resourcesStore.deleteResource(String(id));
+    await store.deleteResource(id);
     await loadResources();
     window.dispatchEvent(new Event('resource-saved'));
   }

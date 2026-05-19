@@ -1,6 +1,6 @@
 <template>
   <div class="modal-overlay" v-if="visible">
-    <div class="modal-content">
+    <div class="modal-content" style="width: 500px">
       <div class="modal-header">Автоматический расчёт ресурсов</div>
       <div class="form-group">
         <label>Режим работы узла (часов в год)</label>
@@ -21,7 +21,7 @@
         <div v-for="res in resources" :key="res.resource_id" class="checkbox-item">
           <label>
             <input type="checkbox" v-model="selectedResources" :value="res.resource_id" />
-            {{ res.name }} ({{ res.node_name }})
+            {{ res.name }} ({{ res.node_name || res.node_id }})
           </label>
         </div>
       </div>
@@ -42,11 +42,10 @@ const store = useResourcesStore();
 const visible = ref(false);
 const workHours = ref('8760');
 const customHours = ref(8760);
-const selectedResources = ref<string[]>([]);
+const selectedResources = ref<number[]>([]);
 const error = ref('');
 
 const resources = computed(() => store.resources);
-
 const emit = defineEmits(['calculated']);
 
 function open() {
@@ -58,29 +57,26 @@ function close() { visible.value = false; }
 async function calculate() {
   let hours = parseInt(workHours.value);
   if (workHours.value === 'custom') hours = customHours.value;
-  
+
   if (isNaN(hours) || hours <= 0) {
     error.value = 'Введите корректное значение часов';
     return;
   }
-  
+
   let calculated = 0;
   for (const res of resources.value) {
     if (selectedResources.value.includes(res.resource_id)) {
       try {
-        // Вызываем API расчёта (не обновляет автоматически, только возвращает результат)
         const result = await store.calculateResource(res.resource_id, hours);
         if (result && result.calculated_resource_percent !== undefined) {
           calculated++;
-          // Можно показать уведомление о результате
-          console.log(`Ресурс ${res.name}: рассчитанный процент = ${result.calculated_resource_percent}`);
         }
       } catch (err) {
         console.error(err);
       }
     }
   }
-  
+
   close();
   emit('calculated', { count: calculated });
   window.dispatchEvent(new Event('resource-saved'));

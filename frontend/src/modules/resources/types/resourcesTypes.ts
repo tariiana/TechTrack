@@ -1,52 +1,55 @@
 export interface Resource {
-  id: number;
-  nodeId: number;
-  nodeName?: string;
+  resource_id: number;
+  node_id: number;
+  node_name?: string;
   name: string;
-  mark?: string;              // Марка
-  type?: string;              // Тип
-  productionDate?: string;    // Дата производства
-  registrationDate: string;   // Дата регистрации
-  registrationNumber?: number; // Учётный номер
-  serviceLife?: number;        // Срок службы (лет)
-  lastServiceDate?: string;    // Дата последнего ТО
-  timeToService?: number;      // Срок до ТО (лет)
-  initialResource?: string;    // Исходный ресурс
-  remainingResource?: string;  // Остаточный ресурс
-  installedIn?: string;        // Установлен в
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-  isDeleted: boolean;
+  mark?: string;
+  type?: string;
+  production_date?: string;
+  registration_date: string;
+  registration_number?: number;
+  service_life?: number;
+  time_to_service?: number;
+  initial_resource?: string;
+  remaining_resource?: string;
+  installed_in?: string;
+  resource_params?: Record<string, any>;
+  note?: string;
+  created_at: string;
+  updated_at: string;
+  is_deleted: boolean;
 }
 
 export interface ResourceParameter {
-  id: number;
-  resourceId: number;
+  parameter_id: number;
+  resource_id: number;
   name: string;
   value: string | number;
   unit: string;
-  isMain: boolean;
+  is_main: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ResourceMeasurement {
-  id: number;
-  resourceId: number;
-  nodeId: number;
-  nodeName?: string;
-  resourceName?: string;
+  measurement_id: number;
+  resource_id: number;
+  node_id: number;
+  node_name?: string;
+  resource_name?: string;
   mark?: string;
-  registrationNumber?: number;
-  measurementDate: string;
-  parameters: Record<string, any>; // JSON параметров измерения
-  createdAt: string;
+  registration_number?: number;
+  measurement_date: string;
+  parameters: Record<string, any>;
+  created_at: string;
 }
 
 export interface ResourceAlert {
-  id: number;
-  resourceId: number;
-  nodeId: number;
+  alert_id: number;
+  resource_id: number;
+  node_id: number;
   threshold: number;
   message: string;
-  isActive: boolean;
+  is_active: boolean;
+  created_at: string;
 }

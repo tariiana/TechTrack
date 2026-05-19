@@ -3,5 +3,5 @@
 </template>
 
 <script setup lang="ts">
-import ResourceCard from '../components/ResourceCard.vue'
+import ResourceCard from '../components/ResourceCard.vue';
 </script>

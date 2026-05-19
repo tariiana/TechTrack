@@ -1,10 +1,8 @@
 <template>
   <div class="modal-overlay" v-if="visible">
     <div class="modal-content" style="width: 650px">
-      <div class="modal-header">
-        <h3>{{ editMode ? 'Редактирование измерения' : 'Добавление измерения' }}</h3>
-      </div>
-      
+      <div class="modal-header">{{ editMode ? 'Редактирование измерения' : 'Добавление измерения' }}</div>
+
       <div class="form-group">
         <label>Выберите ресурс*</label>
         <select v-model="selectedResourceId" class="form-control" @change="onResourceSelect">
@@ -14,12 +12,12 @@
           </option>
         </select>
       </div>
-      
+
       <div class="form-group">
         <label>Дата измерения*</label>
         <input type="date" v-model="form.measurementDate" class="form-control" />
       </div>
-      
+
       <!-- Параметры измерения -->
       <div v-if="currentResource" class="params-section">
         <h4>Параметры ресурса</h4>
@@ -29,18 +27,18 @@
               <span class="param-name">{{ key }}</span>
               <span class="param-unit">({{ getUnitHint(key) }})</span>
             </div>
-            <input 
-              type="number" 
-              step="0.01" 
-              v-model="currentResourceParams[key]" 
+            <input
+              type="number"
+              step="0.01"
+              v-model="currentResourceParams[key]"
               class="form-control param-input"
             />
           </div>
         </div>
       </div>
-      
+
       <div v-if="error" class="error-text">{{ error }}</div>
-      
+
       <div class="modal-footer">
         <button class="btn btn-secondary" @click="close">Отмена</button>
         <button class="btn btn-primary" @click="save">Сохранить</button>
@@ -50,14 +48,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive } from 'vue';
 import { useResourcesStore } from '../stores/resourcesStore';
 
 const store = useResourcesStore();
 const visible = ref(false);
 const editMode = ref(false);
-const editId = ref<string | null>(null);
-const selectedResourceId = ref<string | null>(null);
+const editId = ref<number | null>(null);
+const selectedResourceId = ref<number | null>(null);
 const error = ref('');
 const resources = ref<any[]>([]);
 const currentResource = ref<any>(null);
@@ -80,7 +78,7 @@ async function loadResources() {
   resources.value = store.resources;
 }
 
-async function loadResourceParams(resourceId: string) {
+async function loadResourceParams(resourceId: number) {
   try {
     const fullResource = await store.fetchResourceById(resourceId);
     currentResource.value = fullResource;
@@ -127,10 +125,10 @@ async function open(measurement?: any) {
   await loadResources();
   if (measurement) {
     editMode.value = true;
-    editId.value = measurement.id;
-    selectedResourceId.value = measurement.resourceId;
-    await loadResourceParams(measurement.resourceId);
-    form.measurementDate = measurement.measurementDate;
+    editId.value = measurement.measurement_id;
+    selectedResourceId.value = measurement.resource_id;
+    await loadResourceParams(measurement.resource_id);
+    form.measurementDate = measurement.measurement_date;
     // восстановить значения параметров из измерения
     if (measurement.parameters) {
       for (const [key, val] of Object.entries(measurement.parameters)) {
@@ -156,37 +154,33 @@ async function save() {
     error.value = 'Укажите дату измерения';
     return;
   }
-  
+
   const resourceId = selectedResourceId.value;
   const newMeasurement = {
-    date: form.measurementDate,
+    measurement_date: form.measurementDate,
     parameters: { ...currentResourceParams.value },
   };
-  
+
   try {
-    // Получаем текущий ресурс
     const fullResource = await store.fetchResourceById(resourceId);
     const params = fullResource.resource_params || {};
     let measurements = params.measurements || [];
-    
+
     if (editMode.value && editId.value) {
-      // Обновляем существующее измерение
-      const index = measurements.findIndex((m: any) => m.id === editId.value);
+      const index = measurements.findIndex((m: any) => m.measurement_id === editId.value);
       if (index !== -1) {
         measurements[index] = { ...measurements[index], ...newMeasurement };
       }
     } else {
-      // Добавляем новое измерение
-      const newId = Date.now().toString();
-      measurements.push({ id: newId, ...newMeasurement });
+      const newId = Date.now();
+      measurements.push({ measurement_id: newId, ...newMeasurement });
     }
-    
-    // Обновляем resource_params (сохраняем текущие значения параметров как базовые)
+
     const updatedParams = {
       ...currentResourceParams.value,
       measurements: measurements,
     };
-    
+
     await store.updateResource(resourceId, { resource_params: updatedParams });
     close();
     window.dispatchEvent(new Event('resource-saved'));
@@ -199,7 +193,6 @@ defineExpose({ open });
 </script>
 
 <style scoped>
-/* стили остаются без изменений */
 .params-section {
   margin-top: 15px;
   padding-top: 15px;

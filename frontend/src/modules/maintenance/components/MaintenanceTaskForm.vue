@@ -37,7 +37,7 @@
 
       <div class="form-group">
         <label>Рекомендуемая дата</label>
-        <input type="date" v-model="form.recommended_date" class="form-control" />
+        <input type="date" v-model="form.recommended_date" class="form-control">
       </div>
 
       <div class="form-group">
@@ -68,6 +68,23 @@ const planId = ref<number | null>(null);
 const error = ref('');
 const equipmentNodes = ref<any[]>([]);
 
+function getCurrentDate(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getDefaultRecommendedDate(): string {
+  const defaultDate = new Date();
+  defaultDate.setMonth(defaultDate.getMonth() + 1);
+  const year = defaultDate.getFullYear();
+  const month = String(defaultDate.getMonth() + 1).padStart(2, '0');
+  const day = String(defaultDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 const form = reactive({
   node_id: null as number | null,
   service_type: 'плановое ТО',
@@ -92,10 +109,7 @@ function open(pId: number, task?: any) {
     form.recommended_date = task.recommended_date || '';
     form.notes = task.notes || '';
   } else {
-    // Рекомендуемая дата по умолчанию - через месяц
-    const defaultDate = new Date();
-    defaultDate.setMonth(defaultDate.getMonth() + 1);
-    form.recommended_date = defaultDate.toISOString().split('T')[0];
+    form.recommended_date = getDefaultRecommendedDate();
   }
   visible.value = true;
 }

@@ -24,11 +24,11 @@ export const useResourcesStore = defineStore('resources', () => {
     }
   }
 
-  async function fetchResourceById(id: string) {
+  async function fetchResourceById(id: number) {
     return await apiFetch(`/resources/${id}`);
   }
 
-  async function fetchResourcesForNode(nodeId: string) {
+  async function fetchResourcesForNode(nodeId: number) {
     return await apiFetch(`/resources/by-node/${nodeId}`);
   }
 
@@ -38,33 +38,18 @@ export const useResourcesStore = defineStore('resources', () => {
     return newItem;
   }
 
-  async function updateResource(id: string, data: any) {
+  async function updateResource(id: number, data: any) {
     const updated = await apiFetch(`/resources/${id}`, { method: 'PUT', body: JSON.stringify(data) });
     await fetchResources();
     return updated;
   }
 
-  async function updateResourceByWorkMode(resourceId: string, nodeId: string, workHoursPerYear: number) {
-  try {
-    const calcResult = await calculateResource(resourceId, workHoursPerYear);
-    if (calcResult && calcResult.calculated_resource_percent !== undefined) {
-      const resource = await fetchResourceById(resourceId);
-      const newParams = { ...resource.resource_params, calculated_percent: calcResult.calculated_resource_percent };
-      await updateResource(resourceId, { resource_params: newParams });
-      return true;
-    }
-    return false;
-  } catch (err) {
-    console.error(err);
-    return false;
-  }
-}
-  async function deleteResource(id: string) {
+  async function deleteResource(id: number) {
     await apiFetch(`/resources/${id}`, { method: 'DELETE' });
     await fetchResources();
   }
 
-  async function calculateResource(id: string, workHoursPerYear: number) {
+  async function calculateResource(id: number, workHoursPerYear: number) {
     return await apiFetch(`/resources/${id}/calculate`, {
       method: 'POST',
       body: JSON.stringify({ work_hours_per_year: workHoursPerYear }),
