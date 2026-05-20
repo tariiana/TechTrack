@@ -21,7 +21,8 @@
       <button class="btn btn-secondary" @click="resetFilters">Сбросить</button>
     </div>
 
-    <div class="table-wrapper">
+    <!-- Таблица с прокруткой -->
+    <ScrollableTable>
       <table class="data-table">
         <thead>
           <tr>
@@ -42,10 +43,12 @@
               <span v-if="si.status === 'выведено'" class="badge-disabled">Списан</span>
             </td>
           </tr>
-          <tr v-if="sortedList.length === 0"><td :colspan="visibleOrderedColumns.length + 1">Нет данных</td></tr>
+          <tr v-if="sortedList.length === 0">
+            <td :colspan="visibleOrderedColumns.length + 1">Нет данных</td>
+          </tr>
         </tbody>
       </table>
-    </div>
+    </ScrollableTable>
 
     <SIForm ref="siFormRef" @si-saved="refresh" />
     <VerificationForm ref="verFormRef" @verification-saved="refresh" />
@@ -64,6 +67,7 @@ import VerificationForm from './VerificationForm.vue';
 import ExportDialog from './ExportDialog.vue';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import ColumnSettings from './ColumnSettings.vue';
+import ScrollableTable from '@/components/common/ScrollableTable.vue';
 import { formatDate, getDaysUntilVerification } from '@/utils/dateUtils';
 
 const router = useRouter();
@@ -147,7 +151,6 @@ function formatCell(si: any, key: ColumnKey): string {
   }
   if (key === 'verificationInterval') return `${si.verificationInterval} год`;
   if (key === 'mainParams') {
-    // Для отображения в таблице показываем краткую версию
     if (si.mainParams && Object.keys(si.mainParams).length > 0) {
       const params = Object.entries(si.mainParams).slice(0, 2);
       return params.map(([k, v]) => `${k}: ${v}`).join(', ') + (Object.keys(si.mainParams).length > 2 ? '...' : '');
@@ -177,51 +180,33 @@ const canEdit = computed(() => {
 
 function getDaysLeft(si: any): number {
   if (si.status === 'выведено') return Infinity;
-  
   const nextDate = getNextVerificationDate(si.id);
   if (!nextDate) return Infinity;
-  
-  const days = getDaysUntilVerification(nextDate);
-  return days;
+  return getDaysUntilVerification(nextDate);
 }
 
 function getPriority(si: any): number {
   if (si.status === 'выведено') return 3;
-  
   const daysLeft = getDaysLeft(si);
-  if (daysLeft < 0) return 0;      // просроченные (красные)
-  if (daysLeft <= 30) return 1;    // скоро (жёлтые)
-  return 2;                         // нормальные
+  if (daysLeft < 0) return 0;
+  if (daysLeft <= 30) return 1;
+  return 2;
 }
 
 const sortedList = computed(() => {
   let list = [...store.instruments];
   
   list.sort((a, b) => {
-    // Сначала сортируем по приоритету
     const priorityA = getPriority(a);
     const priorityB = getPriority(b);
-    if (priorityA !== priorityB) {
-      return priorityA - priorityB;
-    }
+    if (priorityA !== priorityB) return priorityA - priorityB;
     
-    // Внутри одной группы (просроченные, скоро, нормальные) сортируем по убыванию критичности
-    // Чем меньше дней (или чем больше просрочка), тем выше в списке
-    if (priorityA === 0) {
-      // Просроченные: чем больше просрочка, тем выше (чем меньше число, тем выше)
+    if (priorityA === 0 || priorityA === 1) {
       const daysA = getDaysLeft(a);
       const daysB = getDaysLeft(b);
       return daysA - daysB;
     }
     
-    if (priorityA === 1) {
-      // Скоро: чем меньше дней, тем выше
-      const daysA = getDaysLeft(a);
-      const daysB = getDaysLeft(b);
-      return daysA - daysB;
-    }
-    
-    // Для нормальных и списанных — сортируем по выбранному полю
     const field = sortField.value;
     let valA: any = a[field];
     let valB: any = b[field];
@@ -267,11 +252,11 @@ function onSearchInput() {
 function resetFilters() { filters.value = { search: '', status: '' }; if (searchTimer) clearTimeout(searchTimer); applyFilters(); }
 
 function getRowClass(si: any): string {
-  if (si.status === 'выведено') return 'disabled-row';      // серый
+  if (si.status === 'выведено') return 'disabled-row';
   const days = getDaysLeft(si);
-  if (days < 0) return 'expired-row';                       // красный
-  if (days <= 30) return 'warning-row';                     // жёлтый
-  return '';                                                // обычный
+  if (days < 0) return 'expired-row';
+  if (days <= 30) return 'warning-row';
+  return '';
 }
 
 function getDaysWord(days: number): string {
@@ -322,4 +307,14 @@ onMounted(() => {
 .expired-row:hover { background-color: #ffd0d0; }
 .disabled-row { background-color: #f0f0f0; color: #999; opacity: 0.7; }
 .disabled-row:hover { background-color: #e8e8e8; }
+
+/* Убеждаемся, что карточка не создаёт лишнюю прокрутку */
+.card {
+  overflow-x: hidden;
+}
+
+/* Контейнер таблицы занимает всю ширину */
+.scrollable-table-container {
+  width: 100%;
+}
 </style>

@@ -51,9 +51,9 @@
       </ul>
     </div>
 
-    <!-- Таблица параметров -->
+    <!-- Таблица параметров с прокруткой -->
     <h3>Параметры</h3>
-    <div class="table-wrapper">
+    <div class="table-scroll-container" v-if="parameters.length">
       <table class="data-table">
         <thead>
           <tr>
@@ -76,13 +76,14 @@
         </tbody>
       </table>
     </div>
+    <div v-else class="empty-message">Нет параметров</div>
 
     <div class="text-muted" style="margin-top: 15px">
       <small>Создан: {{ formatDate(resource.created_at) }} | Обновлён: {{ formatDate(resource.updated_at) }}</small>
     </div>
 
     <ResourceForm ref="formRef" @saved="refresh" />
-    <ResourceParameters ref="parametersRef" :resource-id="resource.node_id" @refresh="loadData" />
+    <ResourceParameters ref="parametersRef" :resource-id="resource.resource_id" @refresh="loadData" />
     <ConfirmDialog ref="confirmDialog" />
   </div>
   <div v-else class="card">Загрузка...</div>
@@ -137,7 +138,6 @@ const alerts = computed(() => {
 
 async function loadData() {
   const id = route.params.id as string;
-   resource.value = await store.fetchResourceById(id);
   try {
     resource.value = await store.fetchResourceById(id);
     await loadParameters();
@@ -149,7 +149,6 @@ async function loadData() {
 async function loadParameters() {
   if (!resource.value) return;
   const params = resource.value.resource_params || {};
-  const measurements = params.measurements || [];
   const paramsArray: any[] = [];
   for (const [key, value] of Object.entries(params)) {
     if (key !== 'measurements' && typeof value === 'object' && value !== null) {
@@ -178,7 +177,8 @@ function editResource() { formRef.value?.open(resource.value); }
 async function deleteResource() {
   const ok = await confirmDialog.value?.show('Удаление', 'Удалить ресурс?');
   if (ok) {
-    await store.deleteResource(resource.value.node_id);
+    await store.deleteResource(resource.value.resource_id);
+    router.back();
   }
 }
 function refresh() { loadData(); }
@@ -215,4 +215,42 @@ onMounted(() => {
 }
 .alert-banner .danger { color: #c0392b; }
 .text-muted { color: #6c757d; }
+.empty-message { color: #999; font-style: italic; padding: 10px; }
+
+/* Контейнер для таблицы с прокруткой */
+.table-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 400px;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  background: white;
+  margin: 10px 0;
+}
+
+.table-scroll-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #e0e4e8;
+  border-radius: 6px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #2c5f8a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #1e4566;
+}
+
+/* Стили для таблицы внутри контейнера */
+.table-scroll-container .data-table {
+  min-width: 500px;
+}
 </style>

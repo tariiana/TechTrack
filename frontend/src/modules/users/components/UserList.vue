@@ -29,8 +29,8 @@
       </div>
     </div>
 
-    <!-- Таблица пользователей -->
-    <div class="table-wrapper">
+    <!-- Таблица пользователей с прокруткой -->
+    <div class="table-scroll-container">
       <table class="data-table">
         <thead>
           <tr>
@@ -215,5 +215,41 @@ onMounted(() => {
   text-align: center;
   color: #999;
   padding: 20px;
+}
+
+/* Контейнер для таблицы с прокруткой */
+.table-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 500px;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  background: white;
+}
+
+.table-scroll-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #e0e4e8;
+  border-radius: 6px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #2c5f8a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #1e4566;
+}
+
+/* Стили для таблицы внутри контейнера */
+.table-scroll-container .data-table {
+  min-width: 600px;
 }
 </style>

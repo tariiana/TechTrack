@@ -28,8 +28,8 @@
       </div>
     </div>
 
-    <!-- Таблица ресурсов -->
-    <div class="table-wrapper">
+    <!-- Таблица ресурсов с прокруткой -->
+    <div class="table-scroll-container">
       <table class="data-table">
         <thead>
           <tr>
@@ -131,7 +131,6 @@ function sortBy(field: string) {
     sortField.value = field;
     sortOrder.value = 'asc';
   }
-  // Сортировка на бэкенде, просто обновляем фильтры
   applyFilters();
 }
 
@@ -154,10 +153,7 @@ async function deleteResource(id: string) {
   const ok = await confirmDialog.value?.show('Удаление', 'Удалить ресурс?');
   if (ok) await store.deleteResource(id);
 }
-
-function viewCard(id: string) {
-  router.push(`/resources/${id}`);
-}
+function viewCard(id: string) { router.push(`/resources/${id}`); }
 function refresh() { applyFilters(); }
 function onCalculated(result: { count: number }) {
   alert(`Рассчитано ресурсов: ${result.count}`);
@@ -190,4 +186,40 @@ onMounted(() => {
 .actions-cell { white-space: nowrap; }
 .actions-cell .btn { margin-right: 4px; }
 .empty-data { text-align: center; padding: 20px; color: #999; }
+
+/* Контейнер для таблицы с прокруткой */
+.table-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 500px;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  background: white;
+}
+
+.table-scroll-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #e0e4e8;
+  border-radius: 6px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #2c5f8a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #1e4566;
+}
+
+/* Стили для таблицы внутри контейнера */
+.table-scroll-container .data-table {
+  min-width: 800px;
+}
 </style>

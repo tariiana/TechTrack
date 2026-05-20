@@ -1,11 +1,11 @@
 <template>
   <div class="app-layout">
     <AppHeader />
-    <div class="app-content">
-      <div class="container">
+    <main class="app-main">
+      <div class="app-container">
         <router-view />
       </div>
-    </div>
+    </main>
   </div>
 </template>
 
@@ -17,11 +17,20 @@ import AppHeader from '@/components/common/AppHeader.vue'
 .app-layout {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
-.app-content {
+.app-main {
   flex: 1;
-  padding: 20px 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px;
+}
+
+.app-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
 }
 </style>

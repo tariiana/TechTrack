@@ -44,8 +44,8 @@
       </div>
     </div>
 
-    <!-- ОБЁРТКА ДЛЯ ТАБЛИЦЫ -->
-    <div class="table-wrapper">
+    <!-- Таблица планов с прокруткой -->
+    <div class="table-scroll-container">
       <table class="data-table">
         <thead>
           <tr>
@@ -103,11 +103,8 @@ const sortOrder = ref<'asc' | 'desc'>('asc')
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
-  // Пробуем создать объект Date из строки
   const date = new Date(dateStr);
-  // Проверяем, что дата валидна
-  if (isNaN(date.getTime())) return dateStr; // если не распарсилось, возвращаем как есть
-
+  if (isNaN(date.getTime())) return dateStr;
   const day = date.getDate().toString().padStart(2, '0');
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const year = date.getFullYear();
@@ -126,13 +123,11 @@ function sortBy(field: 'name' | 'startDate' | 'endDate') {
 const filteredAndSortedPlans = computed(() => {
   let list = [...store.plans]
 
-  // Фильтрация по названию
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     list = list.filter((p) => p.name.toLowerCase().includes(q))
   }
 
-  // Фильтрация по диапазону дат
   if (dateFrom.value) {
     list = list.filter((p) => p.start_date >= dateFrom.value)
   }
@@ -140,7 +135,6 @@ const filteredAndSortedPlans = computed(() => {
     list = list.filter((p) => p.start_date <= dateTo.value)
   }
 
-  // Сортировка
   list.sort((a, b) => {
     let valA = a[sortField.value === 'startDate' ? 'start_date' : sortField.value === 'endDate' ? 'end_date' : sortField.value]
     let valB = b[sortField.value === 'startDate' ? 'start_date' : sortField.value === 'endDate' ? 'end_date' : sortField.value]
@@ -180,7 +174,6 @@ function refresh() {
   store.fetchPlans()
 }
 
-// Экспорт
 function getExportData() {
   return filteredAndSortedPlans.value.map((p) => ({
     'Название плана': p.name,
@@ -255,4 +248,40 @@ onUnmounted(() => {
 .filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .filter-label { font-size: 14px; color: #6c757d; }
 .sort-icon { margin-left: 5px; font-size: 12px; color: #2c5f8a; }
+
+/* Контейнер для таблицы с прокруткой */
+.table-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 500px;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  background: white;
+}
+
+.table-scroll-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #e0e4e8;
+  border-radius: 6px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #2c5f8a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #1e4566;
+}
+
+/* Стили для таблицы внутри контейнера */
+.table-scroll-container .data-table {
+  min-width: 600px;
+}
 </style>

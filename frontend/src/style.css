@@ -4,14 +4,11 @@
   padding: 0;
   box-sizing: border-box;
 }
-html, body {
-  overflow-x: hidden;
-}
 
-html,
-body {
+html, body {
   height: 100%;
   width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -20,6 +17,7 @@ body {
   color: #1a2a3a;
   font-size: 14px;
   line-height: 1.4;
+  overflow-y: auto;
 }
 
 /* ===== КОНТЕЙНЕРЫ ===== */
@@ -27,6 +25,8 @@ body {
   max-width: 1400px;
   margin: 0 auto;
   padding: 20px;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 /* ===== КАРТОЧКИ ===== */
@@ -37,20 +37,50 @@ body {
   padding: 20px;
   margin-bottom: 20px;
   border: 1px solid #e0e4e8;
+  width: 100%;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-/* ===== ОБЁРТКА ДЛЯ ТАБЛИЦ С ПРОКРУТКОЙ ===== */
-.table-wrapper {
+/* ===== ОБЁРТКА ДЛЯ ТАБЛИЦЫ (ТОЛЬКО ДЛЯ ПРОКРУТКИ) ===== */
+.table-scroll-container {
   width: 100%;
   overflow-x: auto;
-  margin: 10px 0;
+  overflow-y: auto;
+  max-height: 500px;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  background: white;
 }
 
-/* Дизайн таблицы (без изменений) */
+/* Стилизация полос прокрутки ТОЛЬКО ДЛЯ ТАБЛИЦЫ */
+.table-scroll-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #e0e4e8;
+  border-radius: 6px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #2c5f8a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #1e4566;
+}
+
+/* Дизайн таблицы */
 .data-table {
   width: 100%;
   border-collapse: collapse;
   table-layout: auto;
+  min-width: 800px;
 }
 
 .data-table th,
@@ -58,6 +88,7 @@ body {
   border: 1px solid #e0e4e8;
   padding: 10px 12px;
   text-align: left;
+  white-space: nowrap;
 }
 
 .data-table th {
@@ -223,6 +254,7 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   flex-wrap: wrap;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .logo {
@@ -271,24 +303,31 @@ body {
   display: flex;
   align-items: center;
   gap: 15px;
+  flex-shrink: 0;
 }
 
 /* ===== СТРАНИЦЫ С ДВУМЯ КОЛОНКАМИ ===== */
 .equipment-view,
-.resources-view {
+.resources-view,
+.subsystems-view {
   display: flex;
   gap: 20px;
+  width: 100%;
 }
 
 .equipment-view .sidebar,
-.resources-view .sidebar {
+.resources-view .sidebar,
+.subsystems-view .sidebar {
   width: 350px;
   flex-shrink: 0;
 }
 
 .equipment-view .main,
-.resources-view .main {
+.resources-view .main,
+.subsystems-view .main {
   flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 /* ===== ЦВЕТОВЫЕ КЛАССЫ ДЛЯ ТАБЛИЦ ===== */
@@ -363,62 +402,19 @@ body {
 
 /* ===== АДАПТАЦИЯ ДЛЯ РАЗНЫХ РАЗРЕШЕНИЙ ЭКРАНОВ ===== */
 
-/* Для экранов шире 1400px – максимум */
-@media (min-width: 1400px) {
-  .container {
-    max-width: 1400px;
-  }
-  .data-table {
-    table-layout: auto;
-  }
-}
-
-/* Для экранов 1200-1400px */
-@media (max-width: 1400px) {
-  .container {
-    max-width: 1200px;
-  }
-  .data-table th,
-  .data-table td {
-    padding: 8px 10px;
-  }
-}
-
-/* Для экранов 1000-1200px */
-@media (max-width: 1200px) {
-  .container {
-    max-width: 1000px;
-  }
-  .data-table th,
-  .data-table td {
-    padding: 6px 8px;
-    font-size: 13px;
-  }
-}
-
-/* Для экранов 900-1000px – здесь появляется прокрутка */
-@media (max-width: 1000px) {
-  .data-table {
-    min-width: 900px;
-  }
-}
-
-/* Для экранов 768-900px */
 @media (max-width: 900px) {
   .equipment-view,
-  .resources-view {
+  .resources-view,
+  .subsystems-view {
     flex-direction: column;
   }
   .equipment-view .sidebar,
-  .resources-view .sidebar {
+  .resources-view .sidebar,
+  .subsystems-view .sidebar {
     width: 100%;
-  }
-  .data-table {
-    min-width: 800px;
   }
 }
 
-/* Для планшетов 600-768px */
 @media (max-width: 768px) {
   .app-header {
     height: auto;
@@ -442,9 +438,6 @@ body {
   .action-buttons .btn {
     margin-bottom: 5px;
   }
-  .data-table {
-    min-width: 700px;
-  }
   .data-table th,
   .data-table td {
     padding: 6px 8px;
@@ -452,7 +445,6 @@ body {
   }
 }
 
-/* Для мобильных устройств 480-600px */
 @media (max-width: 600px) {
   .button-group {
     flex-direction: column;
@@ -464,17 +456,11 @@ body {
   .card {
     padding: 15px;
   }
-  .data-table {
-    min-width: 550px;
-  }
-  .data-table th,
-  .data-table td {
-    padding: 4px 6px;
-    font-size: 11px;
+  .table-scroll-container {
+    max-height: 350px;
   }
 }
 
-/* Для маленьких мобильных устройств до 480px */
 @media (max-width: 480px) {
   .container {
     padding: 10px;
@@ -482,12 +468,12 @@ body {
   .card {
     padding: 10px;
   }
-  .data-table {
-    min-width: 480px;
-  }
   .data-table th,
   .data-table td {
-    padding: 3px 4px;
-    font-size: 10px;
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+  .table-scroll-container {
+    max-height: 300px;
   }
 }

@@ -67,9 +67,9 @@
       </div>
     </div>
 
-    <!-- Таблица параметров -->
+    <!-- Таблица параметров с прокруткой -->
     <h3 style="margin-top: 20px">Параметры</h3>
-    <div class="table-wrapper" v-if="parameters.length">
+    <div class="table-scroll-container" v-if="parameters.length">
       <table class="data-table">
         <thead>
           <tr>
@@ -91,9 +91,9 @@
     </div>
     <div v-else class="empty-message">Параметры не заданы</div>
 
-    <!-- Установленные узлы и ресурсы -->
+    <!-- Установленные узлы и ресурсы с прокруткой -->
     <h3 style="margin-top: 20px">Установленные узлы и ресурсы</h3>
-    <div class="table-wrapper" v-if="children.length">
+    <div class="table-scroll-container" v-if="children.length">
       <table class="data-table">
         <thead>
           <tr>
@@ -219,4 +219,41 @@ onMounted(() => {
   text-decoration: underline;
 }
 .link-btn:hover { color: #1e4566; }
+
+/* Контейнер для таблиц с прокруткой */
+.table-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 400px;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  background: white;
+  margin: 10px 0;
+}
+
+.table-scroll-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #e0e4e8;
+  border-radius: 6px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #2c5f8a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #1e4566;
+}
+
+/* Стили для таблиц внутри контейнера */
+.table-scroll-container .data-table {
+  min-width: 600px;
+}
 </style>

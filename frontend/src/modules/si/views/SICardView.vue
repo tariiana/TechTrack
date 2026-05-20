@@ -68,11 +68,40 @@
       </div>
     </div>
 
+    <!-- История поверок с прокруткой -->
     <div style="margin-top: 20px">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px"><h3>История поверок</h3><button v-if="canEdit && instrument.status !== 'выведено'" class="btn btn-primary btn-sm" @click="openAddVerification">+ Добавить поверку</button></div>
-      <div class="table-wrapper"><table class="data-table"><thead><tr><th>Дата передачи</th><th>Дата получения</th><th>Поверитель</th><th>Результат</th><th v-if="canEdit">Действия</th></tr></thead>
-      <tbody><tr v-for="v in verifications" :key="v.id"><td>{{ formatDate(v.transferDate) }}</td><td>{{ formatDate(v.receiptDate) }}</td><td>{{ v.verifier }}</td><td :class="{ 'result-bad': v.result === 'не годен' }">{{ v.result }}</td><td v-if="canEdit"><button class="btn btn-sm btn-secondary" @click="editVerification(v)">✏️</button></td></tr>
-      <tr v-if="verifications.length === 0"><td colspan="5">Нет записей о поверках</td></tr></tbody></table></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px">
+        <h3>История поверок</h3>
+        <button v-if="canEdit && instrument.status !== 'выведено'" class="btn btn-primary btn-sm" @click="openAddVerification">+ Добавить поверку</button>
+      </div>
+      
+      <div class="table-scroll-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Дата передачи</th>
+              <th>Дата получения</th>
+              <th>Поверитель</th>
+              <th>Результат</th>
+              <th v-if="canEdit">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="v in verifications" :key="v.id">
+              <td>{{ formatDate(v.transferDate) }}</td>
+              <td>{{ formatDate(v.receiptDate) }}</td>
+              <td>{{ v.verifier }}</td>
+              <td :class="{ 'result-bad': v.result === 'не годен' }">{{ v.result }}</td>
+              <td v-if="canEdit">
+                <button class="btn btn-sm btn-secondary" @click="editVerification(v)">✏️</button>
+              </td>
+            </tr>
+            <tr v-if="verifications.length === 0">
+              <td colspan="5">Нет записей о поверках</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <SIForm ref="siFormRef" @si-saved="refresh" />
@@ -132,25 +161,70 @@ function goBack() { router.push('/si'); }
 function editInstrument() { siFormRef.value?.open(instrument.value); }
 async function writeOffInstrument() {
   const ok = await confirmDialog.value?.show('Списание', 'Списать СИ?');
-  if (ok) { await store.writeOffInstrument(instrument.value.id); router.push('/si'); }
+  if (ok) {
+    await store.writeOffInstrument(instrument.value.id);
+    router.push('/si');
+  }
 }
 function openAddVerification() { verFormRef.value?.open(instrument.value.id); }
 function editVerification(v: any) { verFormRef.value?.open(instrument.value.id, v); }
 function refresh() { loadData(); }
 
-onMounted(() => { loadData(); window.addEventListener('si-saved', refresh); window.addEventListener('verification-saved', refresh); });
+onMounted(() => {
+  loadData();
+  window.addEventListener('si-saved', refresh);
+  window.addEventListener('verification-saved', refresh);
+});
 </script>
 
 <style scoped>
-.card-detail-grid { background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
-.detail-col { display: flex; flex-direction: column; gap: 12px; }
-.detail-row { display: grid; grid-template-columns: 180px 1fr 180px 1fr; gap: 16px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid #e0e4e8; }
-.detail-row:last-child { border-bottom: none; }
-.detail-label { font-weight: 600; color: #2c3e50; font-size: 13px; }
-.detail-value { color: #1a2a3a; font-size: 13px; }
-.status-disabled { color: #999; font-style: italic; }
-.result-bad { color: #c0392b; font-weight: 500; }
-.warning-badge { background-color: #e67e22; color: white; border-radius: 4px; padding: 2px 6px; font-size: 10px; margin-left: 8px; }
+.card-detail-grid {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.detail-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.detail-row {
+  display: grid;
+  grid-template-columns: 180px 1fr 180px 1fr;
+  gap: 16px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px solid #e0e4e8;
+}
+.detail-row:last-child {
+  border-bottom: none;
+}
+.detail-label {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 13px;
+}
+.detail-value {
+  color: #1a2a3a;
+  font-size: 13px;
+}
+.status-disabled {
+  color: #999;
+  font-style: italic;
+}
+.result-bad {
+  color: #c0392b;
+  font-weight: 500;
+}
+.warning-badge {
+  background-color: #e67e22;
+  color: white;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  margin-left: 8px;
+}
 pre {
   background: #f8f9fa;
   padding: 8px;
@@ -160,5 +234,47 @@ pre {
   overflow-x: auto;
   max-width: 100%;
 }
-@media (max-width: 768px) { .detail-row { grid-template-columns: 1fr 1fr; gap: 8px; } }
+
+/* Контейнер для таблицы с прокруткой */
+.table-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 400px;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  background: white;
+}
+
+.table-scroll-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #e0e4e8;
+  border-radius: 6px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #2c5f8a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #1e4566;
+}
+
+/* Стили для таблицы внутри контейнера */
+.table-scroll-container .data-table {
+  min-width: 600px;
+}
+
+@media (max-width: 768px) {
+  .detail-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+}
 </style>

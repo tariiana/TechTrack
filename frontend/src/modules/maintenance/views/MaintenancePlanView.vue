@@ -45,8 +45,8 @@
       </div>
     </div>
 
-    <!-- Таблица задач -->
-    <div class="table-wrapper">
+    <!-- Таблица задач с прокруткой -->
+    <div class="table-scroll-container">
       <table class="data-table">
         <thead>
           <tr>
@@ -83,7 +83,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr 
+          <tr
             v-for="(task, index) in filteredAndSortedTasks" 
             :key="task.maintenance_id" 
             :class="getRowClass(task)"
@@ -190,16 +190,14 @@ const canEdit = computed(() => {
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
-  // Пробуем создать объект Date из строки
   const date = new Date(dateStr);
-  // Проверяем, что дата валидна
-  if (isNaN(date.getTime())) return dateStr; // если не распарсилось, возвращаем как есть
-
+  if (isNaN(date.getTime())) return dateStr;
   const day = date.getDate().toString().padStart(2, '0');
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const year = date.getFullYear();
   return `${day}.${month}.${year}`;
 }
+
 function getLocation(nodeId: number): string {
   const node = equipmentStore.nodes.find((n: any) => n.node_id === nodeId);
   return node?.location || node?.parent_location || '-';
@@ -215,7 +213,6 @@ function getStatusText(status: string): string {
   return statuses[status] || status;
 }
 
-// Функция для получения количества дней до/после даты истечения
 function getDaysDiff(expiryDate: string): number {
   if (!expiryDate) return Infinity;
   const today = new Date();
@@ -226,43 +223,29 @@ function getDaysDiff(expiryDate: string): number {
   return diff;
 }
 
-// Функция для получения класса строки
 function getRowClass(task: any): string {
-  // Если задача выполнена, не подсвечиваем строку
   if (task.status_name === 'completed') return '';
-  
   const daysDiff = getDaysDiff(task.expiry_date);
-  
-  // Просрочено (дата истечения в прошлом)
   if (daysDiff < 0) return 'expired-row';
-  
-  // Менее 30 дней
   if (daysDiff <= 30) return 'warning-row';
-  
   return '';
 }
 
-// Функция для получения всплывающей подсказки
 function getTooltip(task: any): string {
   if (task.status_name === 'completed') return '';
-  
   const daysDiff = getDaysDiff(task.expiry_date);
-  
   if (daysDiff < 0) {
     const overdueDays = Math.abs(daysDiff);
     const daysWord = getDaysWord(overdueDays);
     return `⚠️ Просрочено на ${overdueDays} ${daysWord}! Необходимо срочно провести ТО!`;
   }
-  
   if (daysDiff <= 30) {
     const daysWord = getDaysWord(daysDiff);
     return `⏰ До истечения срока ТО осталось ${daysDiff} ${daysWord}. Рекомендуется запланировать проведение ТО.`;
   }
-  
   return '';
 }
 
-// Склонение слова "день"
 function getDaysWord(days: number): string {
   const lastDigit = days % 10;
   const lastTwoDigits = days % 100;
@@ -355,7 +338,6 @@ async function deleteTask(id: number) {
 }
 function refresh() { loadData(); }
 
-// Экспорт
 function getTasksExportData() {
   return filteredAndSortedTasks.value.map((t, idx) => ({
     '№ п/п': idx + 1,
@@ -493,5 +475,41 @@ onUnmounted(() => {
   margin-left: 5px;
   font-size: 12px;
   color: #2c5f8a;
+}
+
+/* Контейнер для таблицы с прокруткой */
+.table-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 500px;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  background: white;
+}
+
+.table-scroll-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #e0e4e8;
+  border-radius: 6px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #2c5f8a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #1e4566;
+}
+
+/* Стили для таблицы внутри контейнера */
+.table-scroll-container .data-table {
+  min-width: 800px;
 }
 </style>
