@@ -14,16 +14,23 @@
     </nav>
     <div class="user-info">
       <span class="user-name">{{ userName }}</span>
-      <button class="btn btn-sm btn-secondary" @click="logout">Выйти</button>
+      <button class="btn btn-sm btn-secondary" @click="confirmLogout">Выйти</button>
     </div>
+    
+    <ConfirmDialog ref="confirmDialog" />
   </header>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
+import ConfirmDialog from './ConfirmDialog.vue'
+import { showToast } from '@/utils/toast'
 
 const router = useRouter()
+const authStore = useAuthStore()
+const confirmDialog = ref()
 const userName = ref('')
 const userRole = ref('')
 
@@ -42,9 +49,15 @@ const goToHome = () => {
   router.push('/')
 }
 
-const logout = () => {
-  localStorage.removeItem('user')
-  router.push('/login')
+const confirmLogout = async () => {
+  const confirmed = await confirmDialog.value?.show('Выход из системы', 'Вы уверены, что хотите выйти?')
+  if (confirmed) {
+    authStore.logout()
+    showToast('До свидания!', 'success')
+    setTimeout(() => {
+      router.push('/login')
+    }, 500)
+  }
 }
 </script>
 
@@ -59,7 +72,6 @@ const logout = () => {
   padding: 0 20px;
   gap: 15px;
   flex-wrap: wrap;
-  /* Убираем фиксированную высоту */
   min-height: 56px;
   height: auto;
 }
@@ -120,7 +132,6 @@ const logout = () => {
   white-space: nowrap;
 }
 
-/* Адаптация для узких экранов */
 @media (max-width: 900px) {
   .app-header {
     flex-direction: column;
@@ -128,17 +139,14 @@ const logout = () => {
     padding: 12px 20px;
     gap: 12px;
   }
-
   .logo {
     width: 100%;
     justify-content: center;
   }
-
   .nav-menu {
     width: 100%;
     justify-content: center;
   }
-
   .user-info {
     width: 100%;
     justify-content: center;
@@ -149,40 +157,18 @@ const logout = () => {
   .app-header {
     padding: 10px 16px;
   }
-
   .logo-text {
     font-size: 16px;
   }
-
   .logo-icon {
     height: 28px;
   }
-
   .nav-menu a {
     padding: 6px 10px;
     font-size: 12px;
   }
-
   .user-name {
     font-size: 12px;
-  }
-
-  .btn-sm {
-    padding: 4px 8px;
-    font-size: 11px;
-  }
-}
-
-@media (max-width: 450px) {
-  .nav-menu {
-    gap: 6px;
-  }
-
-  .nav-menu a {
-    padding: 5px 8px;
-    font-size: 11px;
-    white-space: normal;
-    text-align: center;
   }
 }
 </style>

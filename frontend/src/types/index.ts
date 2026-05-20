@@ -7,7 +7,7 @@ export interface Verification {
   result: 'годен' | 'не годен'
   notes?: string
 }
-export type InstrumentStatus = 'в эксплуатации' | 'на поверке' | 'выведено'
+export type InstrumentStatus = 'в эксплуатации' | 'на поверке' | 'в ремонте' | 'выведено';
 export interface MeasuringInstrument {
   id: number
   tabulNumber: string // Табульный номер
