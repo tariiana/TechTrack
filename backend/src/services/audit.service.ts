@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import { query } from '../config/db.js';
 
 export async function getAuditLog(filters?: {
   user_id?: string;

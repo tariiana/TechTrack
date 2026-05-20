@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import { query } from '../config/db.js';
 import bcrypt from 'bcrypt';
 import { auditLog } from '../middleware/audit.js';
 

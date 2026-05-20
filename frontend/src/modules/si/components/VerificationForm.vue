@@ -1,16 +1,16 @@
 <template>
   <div class="modal-overlay" v-if="visible">
-    <div class="modal-content">
+    <div class="modal-content" style="width: 500px">
       <div class="modal-header">{{ editId ? 'Редактирование поверки' : 'Добавление поверки' }}</div>
 
       <div class="form-group">
         <label>Дата передачи*</label>
-        <input type="date" v-model="form.transferDate" class="form-control" @change="validateDates" />
+        <input type="date" v-model="form.transferDate" class="form-control" />
       </div>
 
       <div class="form-group">
         <label>Дата получения*</label>
-        <input type="date" v-model="form.receiptDate" class="form-control" @change="validateDates" />
+        <input type="date" v-model="form.receiptDate" class="form-control" />
       </div>
 
       <div class="form-group">
@@ -20,9 +20,7 @@
             <option value="">-- Выберите поверителя --</option>
             <option v-for="ver in verifierOptions" :key="ver" :value="ver">{{ ver }}</option>
           </select>
-          <button type="button" class="btn btn-secondary btn-sm" @click="openAddVerifierModal">
-            + Добавить
-          </button>
+          <button type="button" class="btn btn-secondary btn-sm" @click="openAddVerifierModal">+ Добавить</button>
         </div>
       </div>
 
@@ -34,7 +32,11 @@
         </select>
       </div>
 
-      <div v-if="dateError" class="error-text">{{ dateError }}</div>
+      <div class="form-group">
+        <label>Примечание</label>
+        <textarea v-model="form.notes" rows="2" class="form-control"></textarea>
+      </div>
+
       <div v-if="error" class="error-text">{{ error }}</div>
 
       <div class="modal-footer">
@@ -44,6 +46,7 @@
     </div>
   </div>
 
+  <!-- Модалка добавления нового поверителя -->
   <div class="modal-overlay" v-if="showVerifierModal">
     <div class="modal-content" style="width: 400px">
       <div class="modal-header">Добавление поверителя</div>
@@ -66,17 +69,28 @@ import { useSIStore } from '../stores/siStore'
 import type { Verification } from '../types/siTypes'
 
 const store = useSIStore()
+const emit = defineEmits(['verification-saved'])
+
 const visible = ref(false)
-const siId = ref<string | null>(null)   // изменено на string
+const instrumentId = ref<string | null>(null)
 const editId = ref<number | null>(null)
 const error = ref('')
-const dateError = ref('')
 
+// Список поверителей (храним в localStorage)
 const verifierOptions = ref<string[]>([])
 const showVerifierModal = ref(false)
 const newVerifier = ref('')
 const verifierError = ref('')
 
+const form = reactive({
+  transferDate: '',
+  receiptDate: '',
+  verifier: '',
+  result: 'годен' as 'годен' | 'не годен',
+  notes: '',
+})
+
+// Загрузка списка поверителей
 function loadVerifiers() {
   const saved = localStorage.getItem('si_verifiers')
   if (saved) {
@@ -117,46 +131,28 @@ function addNewVerifier() {
   closeVerifierModal()
 }
 
-const form = reactive({
-  transferDate: '',
-  receiptDate: '',
-  verifier: '',
-  result: 'годен' as 'годен' | 'не годен',
-})
-
-function validateDates(): boolean {
-  dateError.value = ''
-  if (!form.transferDate || !form.receiptDate) return true
-  const transfer = new Date(form.transferDate)
-  const receipt = new Date(form.receiptDate)
-  if (receipt < transfer) {
-    dateError.value = 'Дата получения не может быть раньше даты передачи'
-    return false
-  }
-  return true
-}
-
 function reset() {
   form.transferDate = ''
   form.receiptDate = ''
   form.verifier = ''
   form.result = 'годен'
+  form.notes = ''
   error.value = ''
-  dateError.value = ''
-  siId.value = null
   editId.value = null
+  instrumentId.value = null
 }
 
-function open(instrumentId: string, existing?: Verification) {
+function open(instrId: string, existing?: Verification) {
   reset()
   loadVerifiers()
-  siId.value = instrumentId
+  instrumentId.value = instrId
   if (existing) {
     editId.value = existing.id
     form.transferDate = existing.transferDate
     form.receiptDate = existing.receiptDate
     form.verifier = existing.verifier
     form.result = existing.result
+    form.notes = existing.notes || ''
   }
   visible.value = true
 }
@@ -178,27 +174,50 @@ async function save() {
     error.value = 'Укажите поверителя'
     return
   }
-  if (!validateDates()) return
 
-  if (editId.value) {
-    error.value = 'Редактирование поверки пока недоступно. Удалите и добавьте заново.'
-    return
-  } else {
-    try {
+  const payload = {
+    transferDate: form.transferDate,
+    receiptDate: form.receiptDate,
+    verifier: form.verifier,
+    result: form.result,
+    notes: form.notes,
+  }
+
+  try {
+    if (editId.value && instrumentId.value) {
+      // Редактирование поверки (если реализовано в бэкенде)
+      error.value = 'Редактирование поверки пока недоступно. Удалите и добавьте заново.'
+      return
+    } else if (instrumentId.value) {
       await store.addVerification({
-        siId: siId.value,
+        siId: instrumentId.value,
         transferDate: form.transferDate,
         receiptDate: form.receiptDate,
         verifier: form.verifier,
         result: form.result,
+        notes: form.notes,
       })
+      emit('verification-saved')
       close()
-      window.dispatchEvent(new Event('verification-saved'))
-    } catch (err: any) {
-      error.value = err.message || 'Ошибка добавления поверки'
     }
+  } catch (err: any) {
+    error.value = err.message || 'Ошибка добавления поверки'
   }
 }
 
 defineExpose({ open })
 </script>
+
+<style scoped>
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 15px;
+}
+.error-text {
+  color: #c0392b;
+  font-size: 12px;
+  margin-top: 8px;
+}
+</style>

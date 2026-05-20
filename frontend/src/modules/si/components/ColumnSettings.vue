@@ -45,7 +45,7 @@ const allColumns = [
   { key: 'nextVerificationDate', label: 'Следующая поверка' },
   { key: 'verificationInterval', label: 'Межповерочный интервал' },
   { key: 'location', label: 'Размещение' },
-  { key: 'notes', label: 'Примечание' },
+  { key: 'note', label: 'Примечание' },           // было 'notes', исправлено
 ]
 
 const visible = ref(false)
@@ -53,6 +53,7 @@ const localVisibility = reactive<Record<string, boolean>>({})
 const editableOrder = ref<typeof allColumns>([])
 
 function loadSettings() {
+  // Загружаем видимость
   const saved = localStorage.getItem(STORAGE_KEY)
   if (saved) {
     const parsed = JSON.parse(saved)
@@ -65,21 +66,28 @@ function loadSettings() {
     }
   }
 
+  // Загружаем порядок
   const savedOrder = localStorage.getItem(STORAGE_ORDER_KEY)
   if (savedOrder) {
-    const orderKeys: string[] = JSON.parse(savedOrder)
+    const orderKeys = JSON.parse(savedOrder)
     editableOrder.value = orderKeys
-      .map((key) => allColumns.find((c) => c.key === key))
-      .filter((c): c is (typeof allColumns)[0] => c !== undefined)
+      .map((key: string) => allColumns.find(c => c.key === key))
+      .filter(Boolean)
   } else {
     editableOrder.value = [...allColumns]
   }
 }
 
 function save() {
-  const orderToSave = editableOrder.value.map((c) => c.key)
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(localVisibility))
+  const visibilityToSave: Record<string, boolean> = {}
+  for (const col of allColumns) {
+    visibilityToSave[col.key] = localVisibility[col.key] ?? true
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(visibilityToSave))
+  
+  const orderToSave = editableOrder.value.map(c => c.key)
   localStorage.setItem(STORAGE_ORDER_KEY, JSON.stringify(orderToSave))
+  
   visible.value = false
   window.dispatchEvent(new Event('column-settings-changed'))
 }

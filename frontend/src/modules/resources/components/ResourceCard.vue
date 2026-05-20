@@ -82,7 +82,7 @@
     </div>
 
     <ResourceForm ref="formRef" @saved="refresh" />
-    <ResourceParameters ref="parametersRef" :resource-id="resource.resource_id" @refresh="loadData" />
+    <ResourceParameters ref="parametersRef" :resource-id="resource.node_id" @refresh="loadData" />
     <ConfirmDialog ref="confirmDialog" />
   </div>
   <div v-else class="card">Загрузка...</div>
@@ -136,7 +136,8 @@ const alerts = computed(() => {
 });
 
 async function loadData() {
-  const id = Number(route.params.id);
+  const id = route.params.id as string;
+   resource.value = await store.fetchResourceById(id);
   try {
     resource.value = await store.fetchResourceById(id);
     await loadParameters();
@@ -177,8 +178,7 @@ function editResource() { formRef.value?.open(resource.value); }
 async function deleteResource() {
   const ok = await confirmDialog.value?.show('Удаление', 'Удалить ресурс?');
   if (ok) {
-    await store.deleteResource(resource.value.resource_id);
-    router.back();
+    await store.deleteResource(resource.value.node_id);
   }
 }
 function refresh() { loadData(); }

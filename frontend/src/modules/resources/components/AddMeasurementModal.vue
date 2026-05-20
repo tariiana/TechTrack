@@ -60,6 +60,7 @@ const error = ref('');
 const resources = ref<any[]>([]);
 const currentResource = ref<any>(null);
 const currentResourceParams = ref<Record<string, number>>({});
+const resourceId = String(selectedResourceId.value);
 
 const form = reactive({
   measurementDate: '',
@@ -80,7 +81,7 @@ async function loadResources() {
 
 async function loadResourceParams(resourceId: number) {
   try {
-    const fullResource = await store.fetchResourceById(resourceId);
+    const fullResource = await store.fetchResourceById(String(resourceId));
     currentResource.value = fullResource;
     const params = fullResource.resource_params || {};
     // Извлекаем текущие значения параметров (игнорируем служебные поля)
@@ -155,7 +156,7 @@ async function save() {
     return;
   }
 
-  const resourceId = selectedResourceId.value;
+  const resourceId = String(selectedResourceId.value);
   const newMeasurement = {
     measurement_date: form.measurementDate,
     parameters: { ...currentResourceParams.value },
@@ -177,11 +178,32 @@ async function save() {
     }
 
     const updatedParams = {
-      ...currentResourceParams.value,
+      ...params,
       measurements: measurements,
     };
 
-    await store.updateResource(resourceId, { resource_params: updatedParams });
+    // ⚠️ СТАРЫЙ ВЫЗОВ (удаляем):
+    // await store.updateResource(resourceId, { resource_params: updatedParams });
+    
+    // ✅ НОВЫЙ КОД (вставляем):
+    const resource = await store.fetchResourceById(resourceId);
+    const payload = {
+      name: resource.name,
+      mark: resource.mark,
+      type: resource.type,
+      production_date: resource.production_date,
+      registration_number: resource.registration_number,
+      service_life: resource.service_life,
+      time_to_service: resource.time_to_service,
+      initial_resource: resource.initial_resource,
+      remaining_resource: resource.remaining_resource,
+      installed_in: resource.installed_in,
+      location: resource.location,
+      note: resource.note,
+      resource_params: updatedParams,
+    };
+    await store.upsertResource(resourceId, payload);
+
     close();
     window.dispatchEvent(new Event('resource-saved'));
   } catch (err: any) {

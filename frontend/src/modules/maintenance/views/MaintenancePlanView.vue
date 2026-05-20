@@ -188,12 +188,18 @@ const canEdit = computed(() => {
   return role === 'operator' || role === 'admin';
 });
 
-function formatDate(dateStr: string): string {
+function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  return `${parts[2]}.${parts[1]}.${parts[0]}`;
-}
+  // Пробуем создать объект Date из строки
+  const date = new Date(dateStr);
+  // Проверяем, что дата валидна
+  if (isNaN(date.getTime())) return dateStr; // если не распарсилось, возвращаем как есть
 
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}.${month}.${year}`;
+}
 function getLocation(nodeId: number): string {
   const node = equipmentStore.nodes.find((n: any) => n.node_id === nodeId);
   return node?.location || node?.parent_location || '-';

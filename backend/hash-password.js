@@ -10,7 +10,7 @@ const pool = new Pool({
 });
 
 async function hashAndUpdate() {
-  const password = 'operator123';
+  const password = 'admin123';
   const saltRounds = 10;
   const hash = await bcrypt.hash(password, saltRounds);
   
@@ -18,7 +18,7 @@ async function hashAndUpdate() {
   
   // Обновить пароль администратора
   await pool.query(
-    `UPDATE equipment.users SET password_hash = $1 WHERE login = 'operator'`,
+    `UPDATE equipment.users SET password_hash = $1 WHERE login = 'admin'`,
     [hash]
   );
   

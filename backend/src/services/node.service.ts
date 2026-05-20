@@ -1,4 +1,4 @@
-import { query, getClient } from '../config/database.js';
+import { query, getClient } from '../config/db.js';
 import { auditLog } from '../middleware/audit.js';
 
 export async function getAllNodes(filters?: { subsystem_id?: string; node_type_id?: string; status?: string; search?: string }) {

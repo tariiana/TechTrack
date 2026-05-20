@@ -24,43 +24,46 @@ export const useEquipmentStore = defineStore('equipment', () => {
   });
 
   async function fetchNodes() {
-    isLoading.value = true;
-    error.value = null;
-    try {
-      const params = new URLSearchParams();
-      if (filterParams.value.search) params.append('search', filterParams.value.search);
-      if (filterParams.value.status) params.append('status', filterParams.value.status);
-      if (filterParams.value.subsystem_id) params.append('subsystem_id', filterParams.value.subsystem_id);
-      if (filterParams.value.node_type_id) params.append('node_type_id', filterParams.value.node_type_id);
-      const query = params.toString() ? `?${params.toString()}` : '';
-      const data = await apiFetch(`/nodes${query}`);
-      nodes.value = data;
-    } catch (err: any) {
-      error.value = err.message;
-    } finally {
-      isLoading.value = false;
-    }
+  isLoading.value = true;
+  error.value = null;
+  try {
+    const params = new URLSearchParams();
+    if (filterParams.value.search) params.append('search', filterParams.value.search);
+    if (filterParams.value.status) params.append('status', filterParams.value.status);
+    if (filterParams.value.subsystem_id) params.append('subsystem_id', filterParams.value.subsystem_id);
+    if (filterParams.value.node_type_id) params.append('node_type_id', filterParams.value.node_type_id);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const response = await apiFetch(`/nodes${query}`);
+    // Бэкенд возвращает { success: true, data: [...] }
+    nodes.value = response.data || response;  // ← исправлено
+  } catch (err: any) {
+    error.value = err.message;
+  } finally {
+    isLoading.value = false;
   }
+}
 
   async function fetchTree() {
     try {
-      const data = await apiFetch('/nodes/tree');
-      tree.value = data;
+      const response = await apiFetch('/nodes/tree');
+      tree.value = response.data || response;;
     } catch (err: any) {
       console.error(err);
     }
   }
 
-  async function fetchNodeById(id: string) {
-    return await apiFetch(`/nodes/${id}`);
-  }
-
+ async function fetchNodeById(id: string) {
+  const response = await apiFetch(`/nodes/${id}`);
+  return response.data || response;
+}
   async function fetchNodeChildren(id: string) {
-    return await apiFetch(`/nodes/${id}/children`);
+    const response = await apiFetch(`/nodes/${id}/children`);
+    return response.data || response;
   }
 
   async function fetchMovementHistory(id: string) {
-    return await apiFetch(`/nodes/${id}/movement-history`);
+    const response = await apiFetch(`/nodes/${id}/movement-history`);
+    return response.data || response;
   }
 
   async function createNode(nodeData: any) {

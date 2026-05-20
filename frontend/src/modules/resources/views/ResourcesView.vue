@@ -150,11 +150,14 @@ function openForm() { formRef.value?.open(); }
 function editResource(res: any) { formRef.value?.open(res); }
 function openCalculateModal() { calcModalRef.value?.open(); }
 function openMeasurementsModal() { measurementsModalRef.value?.open(); }
-async function deleteResource(id: number) {
+async function deleteResource(id: string) {
   const ok = await confirmDialog.value?.show('Удаление', 'Удалить ресурс?');
   if (ok) await store.deleteResource(id);
 }
-function viewCard(id: number) { router.push(`/resources/${id}`); }
+
+function viewCard(id: string) {
+  router.push(`/resources/${id}`);
+}
 function refresh() { applyFilters(); }
 function onCalculated(result: { count: number }) {
   alert(`Рассчитано ресурсов: ${result.count}`);

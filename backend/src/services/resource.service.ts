@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import { query } from '../config/db.js';
 import { auditLog } from '../middleware/audit.js';
 
 export async function getAllResources(filters?: { node_id?: string; search?: string }) {

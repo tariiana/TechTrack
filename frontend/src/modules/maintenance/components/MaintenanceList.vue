@@ -110,20 +110,25 @@ const dropdownOpen = ref(false)
 // Сортировка
 const sortField = ref<'name' | 'startDate' | 'endDate'>('startDate')
 const sortOrder = ref<'asc' | 'desc'>('asc')
-
-function formatDate(dateStr: string): string {
-  if (!dateStr) return ''
-  const parts = dateStr.split('-')
-  return `${parts[2]}.${parts[1]}.${parts[0]}`
-}
-
 function sortBy(field: 'name' | 'startDate' | 'endDate') {
   if (sortField.value === field) {
-    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
   } else {
-    sortField.value = field
-    sortOrder.value = 'asc'
+    sortField.value = field;
+    sortOrder.value = 'asc';
   }
+}
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  // Пробуем создать объект Date из строки
+  const date = new Date(dateStr);
+  // Проверяем, что дата валидна
+  if (isNaN(date.getTime())) return dateStr; // если не распарсилось, возвращаем как есть
+
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}.${month}.${year}`;
 }
 
 const filteredAndSortedPlans = computed(() => {

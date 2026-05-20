@@ -44,7 +44,7 @@ const routes = [
       { path: '', component: HomeView },
       // Модуль СИ
       { path: 'si', component: SIView },
-      { path: 'si/:id', component: SICardView },
+      { path: '/si/:id', name: 'SICard', component: () => import('@/modules/si/views/SICardView.vue') },
       // Модуль Оборудование
       { path: 'equipment', component: EquipmentView },
       { path: 'equipment/:id', component: EquipmentCardView },
@@ -58,9 +58,9 @@ const routes = [
       { path: 'subsystems/:id', component: SubsystemsView }, // для карточки подсистемы
       { path: 'subsystems/plan/:id', component: PlanView },
       {
-        path: 'subsystems',
-        component: SubsystemsView,
-        children: [{ path: ':id', component: SubsystemCard }],
+          path: '/subsystems/:id',
+          name: 'SubsystemCard',
+          component: () => import('@/modules/subsystems/components/SubsystemCard.vue'),
       },
     ],
   },

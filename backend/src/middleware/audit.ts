@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { query } from '../config/database.js';
+import { query } from '../config/db.js';
 import { AuthenticatedRequest } from '../types/index.js';
 
 export async function auditLog(

@@ -190,7 +190,7 @@ async function loadMeasurements() {
     for (const m of measurementsList) {
       allMeasurements.push({
         id: m.id,
-        resourceId: res.resource_id,
+        resourceId: res.node_id,   // ← добавить
         resourceName: res.name,
         mark: res.mark,
         registrationNumber: res.registration_number,
@@ -216,17 +216,57 @@ async function confirmDeleteMeasurement(id: number) {
     await deleteMeasurement(id);
   }
 }
-async function deleteMeasurement(id: number) {
-  for (const res of store.resources) {
-    const measurementsList = res.resource_params?.measurements || [];
-    const index = measurementsList.findIndex((m: any) => m.id === id);
-    if (index !== -1) {
-      measurementsList.splice(index, 1);
-      await store.updateResource(res.resource_id, { resource_params: { ...res.resource_params, measurements: measurementsList } });
-      break;
-    }
+async function deleteMeasurement(measurementId: number) {
+  const ok = await confirmDialog.value?.show('Удаление', 'Удалить измерение?');
+  if (!ok) return;
+
+  // Находим измерение по id
+  const measurement = measurements.value.find(m => m.id === measurementId);
+  if (!measurement) {
+    console.error('Измерение не найдено');
+    return;
   }
-  await loadMeasurements();
+
+  // resourceId – это node_id ресурса, который мы должны были сохранить при загрузке
+  const resourceId = measurement.resourceId;
+  if (!resourceId) {
+    console.error('resourceId не найден в измерении');
+    return;
+  }
+
+  try {
+    // Загружаем текущий ресурс
+    const resource = await store.fetchResourceById(resourceId);
+    const params = resource.resource_params || {};
+    let measurementsList = params.measurements || [];
+
+    // Удаляем измерение
+    measurementsList = measurementsList.filter((m: any) => m.id !== measurementId);
+
+    const updatedParams = { ...params, measurements: measurementsList };
+
+    // Формируем полный payload для upsertResource
+    const payload = {
+      name: resource.name,
+      mark: resource.mark,
+      type: resource.type,
+      production_date: resource.production_date,
+      registration_number: resource.registration_number,
+      service_life: resource.service_life,
+      time_to_service: resource.time_to_service,
+      initial_resource: resource.initial_resource,
+      remaining_resource: resource.remaining_resource,
+      installed_in: resource.installed_in,
+      location: resource.location,
+      note: resource.note,
+      resource_params: updatedParams,
+    };
+
+    await store.upsertResource(resourceId, payload);
+    await loadMeasurements(); // обновляем список измерений
+  } catch (err) {
+    console.error('Ошибка удаления измерения:', err);
+  }
 }
 function refresh() { loadMeasurements(); }
 function applyFilters() {}

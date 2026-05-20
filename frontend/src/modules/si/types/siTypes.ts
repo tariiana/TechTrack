@@ -1,4 +1,4 @@
-export type InstrumentStatus = 'в эксплуатации' | 'на поверке' | 'в ремонте' | 'выведено'
+import type { InstrumentStatus } from "@/types"
 
 export interface MeasuringInstrument {
   id: number

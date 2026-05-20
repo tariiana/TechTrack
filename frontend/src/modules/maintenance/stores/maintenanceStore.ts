@@ -6,30 +6,32 @@ export const useMaintenanceStore = defineStore('maintenance', () => {
   const plans = ref<any[]>([]);
   const tasks = ref<any[]>([]);
   const isLoading = ref(false);
-
+  
   async function fetchPlans() {
     isLoading.value = true;
     try {
-      plans.value = await apiFetch('/maintenance/plans');
+      const response = await apiFetch('/maintenance/plans');
+      plans.value = response.data || response;
     } finally {
       isLoading.value = false;
     }
   }
 
   async function fetchPlanById(id: string) {
-    return await apiFetch(`/maintenance/plans/${id}`);
+    const response = await apiFetch(`/maintenance/plans/${id}`);
+    return response.data || response;
   }
 
   async function createPlan(data: any) {
-    const newPlan = await apiFetch('/maintenance/plans', { method: 'POST', body: JSON.stringify(data) });
+    const response = await apiFetch('/maintenance/plans', { method: 'POST', body: JSON.stringify(data) });
     await fetchPlans();
-    return newPlan;
+    return response.data || response;
   }
 
   async function updatePlan(id: string, data: any) {
-    const updated = await apiFetch(`/maintenance/plans/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    const response = await apiFetch(`/maintenance/plans/${id}`, { method: 'PUT', body: JSON.stringify(data) });
     await fetchPlans();
-    return updated;
+    return response.data || response;
   }
 
   async function deletePlan(id: string) {

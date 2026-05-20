@@ -83,7 +83,7 @@ import { useResourcesStore } from '../stores/resourcesStore';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 
 const props = defineProps<{
-  resourceId: number;
+  resourceId: string;  // теперь строка (UUID)
 }>();
 
 const emit = defineEmits(['refresh']);
@@ -199,36 +199,50 @@ async function saveParam() {
   if (!validateParam()) return;
   
   try {
+    // Получаем текущий ресурс целиком
     const resource = await store.fetchResourceById(props.resourceId);
+    if (!resource) throw new Error('Ресурс не найден');
+    
+    // Копируем текущие resource_params
     const currentParams = resource.resource_params || {};
+    const { measurements, ...cleanParams } = currentParams; // measurements не трогаем
     
-    // Удаляем measurements из параметров, если они есть
-    const { measurements, ...cleanParams } = currentParams;
-    
-    const newParams = { ...cleanParams };
     const paramName = paramForm.value.name;
+    const newValue = {
+      value: paramForm.value.value,
+      unit: paramForm.value.unit,
+      is_main: paramForm.value.is_main,
+    };
     
     if (isEditParam.value && editParamKey.value) {
-      // Если имя изменилось, удаляем старый ключ
+      // Удаляем старый ключ, если имя изменилось
       if (editParamKey.value !== paramName) {
-        delete newParams[editParamKey.value];
+        delete cleanParams[editParamKey.value];
       }
-      // Добавляем/обновляем параметр с новым именем
-      newParams[paramName] = {
-        value: paramForm.value.value,
-        unit: paramForm.value.unit,
-        is_main: paramForm.value.is_main,
-      };
+      cleanParams[paramName] = newValue;
     } else {
-      // Добавляем новый параметр
-      newParams[paramName] = {
-        value: paramForm.value.value,
-        unit: paramForm.value.unit,
-        is_main: paramForm.value.is_main,
-      };
+      cleanParams[paramName] = newValue;
     }
     
-    await store.updateResource(props.resourceId, { resource_params: newParams });
+    // Теперь нужно обновить ресурс, передав все поля (name, mark, initial_resource и т.д.)
+    // Формируем payload для upsertResource
+    const payload = {
+      name: resource.name,
+      mark: resource.mark,
+      type: resource.type,
+      production_date: resource.production_date,
+      registration_number: resource.registration_number,
+      service_life: resource.service_life,
+      time_to_service: resource.time_to_service,
+      initial_resource: resource.initial_resource,
+      remaining_resource: resource.remaining_resource,
+      installed_in: resource.installed_in,
+      location: resource.location,
+      note: resource.note,
+      resource_params: cleanParams,
+    };
+    
+    await store.upsertResource(props.resourceId, payload);
     closeParamModal();
     await loadParameters();
     emit('refresh');
@@ -253,7 +267,7 @@ async function deleteParam(parameterId: string) {
     // Удаляем параметр по ключу
     delete cleanParams[parameterId];
     
-    await store.updateResource(props.resourceId, { resource_params: cleanParams });
+    await store.upsertResource(props.resourceId, { resource_params: cleanParams });
     await loadParameters();
     emit('refresh');
   } catch (err: any) {

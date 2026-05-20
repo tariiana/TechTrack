@@ -15,8 +15,8 @@ export const useResourcesStore = defineStore('resources', () => {
       if (filters?.node_id) params.append('node_id', filters.node_id);
       if (filters?.search) params.append('search', filters.search);
       const query = params.toString() ? `?${params.toString()}` : '';
-      const data = await apiFetch(`/resources${query}`);
-      resources.value = data;
+      const response = await apiFetch(`/resources${query}`);
+      resources.value = response.data || response;
     } catch (err: any) {
       error.value = err.message;
     } finally {
@@ -24,36 +24,39 @@ export const useResourcesStore = defineStore('resources', () => {
     }
   }
 
-  async function fetchResourceById(id: number) {
-    return await apiFetch(`/resources/${id}`);
+  async function fetchResourceById(id: string) {
+    const response = await apiFetch(`/resources/${id}`);
+    return response.data || response;
   }
 
-  async function fetchResourcesForNode(nodeId: number) {
-    return await apiFetch(`/resources/by-node/${nodeId}`);
+  // Получить ресурсы для конкретного узла (используется в карточке оборудования)
+  async function fetchResourcesForNode(nodeId: string) {
+    return await fetchResources({ node_id: nodeId });
   }
 
-  async function createResource(data: any) {
-    const newItem = await apiFetch('/resources', { method: 'POST', body: JSON.stringify(data) });
-    await fetchResources();
-    return newItem;
-  }
-
-  async function updateResource(id: number, data: any) {
-    const updated = await apiFetch(`/resources/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-    await fetchResources();
-    return updated;
-  }
-
-  async function deleteResource(id: number) {
-    await apiFetch(`/resources/${id}`, { method: 'DELETE' });
-    await fetchResources();
-  }
-
-  async function calculateResource(id: number, workHoursPerYear: number) {
-    return await apiFetch(`/resources/${id}/calculate`, {
+  // Создать или обновить ресурс (upsert)
+  async function upsertResource(nodeId: string, data: any) {
+    const response = await apiFetch(`/resources/${nodeId}`, {
       method: 'POST',
-      body: JSON.stringify({ work_hours_per_year: workHoursPerYear }),
+      body: JSON.stringify(data)
     });
+    await fetchResources(); // обновляем список
+    return response.data || response;
+  }
+
+  // Удалить ресурс
+  async function deleteResource(nodeId: string) {
+    await apiFetch(`/resources/${nodeId}`, { method: 'DELETE' });
+    await fetchResources();
+  }
+
+  // Расчёт ресурса
+  async function calculateResource(nodeId: string, workHoursPerYear: number) {
+    const response = await apiFetch(`/resources/${nodeId}/calculate`, {
+      method: 'POST',
+      body: JSON.stringify({ work_hours_per_year: workHoursPerYear })
+    });
+    return response.data || response;
   }
 
   return {
@@ -63,8 +66,7 @@ export const useResourcesStore = defineStore('resources', () => {
     fetchResources,
     fetchResourceById,
     fetchResourcesForNode,
-    createResource,
-    updateResource,
+    upsertResource,
     deleteResource,
     calculateResource,
   };

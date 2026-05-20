@@ -4,10 +4,9 @@
   "description": "API для системы учета оборудования",
   "main": "server.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js"
-  },
+    "dev": "nodemon server.js",
+    "start": "node server.js"
+},
   "dependencies": {
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",

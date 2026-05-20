@@ -4,7 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-const { pool, initDatabase } = require('./src/config/database');
+const { pool, initDatabase } = require('./src/config/db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -47,13 +47,23 @@ app.use(async (req, res, next) => {
 });
 
 // Маршруты API
-app.use('/api', require('./src/routes/index'));
+//app.use('/api', require('./src/routes/index'));
+app.use('/api/auth', require('./src/routes/auth.routes'));
+// Маршрут для СИ (средств измерений)
+app.use('/api/instruments', require('./src/routes/instruments.routes'));
+// Маршрут для Обслуживания
+app.use('/api/maintenance', require('./src/routes/maintenance.routes'));
+
+app.use('/api/nodes', require('./src/routes/nodes.routes'));
+app.use('/api/subsystems', require('./src/routes/subsystems.routes'));
+app.use('/api/node-types', require('./src/routes/nodeTypes.routes'));
+app.use('/api/resources', require('./src/routes/resources.routes'));
+app.use('/api/users', require('./src/routes/users.routes'));
 
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
-
 app.get('/test', (req, res) => {
     res.json({ message: 'Backend is working!' });
 });

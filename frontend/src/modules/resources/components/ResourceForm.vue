@@ -163,56 +163,6 @@ function validate(): boolean {
   return isValid;
 }
 
-function open(resource?: any) {
-  reset();
-  loadNodes();
-  const today = getCurrentDate();
-
-  if (resource) {
-    isEdit.value = true;
-    editId.value = resource.resource_id;
-    form.name = resource.name || '';
-    form.mark = resource.mark || '';
-    form.type = resource.type || '';
-    form.production_date = resource.production_date || '';
-    form.node_id = resource.node_id;
-    form.registration_number = resource.registration_number || null;
-    form.service_life = resource.service_life || null;
-    form.time_to_service = resource.time_to_service || null;
-    form.initial_resource = resource.initial_resource || null;
-    form.remaining_resource = resource.remaining_resource || null;
-    form.installed_in = resource.installed_in || '';
-    form.location = resource.location || '';
-    form.note = resource.note || '';
-    paramsStr.value = JSON.stringify(resource.resource_params || {}, null, 2);
-  } else {
-    form.name = '';
-    form.mark = '';
-    form.type = '';
-    form.production_date = '';
-    form.node_id = null;
-    form.registration_number = null;
-    form.service_life = null;
-    form.time_to_service = null;
-    form.initial_resource = null;
-    form.remaining_resource = null;
-    form.installed_in = '';
-    form.location = '';
-    form.note = '';
-    paramsStr.value = '{}';
-  }
-  visible.value = true;
-}
-
-function reset() {
-  isEdit.value = false;
-  editId.value = null;
-}
-
-function close() {
-  visible.value = false;
-}
-
 async function save() {
   if (!validate()) return;
 
@@ -224,12 +174,12 @@ async function save() {
     return;
   }
 
-  const data = {
+  // Собираем все поля в resource_params
+  const payload = {
     name: form.name,
     mark: form.mark,
     type: form.type,
     production_date: form.production_date,
-    node_id: form.node_id,
     registration_number: form.registration_number,
     service_life: form.service_life,
     time_to_service: form.time_to_service,
@@ -237,22 +187,55 @@ async function save() {
     remaining_resource: form.remaining_resource,
     installed_in: form.installed_in,
     location: form.location,
-    registration_date: getCurrentDate(),
     resource_params: resourceParams,
     note: form.note,
   };
 
   try {
-    if (isEdit.value && editId.value) {
-      await store.updateResource(editId.value, data);
-    } else {
-      await store.createResource(data);
+    const nodeId = form.node_id;
+    if (!nodeId) {
+      error.value = 'Не выбран узел';
+      return;
     }
+    await store.upsertResource(String(nodeId), payload);
     close();
     window.dispatchEvent(new Event('resource-saved'));
   } catch (err: any) {
     error.value = err.message || 'Ошибка сохранения';
   }
+}
+
+function open(resource?: any) {
+  reset();
+  loadNodes();
+  if (resource) {
+    isEdit.value = true;
+    editId.value = resource.node_id; // сохраняем node_id
+    form.name = resource.name || '';
+    form.mark = resource.mark || '';
+    form.type = resource.type || '';
+    form.production_date = resource.production_date || '';
+    form.node_id = resource.node_id; // это UUID
+    form.registration_number = resource.registration_number || null;
+    form.service_life = resource.service_life || null;
+    form.time_to_service = resource.time_to_service || null;
+    form.initial_resource = resource.initial_resource || null;
+    form.remaining_resource = resource.remaining_resource || null;
+    form.installed_in = resource.installed_in || '';
+    form.location = resource.location || '';
+    form.note = resource.note || '';
+    paramsStr.value = JSON.stringify(resource.resource_params || {}, null, 2);
+  }
+  visible.value = true;
+}
+
+function reset() {
+  isEdit.value = false;
+  editId.value = null;
+}
+
+function close() {
+  visible.value = false;
 }
 
 defineExpose({ open });
