@@ -1,28 +1,28 @@
 <template>
-  <div class="modal-overlay" v-if="visible">
-    <div class="modal-content" style="width: 600px;">
+  <div class="modal-overlay" v-if="visible" @click.self="close">
+    <div class="modal-content" style="width: 600px">
       <div class="modal-header">Расширенный фильтр</div>
-      <div v-for="(cond, idx) in conditions" :key="idx" class="filter-row">
-        <select v-model="cond.field">
-          <option value="name">Наименование</option>
-          <option value="status">Статус</option>
-          <option value="location">Местоположение</option>
-          <option value="manufacturer">Производитель</option>
-          <option value="model">Модель</option>
-        </select>
-        <select v-model="cond.operator">
-          <option value="contains">Содержит</option>
-          <option value="eq">Равно</option>
-          <option value="gt">Больше</option>
-          <option value="lt">Меньше</option>
-        </select>
-        <input v-model="cond.value" type="text" placeholder="Значение" class="form-control" />
-        <button @click="removeCondition(idx)" class="btn-sm btn-danger">✖</button>
+      <div class="filter-conditions">
+        <div v-for="(cond, idx) in conditions" :key="idx" class="filter-row">
+          <select v-model="cond.field" class="form-control">
+            <option value="">-- Поле --</option>
+            <option v-for="col in filterableFields" :key="col.key" :value="col.key">{{ col.label }}</option>
+          </select>
+          <select v-model="cond.operator" class="form-control">
+            <option value="contains">Содержит</option>
+            <option value="equals">Равно</option>
+            <option value="greater">Больше</option>
+            <option value="less">Меньше</option>
+          </select>
+          <input v-model="cond.value" type="text" class="form-control" placeholder="Значение" />
+          <button class="btn-icon" @click="removeCondition(idx)">🗑️</button>
+        </div>
       </div>
-      <button class="btn-sm btn-secondary" @click="addCondition">+ Добавить условие</button>
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="close">Отмена</button>
+        <button class="btn btn-secondary" @click="addCondition">+ Добавить условие</button>
+        <button class="btn btn-secondary" @click="resetConditions">Сбросить</button>
         <button class="btn btn-primary" @click="apply">Применить</button>
+        <button class="btn btn-secondary" @click="close">Закрыть</button>
       </div>
     </div>
   </div>
@@ -31,36 +31,120 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
+const emit = defineEmits<{
+  (e: 'apply', conditions: any[]): void;
+}>();
+
 const visible = ref(false);
 const conditions = ref<{ field: string; operator: string; value: string }[]>([]);
 
-const emit = defineEmits(['apply']);
+const filterableFields = [
+  { key: 'name', label: 'Наименование' },
+  { key: 'manufacturer', label: 'Производитель' },
+  { key: 'model', label: 'Марка' },
+  { key: 'serial_number', label: 'Зав. №' },
+  { key: 'inventory_number', label: 'Инв. №' },
+  { key: 'status', label: 'Состояние' },
+  { key: 'location', label: 'Размещение' },
+  { key: 'subsystem_name', label: 'Подсистема' },
+  { key: 'parent_name', label: 'Установлено в' },
+];
+
+function addCondition() {
+  conditions.value.push({ field: '', operator: 'contains', value: '' });
+}
+
+function removeCondition(idx: number) {
+  conditions.value.splice(idx, 1);
+}
+
+function resetConditions() {
+  conditions.value = [];
+}
+
+function apply() {
+  const validConditions = conditions.value.filter(c => c.field && c.value);
+  emit('apply', validConditions);
+  visible.value = false;
+}
 
 function open() {
   visible.value = true;
 }
-function close() { visible.value = false; }
-function addCondition() {
-  conditions.value.push({ field: 'name', operator: 'contains', value: '' });
+
+function close() {
+  visible.value = false;
 }
-function removeCondition(idx: number) {
-  conditions.value.splice(idx, 1);
-}
-function apply() {
-  emit('apply', conditions.value);
-  close();
-}
+
 defineExpose({ open });
 </script>
 
 <style scoped>
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 600px;
+  max-width: 90%;
+}
+.modal-header {
+  padding: 16px;
+  border-bottom: 1px solid #e0e4e8;
+  font-weight: bold;
+}
+.filter-conditions {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 16px;
+}
 .filter-row {
   display: flex;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   align-items: center;
 }
-.filter-row select, .filter-row input {
+.filter-row .form-control {
   flex: 1;
+}
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+}
+.modal-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #e0e4e8;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.btn-secondary {
+  background: #e0e4e8;
+  border: 1px solid #cbd5e1;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.btn-primary {
+  background: #1976d2;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
 }
 </style>

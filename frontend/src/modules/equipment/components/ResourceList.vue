@@ -41,13 +41,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { useResourcesStore } from '@/modules/resources/stores/resourcesStore';
+import { useEquipmentStore } from '@/modules/equipment/stores/equipmentStore';
 import { formatDate } from '@/utils/dateUtils';
 
 const props = defineProps<{ nodeId: number }>();
 const emit = defineEmits(['add', 'edit']);
 const router = useRouter();
-const store = useResourcesStore();
+const store = useEquipmentStore();
 
 const resources = ref<any[]>([]);
 const isLoading = ref(false);
@@ -62,8 +62,7 @@ const canEdit = computed(() => {
 async function loadResources() {
   isLoading.value = true;
   try {
-    // props.nodeId уже number, передаём как есть
-    resources.value = await store.fetchResourcesForNode(props.nodeId);
+    resources.value = await store.getResourcesForNode(String(props.nodeId));
   } catch (err) {
     console.error('Ошибка загрузки ресурсов:', err);
     resources.value = [];
@@ -76,14 +75,13 @@ function goToResources() {
   router.push({ path: '/resources', query: { nodeId: String(props.nodeId) } });
 }
 
-async function deleteResource(id: number) {
+async function deleteResource(id: string) {
   if (confirm('Удалить ресурс?')) {
     await store.deleteResource(id);
     await loadResources();
     window.dispatchEvent(new Event('resource-saved'));
   }
 }
-
 function handleResourceSaved() {
   loadResources();
 }
