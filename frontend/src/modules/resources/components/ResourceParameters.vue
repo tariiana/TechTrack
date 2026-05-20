@@ -5,7 +5,7 @@
       <button v-if="canEdit" class="btn btn-sm btn-primary" @click="openAddParamForm">+ Добавить параметр</button>
     </div>
 
-    <div class="table-wrapper" v-if="parameters.length">
+    <div class="table-scroll-container" v-if="parameters.length">
       <table class="data-table">
         <thead>
           <tr>
@@ -83,7 +83,7 @@ import { useResourcesStore } from '../stores/resourcesStore';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 
 const props = defineProps<{
-  resourceId: string;  // теперь строка (UUID)
+  resourceId: string;
 }>();
 
 const emit = defineEmits(['refresh']);
@@ -122,21 +122,14 @@ async function loadParameters() {
     const params = resource.resource_params;
     const paramsArray: any[] = [];
     for (const [key, value] of Object.entries(params)) {
-      if (key !== 'measurements' && typeof value === 'object' && value !== null) {
+      if (key !== 'measurements') {
+        const v = value as any;
         paramsArray.push({
           parameter_id: key,
           name: key,
-          value: (value as any).value || value,
-          unit: (value as any).unit || '',
-          is_main: (value as any).is_main || false,
-        });
-      } else if (key !== 'measurements' && typeof value !== 'object') {
-        paramsArray.push({
-          parameter_id: key,
-          name: key,
-          value: value,
-          unit: '',
-          is_main: false,
+          value: v.value !== undefined ? v.value : v,
+          unit: v.unit || '',
+          is_main: v.is_main || false,
         });
       }
     }
@@ -199,13 +192,11 @@ async function saveParam() {
   if (!validateParam()) return;
   
   try {
-    // Получаем текущий ресурс целиком
     const resource = await store.fetchResourceById(props.resourceId);
     if (!resource) throw new Error('Ресурс не найден');
     
-    // Копируем текущие resource_params
     const currentParams = resource.resource_params || {};
-    const { measurements, ...cleanParams } = currentParams; // measurements не трогаем
+    const { measurements, ...cleanParams } = currentParams;
     
     const paramName = paramForm.value.name;
     const newValue = {
@@ -215,7 +206,6 @@ async function saveParam() {
     };
     
     if (isEditParam.value && editParamKey.value) {
-      // Удаляем старый ключ, если имя изменилось
       if (editParamKey.value !== paramName) {
         delete cleanParams[editParamKey.value];
       }
@@ -224,8 +214,6 @@ async function saveParam() {
       cleanParams[paramName] = newValue;
     }
     
-    // Теперь нужно обновить ресурс, передав все поля (name, mark, initial_resource и т.д.)
-    // Формируем payload для upsertResource
     const payload = {
       name: resource.name,
       mark: resource.mark,
@@ -263,10 +251,7 @@ async function deleteParam(parameterId: string) {
     const resource = await store.fetchResourceById(props.resourceId);
     const currentParams = resource.resource_params || {};
     const { measurements, ...cleanParams } = currentParams;
-    
-    // Удаляем параметр по ключу
     delete cleanParams[parameterId];
-    
     await store.upsertResource(props.resourceId, { resource_params: cleanParams });
     await loadParameters();
     emit('refresh');
@@ -275,12 +260,11 @@ async function deleteParam(parameterId: string) {
   }
 }
 
-// Загружаем параметры при монтировании и при изменении resourceId
 watch(() => props.resourceId, () => {
   loadParameters();
 }, { immediate: true });
 
-defineExpose({ loadParameters });
+defineExpose({ loadParameters, openAddParamForm });
 </script>
 
 <style scoped>
@@ -289,6 +273,31 @@ defineExpose({ loadParameters });
   justify-content: space-between;
   align-items: center;
   margin-bottom: 15px;
+}
+.table-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  max-height: 400px;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  background: white;
+  margin: 10px 0;
+}
+.table-scroll-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #e0e4e8;
+  border-radius: 6px;
+}
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #2c5f8a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #1e4566;
 }
 .empty-message {
   color: #999;
@@ -324,5 +333,11 @@ defineExpose({ loadParameters });
 }
 .actions-cell .btn {
   margin-right: 4px;
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
 }
 </style>

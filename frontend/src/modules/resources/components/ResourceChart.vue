@@ -1,84 +1,108 @@
 <template>
-  <div class="chart-container" v-if="parameters.length">
+  <div class="chart-container" v-if="hasData">
     <div class="chart-header">
       <h4>Динамика изменения ресурса</h4>
-      <select v-model="selectedParamId" class="form-control chart-select">
-        <option :value="null" disabled>-- Выберите параметр --</option>
-        <option v-for="p in availableParams" :key="p.id" :value="p.id">
-          {{ p.name }} ({{ p.unit }})
-        </option>
+      <select v-model="selectedParam" class="form-control chart-select">
+        <option value="U">Напряжение (U), В</option>
+        <option value="R">Сопротивление (R), Ом</option>
+        <option value="E">Ёмкость (E), Втч</option>
+        <option value="C">Ёмкость (C), мАч</option>
       </select>
     </div>
     <canvas ref="chartCanvas" class="chart-canvas"></canvas>
-    <div v-if="!hasData" class="chart-empty">
-      Нет данных для отображения графика
-    </div>
+  </div>
+  <div v-else class="chart-empty">
+    Нет данных для отображения графика
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, watch, onMounted } from 'vue';
+import { useResourcesStore } from '../stores/resourcesStore';
 
 const props = defineProps<{
-  parameters: any[];
+  resourceId: number;
 }>();
 
+const store = useResourcesStore();
 const chartCanvas = ref<HTMLCanvasElement | null>(null);
 let chartInstance: any = null;
-const selectedParamId = ref<number | null>(null);
+const selectedParam = ref('U');
 const hasData = ref(false);
+const measurements = ref<any[]>([]);
+let chartKey = ref(0);
 
-const availableParams = computed(() => props.parameters.filter(p => 
-  p.name === 'Емкость' || p.name === 'Напряжение' || p.name === 'Внутреннее сопротивление'
-));
+function formatDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  return `${parts[2]}.${parts[1]}.${parts[0]}`;
+}
 
-const getMockHistory = (paramName: string) => {
-  const histories: Record<string, { labels: string[]; values: number[] }> = {
-    'Емкость': { labels: ['Янв', 'Мар', 'Май', 'Июл', 'Сен', 'Ноя'], values: [95, 92, 88, 85, 82, 80] },
-    'Напряжение': { labels: ['Янв', 'Мар', 'Май', 'Июл', 'Сен', 'Ноя'], values: [12.5, 12.4, 12.3, 12.2, 12.1, 12.0] },
-    'Внутреннее сопротивление': { labels: ['Янв', 'Мар', 'Май', 'Июл', 'Сен', 'Ноя'], values: [0.018, 0.019, 0.020, 0.022, 0.024, 0.026] }
-  };
-  return histories[paramName] || { labels: [], values: [] };
-};
+async function loadMeasurements() {
+  measurements.value = store.getMeasurementsForResource(props.resourceId);
+  await renderChart();
+}
 
 async function renderChart() {
-  if (!chartCanvas.value || !selectedParamId.value) return;
-  const param = props.parameters.find(p => p.id === selectedParamId.value);
-  if (!param) return;
-
-  const history = getMockHistory(param.name);
-  if (history.labels.length === 0) { hasData.value = false; return; }
+  if (!chartCanvas.value) return;
+  
+  const sorted = [...measurements.value].sort((a, b) => 
+    new Date(a.measurementDate).getTime() - new Date(b.measurementDate).getTime()
+  );
+  
+  const labels = sorted.map(m => formatDate(m.measurementDate));
+  const data = sorted.map(m => m.parameters?.[selectedParam.value] || 0);
+  
+  if (labels.length === 0) {
+    hasData.value = false;
+    if (chartInstance) {
+      chartInstance.destroy();
+      chartInstance = null;
+    }
+    return;
+  }
+  
   hasData.value = true;
+  const label = selectedParam.value === 'U' ? 'Напряжение (В)' :
+                selectedParam.value === 'R' ? 'Сопротивление (Ом)' :
+                selectedParam.value === 'E' ? 'Ёмкость (Втч)' : 'Ёмкость (мАч)';
 
   try {
     const { Chart, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } = await import('chart.js');
     Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+    
     if (chartInstance) chartInstance.destroy();
-
+    
     const ctx = chartCanvas.value.getContext('2d');
     if (!ctx) return;
-
+    
     chartInstance = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: history.labels,
+        labels,
         datasets: [{
-          label: `${param.name} (${param.unit})`,
-          data: history.values,
+          label,
+          data,
           borderColor: '#2c5f8a',
-          backgroundColor: 'rgba(44, 95, 138, 0.1)',
+          backgroundColor: 'rgba(44,95,138,0.1)',
           tension: 0.3,
           fill: true,
           pointBackgroundColor: '#2c5f8a',
           pointBorderColor: '#fff',
           pointRadius: 5,
+          pointHoverRadius: 7,
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'top' }, tooltip: { mode: 'index' } },
-        scales: { y: { beginAtZero: false, title: { display: true, text: param.unit } } }
+        plugins: {
+          tooltip: { mode: 'index', intersect: false },
+          legend: { position: 'top' }
+        },
+        scales: {
+          y: { title: { display: true, text: selectedParam.value === 'U' ? 'В' : selectedParam.value === 'R' ? 'Ом' : 'Втч/мАч' } }
+        }
       }
     });
   } catch (error) {
@@ -86,16 +110,15 @@ async function renderChart() {
   }
 }
 
-watch(selectedParamId, () => renderChart());
-onMounted(() => {
-  if (availableParams.value.length) selectedParamId.value = availableParams.value[0].id;
-});
+watch(selectedParam, () => renderChart());
+watch(() => props.resourceId, () => loadMeasurements(), { immediate: true });
+watch(() => measurements.value, () => renderChart(), { deep: true });
 </script>
 
 <style scoped>
 .chart-container { margin-top: 20px; padding: 15px; background: white; border-radius: 8px; border: 1px solid #e0e4e8; }
 .chart-header { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
-.chart-select { width: 200px; }
+.chart-select { width: 250px; }
 .chart-canvas { width: 100%; height: 300px; min-height: 300px; }
-.chart-empty { text-align: center; padding: 60px 20px; color: #999; }
+.chart-empty { text-align: center; padding: 60px 20px; color: #999; background: #f8f9fa; border-radius: 8px; margin-top: 20px; }
 </style>

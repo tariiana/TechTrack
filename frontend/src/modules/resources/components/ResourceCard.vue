@@ -1,15 +1,22 @@
 <template>
   <div class="card" v-if="resource">
     <div style="display: flex; justify-content: space-between; margin-bottom: 20px">
-      <h2>Ресурсы</h2>
-      <div>
+      <h2>{{ resource.name }}</h2>
+      <div class="action-buttons">
         <button class="btn btn-secondary" @click="goBack">← Назад</button>
         <button v-if="canEdit" class="btn btn-primary" @click="editResource">Редактировать</button>
-        <button v-if="canEdit" class="btn btn-danger" @click="deleteResource">Удалить</button>
+        <button v-if="canEdit" class="btn btn-danger" @click="deleteResource">Списать</button>
+        <div class="dropdown">
+          <button class="btn btn-secondary" @click="toggleExportDropdown">📎 Экспорт</button>
+          <div v-if="exportDropdownOpen" class="dropdown-menu">
+            <button class="dropdown-item" @click="exportToExcel">Microsoft Excel (.xlsx)</button>
+            <button class="dropdown-item" @click="exportToWord">Microsoft Word (.docx)</button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Основные сведения (2 колонки) -->
+    <!-- Основные сведения -->
     <div class="info-grid">
       <div class="info-row">
         <div class="info-label">Наименование</div>
@@ -21,7 +28,7 @@
         <div class="info-label">Тип</div>
         <div class="info-value">{{ resource.type || '-' }}</div>
         <div class="info-label">Дата производства</div>
-        <div class="info-value">{{ resource.production_date || '-' }}</div>
+        <div class="info-value">{{ formatDate(resource.production_date) || '-' }}</div>
       </div>
       <div class="info-row">
         <div class="info-label">Узел</div>
@@ -31,27 +38,42 @@
       </div>
       <div class="info-row">
         <div class="info-label">Дата регистрации</div>
-        <div class="info-value">{{ resource.registration_date }}</div>
+        <div class="info-value">{{ formatDate(resource.registration_date) }}</div>
         <div class="info-label">Учётный номер</div>
         <div class="info-value">{{ resource.registration_number || '-' }}</div>
       </div>
       <div class="info-row">
-        <div class="info-label">Дата ТО</div>
+        <div class="info-label">Дата последнего ТО</div>
         <div class="info-value">{{ resource.last_service_date || '-' }}</div>
         <div class="info-label">Срок до ТО</div>
         <div class="info-value">{{ resource.time_to_service ? resource.time_to_service + ' лет' : '-' }}</div>
       </div>
+      <div class="info-row">
+        <div class="info-label">Исходный ресурс</div>
+        <div class="info-value">{{ resource.initial_resource || '-' }}</div>
+        <div class="info-label">Остаточный ресурс</div>
+        <div class="info-value">{{ resource.remaining_resource || '-' }}</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">Установлен в</div>
+        <div class="info-value">{{ resource.installed_in || '-' }}</div>
+      </div>
     </div>
 
     <!-- Предупреждения -->
-    <div v-if="alerts.length" class="alert-banner">
-      <h4>⚠️ Предупреждения</h4>
-      <ul>
-        <li v-for="(alert, idx) in alerts" :key="idx" :class="alert.type">{{ alert.message }}</li>
-      </ul>
+    <div v-if="alerts.length" class="alert-panel">
+      <div class="alert-header" @click="toggleAlerts">
+        <h4>⚠️ Предупреждения</h4>
+        <button class="btn-icon">{{ alertsCollapsed ? '▼' : '▲' }}</button>
+      </div>
+      <div v-if="!alertsCollapsed" class="alert-list">
+        <div v-for="(alert, idx) in alerts" :key="idx" :class="['alert-item', alert.type]">
+          {{ alert.message }}
+        </div>
+      </div>
     </div>
 
-    <!-- Таблица параметров с прокруткой -->
+    <!-- Параметры -->
     <h3>Параметры</h3>
     <div class="table-scroll-container" v-if="parameters.length">
       <table class="data-table">
@@ -64,11 +86,13 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="param in parameters" :key="param.parameter_id">
+          <tr v-for="param in parameters" :key="param.name">
             <td>{{ param.name }}</td>
             <td>{{ param.value }}</td>
             <td>{{ param.unit || '-' }}</td>
-            <td>{{ param.is_main ? '✅' : '' }}</td>
+            <td class="is-main-cell" @click="toggleMainParam(param)">
+              {{ param.is_main ? '✅' : '◻️' }}
+            </td>
           </tr>
           <tr v-if="parameters.length === 0">
             <td colspan="4">Нет параметров</td>
@@ -78,12 +102,29 @@
     </div>
     <div v-else class="empty-message">Нет параметров</div>
 
+    <!-- График -->
+    <ResourceChart :resource-id="resource.resource_id" :key="chartKey" />
+
+    <!-- Примечания -->
+    <div v-if="resource.note" class="notes-section">
+      <h4>Примечания</h4>
+      <p>{{ resource.note }}</p>
+    </div>
+
+    <!-- Кнопки журнала и добавления измерения -->
+    <div class="measurement-buttons">
+      <button class="btn btn-secondary" @click="openMeasurementsModal">📊 Журнал измерений</button>
+      <button class="btn btn-primary" @click="openAddMeasurementModal">+ Добавить измерение</button>
+    </div>
+
     <div class="text-muted" style="margin-top: 15px">
       <small>Создан: {{ formatDate(resource.created_at) }} | Обновлён: {{ formatDate(resource.updated_at) }}</small>
     </div>
 
+    <!-- Модальные окна -->
     <ResourceForm ref="formRef" @saved="refresh" />
-    <ResourceParameters ref="parametersRef" :resource-id="resource.resource_id" @refresh="loadData" />
+    <AddMeasurementModal ref="addMeasurementModalRef" @saved="refresh" />
+    <MeasurementsModal ref="measurementsModalRef" />
     <ConfirmDialog ref="confirmDialog" />
   </div>
   <div v-else class="card">Загрузка...</div>
@@ -94,19 +135,26 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useResourcesStore } from '../stores/resourcesStore';
 import ResourceForm from './ResourceForm.vue';
-import ResourceParameters from './ResourceParameters.vue';
+import ResourceChart from './ResourceChart.vue';
+import AddMeasurementModal from './AddMeasurementModal.vue';
+import MeasurementsModal from './MeasurementsModal.vue';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import { formatDate } from '@/utils/dateUtils';
+import * as exportUtils from '@/utils/exportUtils';
 
 const route = useRoute();
 const router = useRouter();
 const store = useResourcesStore();
 const formRef = ref();
-const parametersRef = ref();
+const addMeasurementModalRef = ref();
+const measurementsModalRef = ref();
 const confirmDialog = ref();
 
 const resource = ref<any>(null);
 const parameters = ref<any[]>([]);
+const exportDropdownOpen = ref(false);
+const alertsCollapsed = ref(false);
+const chartKey = ref(0);
 
 const canEdit = computed(() => {
   const user = localStorage.getItem('user');
@@ -118,29 +166,54 @@ const canEdit = computed(() => {
 const alerts = computed(() => {
   const result: { type: string; message: string }[] = [];
   if (!resource.value) return result;
-
-  const timeToService = resource.value.time_to_service;
-  if (timeToService !== undefined && timeToService < 0) {
-    result.push({ type: 'danger', message: '🔴 Срок до ТО просрочен!' });
-  } else if (timeToService !== undefined && timeToService < 1) {
-    result.push({ type: 'warning', message: `⚠️ Срок до ТО менее года (${timeToService} лет)` });
-  }
   
   const remaining = resource.value.remaining_resource;
-  if (remaining !== undefined && remaining <= 20) {
-    result.push({ type: 'danger', message: `🔴 Остаточный ресурс критический (${remaining}%)` });
-  } else if (remaining !== undefined && remaining <= 50) {
-    result.push({ type: 'warning', message: `⚠️ Остаточный ресурс менее 50% (${remaining}%)` });
+  if (remaining !== undefined) {
+    const remainingNum = parseFloat(remaining);
+    if (remainingNum <= 20) {
+      result.push({ type: 'danger', message: `🔴 Остаточный ресурс критический (${remainingNum}%)` });
+    } else if (remainingNum <= 50) {
+      result.push({ type: 'warning', message: `⚠️ Остаточный ресурс менее 50% (${remainingNum}%)` });
+    }
+  }
+  
+  if (resource.value.time_to_service !== undefined && resource.value.time_to_service < 1) {
+    result.push({ type: 'warning', message: `⚠️ Срок до ТО менее года (${resource.value.time_to_service} лет)` });
   }
   
   return result;
 });
+
+function toggleAlerts() { alertsCollapsed.value = !alertsCollapsed.value; }
+
+async function toggleMainParam(param: any) {
+  if (!canEdit.value) return;
+  param.is_main = !param.is_main;
+  await saveParameters();
+}
+
+async function saveParameters() {
+  try {
+    const resourceParams: Record<string, any> = {};
+    for (const param of parameters.value) {
+      resourceParams[param.name] = {
+        value: param.value,
+        unit: param.unit,
+        is_main: param.is_main,
+      };
+    }
+    await store.upsertResource(resource.value.node_id, { resource_params: resourceParams });
+  } catch (err) {
+    console.error(err);
+  }
+}
 
 async function loadData() {
   const id = route.params.id as string;
   try {
     resource.value = await store.fetchResourceById(id);
     await loadParameters();
+    chartKey.value++;
   } catch (err) {
     console.error(err);
   }
@@ -148,24 +221,18 @@ async function loadData() {
 
 async function loadParameters() {
   if (!resource.value) return;
+  console.log('Resource data:', resource.value);
   const params = resource.value.resource_params || {};
+   console.log('Resource params:', params);
   const paramsArray: any[] = [];
   for (const [key, value] of Object.entries(params)) {
-    if (key !== 'measurements' && typeof value === 'object' && value !== null) {
+    if (key !== 'measurements') {
+      const v = value as any;
       paramsArray.push({
-        parameter_id: key,
         name: key,
-        value: (value as any).value || value,
-        unit: (value as any).unit || '',
-        is_main: (value as any).is_main || false,
-      });
-    } else if (key !== 'measurements' && typeof value !== 'object') {
-      paramsArray.push({
-        parameter_id: key,
-        name: key,
-        value: value,
-        unit: '',
-        is_main: false,
+        value: v.value !== undefined ? v.value : v,
+        unit: v.unit || '',
+        is_main: v.is_main || false,
       });
     }
   }
@@ -175,82 +242,103 @@ async function loadParameters() {
 function goBack() { router.back(); }
 function editResource() { formRef.value?.open(resource.value); }
 async function deleteResource() {
-  const ok = await confirmDialog.value?.show('Удаление', 'Удалить ресурс?');
+  const ok = await confirmDialog.value?.show('Списание', 'Списать ресурс?');
   if (ok) {
     await store.deleteResource(resource.value.resource_id);
     router.back();
   }
 }
+function openAddMeasurementModal() { addMeasurementModalRef.value?.open(resource.value.resource_id); }
+function openMeasurementsModal() { measurementsModalRef.value?.open(resource.value.resource_id); }
 function refresh() { loadData(); }
+
+function getExportData() {
+  if (!resource.value) return [];
+  return [{
+    'Наименование': resource.value.name || '-',
+    'Марка': resource.value.mark || '-',
+    'Тип': resource.value.type || '-',
+    'Дата производства': resource.value.production_date || '-',
+    'Узел': resource.value.node_name || '-',
+    'Срок службы': resource.value.service_life ? `${resource.value.service_life} лет` : '-',
+    'Дата регистрации': resource.value.registration_date || '-',
+    'Учётный номер': resource.value.registration_number || '-',
+    'Дата последнего ТО': resource.value.last_service_date || '-',
+    'Срок до ТО': resource.value.time_to_service ? `${resource.value.time_to_service} лет` : '-',
+    'Исходный ресурс': resource.value.initial_resource || '-',
+    'Остаточный ресурс': resource.value.remaining_resource || '-',
+    'Установлен в': resource.value.installed_in || '-',
+    'Примечание': resource.value.note || '-',
+  }];
+}
+
+function exportToExcel() {
+  const data = getExportData();
+  if (data.length === 0 || !data[0]) {
+    alert('Нет данных для экспорта');
+    return;
+  }
+  const filename = `${resource.value.name.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-').replace(/-/g, '_')}`;
+  exportUtils.exportToExcel(data, filename);
+  exportDropdownOpen.value = false;
+}
+
+function exportToWord() {
+  const data = getExportData();
+  if (data.length === 0 || !data[0]) {
+    alert('Нет данных для экспорта');
+    return;
+  }
+  const headers = Object.keys(data[0]);
+  const filename = `${resource.value.name.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-').replace(/-/g, '_')}`;
+  exportUtils.exportToWord(data, headers, filename);
+  exportDropdownOpen.value = false;
+}
+
+function toggleExportDropdown() { exportDropdownOpen.value = !exportDropdownOpen.value; }
+function handleClickOutside(event: MouseEvent) {
+  const target = event.target as HTMLElement;
+  if (!target.closest('.dropdown')) exportDropdownOpen.value = false;
+}
 
 onMounted(() => {
   loadData();
+  document.addEventListener('click', handleClickOutside);
   window.addEventListener('resource-saved', refresh);
 });
 </script>
 
 <style scoped>
-.info-grid {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 20px;
-}
-.info-row {
-  display: grid;
-  grid-template-columns: 150px 1fr 150px 1fr;
-  gap: 16px;
-  padding: 8px 0;
-  border-bottom: 1px solid #e0e4e8;
-}
+.action-buttons { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.info-grid { background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+.info-row { display: grid; grid-template-columns: 150px 1fr 150px 1fr; gap: 16px; padding: 8px 0; border-bottom: 1px solid #e0e4e8; }
 .info-row:last-child { border-bottom: none; }
 .info-label { font-weight: 600; color: #2c3e50; }
 .info-value { color: #1a2a3a; }
-.alert-banner {
-  background-color: #fff3e0;
-  border-left: 4px solid #e67e22;
-  padding: 12px;
-  margin-bottom: 20px;
-  border-radius: 4px;
-}
-.alert-banner .danger { color: #c0392b; }
-.text-muted { color: #6c757d; }
+
+.alert-panel { background: #fff3e0; border: 1px solid #e0e4e8; border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+.alert-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; cursor: pointer; background: #fff3e0; }
+.alert-header h4 { margin: 0; }
+.alert-list { padding: 0 16px 16px 16px; }
+.alert-item { padding: 6px 0; border-bottom: 1px solid #ffe0b3; }
+.alert-item:last-child { border-bottom: none; }
+.alert-item.danger { color: #c0392b; font-weight: 500; }
+.alert-item.warning { color: #e67e22; }
+
+.table-scroll-container { width: 100%; overflow-x: auto; border: 1px solid #e0e4e8; border-radius: 8px; background: white; margin: 10px 0; }
+.table-scroll-container .data-table { min-width: 500px; }
+.is-main-cell { cursor: pointer; text-align: center; }
+.is-main-cell:hover { background-color: #f0f2f5; }
 .empty-message { color: #999; font-style: italic; padding: 10px; }
 
-/* Контейнер для таблицы с прокруткой */
-.table-scroll-container {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: 400px;
-  border: 1px solid #e0e4e8;
-  border-radius: 8px;
-  background: white;
-  margin: 10px 0;
-}
+.measurement-buttons { display: flex; gap: 10px; margin-top: 20px; }
+.notes-section { margin-top: 20px; padding: 12px; background: #f8f9fa; border-radius: 8px; }
+.notes-section h4 { margin-bottom: 8px; }
 
-.table-scroll-container::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
+.dropdown { position: relative; }
+.dropdown-menu { position: absolute; top: 100%; right: 0; margin-top: 4px; background: white; border: 1px solid #e0e4e8; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 100; min-width: 150px; }
+.dropdown-item { display: block; width: 100%; padding: 8px 12px; text-align: left; background: none; border: none; cursor: pointer; font-size: 14px; }
+.dropdown-item:hover { background-color: #f0f2f5; }
 
-.table-scroll-container::-webkit-scrollbar-track {
-  background: #e0e4e8;
-  border-radius: 6px;
-}
-
-.table-scroll-container::-webkit-scrollbar-thumb {
-  background: #2c5f8a;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.table-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: #1e4566;
-}
-
-/* Стили для таблицы внутри контейнера */
-.table-scroll-container .data-table {
-  min-width: 500px;
-}
+.text-muted { color: #6c757d; }
 </style>

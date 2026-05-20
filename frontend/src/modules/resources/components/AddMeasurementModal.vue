@@ -20,19 +20,51 @@
 
       <!-- Параметры измерения -->
       <div v-if="currentResource" class="params-section">
-        <h4>Параметры ресурса</h4>
+        <h4>Параметры измерения</h4>
         <div class="params-list">
-          <div v-for="(value, key) in currentResourceParams" :key="key" class="param-row">
+          <div class="param-row">
             <div class="param-info">
-              <span class="param-name">{{ key }}</span>
-              <span class="param-unit">({{ getUnitHint(key) }})</span>
+              <span class="param-name">Напряжение (В)</span>
             </div>
-            <input
-              type="number"
-              step="0.01"
-              v-model="currentResourceParams[key]"
-              class="form-control param-input"
-            />
+            <input type="number" step="0.01" v-model="measurementParams.voltage" class="form-control param-input" />
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="measurementParams.voltage_main" /> Основной
+            </label>
+          </div>
+          <div class="param-row">
+            <div class="param-info">
+              <span class="param-name">Внутреннее сопротивление (Ом)</span>
+            </div>
+            <input type="number" step="0.001" v-model="measurementParams.resistance" class="form-control param-input" />
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="measurementParams.resistance_main" /> Основной
+            </label>
+          </div>
+          <div class="param-row">
+            <div class="param-info">
+              <span class="param-name">Ёмкость (%)</span>
+            </div>
+            <input type="number" step="1" v-model="measurementParams.capacity" class="form-control param-input" />
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="measurementParams.capacity_main" /> Основной
+            </label>
+          </div>
+        </div>
+
+        <!-- Дополнительные параметры -->
+        <div class="custom-params">
+          <div class="custom-param-header">
+            <span>Дополнительные параметры</span>
+            <button type="button" class="btn btn-sm btn-secondary" @click="addCustomParam">+ Добавить параметр</button>
+          </div>
+          <div v-for="(param, idx) in customParams" :key="idx" class="param-row custom-param-row">
+            <input v-model="param.name" placeholder="Название параметра" class="form-control" style="width: 150px" />
+            <input v-model="param.value" placeholder="Значение" class="form-control" style="width: 120px" />
+            <input v-model="param.unit" placeholder="Ед. изм." class="form-control" style="width: 80px" />
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="param.is_main" /> Основной
+            </label>
+            <button type="button" class="btn btn-sm btn-danger" @click="removeCustomParam(idx)">🗑️</button>
           </div>
         </div>
       </div>
@@ -55,16 +87,26 @@ const store = useResourcesStore();
 const visible = ref(false);
 const editMode = ref(false);
 const editId = ref<number | null>(null);
-const selectedResourceId = ref<number | null>(null);
+const selectedResourceId = ref<string | null>(null);
 const error = ref('');
 const resources = ref<any[]>([]);
 const currentResource = ref<any>(null);
-const currentResourceParams = ref<Record<string, number>>({});
-const resourceId = String(selectedResourceId.value);
+const resourceIdFromCard = ref<string | null>(null);
 
 const form = reactive({
   measurementDate: '',
 });
+
+const measurementParams = reactive({
+  voltage: null as number | null,
+  voltage_main: false,
+  resistance: null as number | null,
+  resistance_main: false,
+  capacity: null as number | null,
+  capacity_main: false,
+});
+
+const customParams = ref<{ name: string; value: string; unit: string; is_main: boolean }[]>([]);
 
 function getCurrentDate(): string {
   const now = new Date();
@@ -77,65 +119,77 @@ function getCurrentDate(): string {
 async function loadResources() {
   await store.fetchResources();
   resources.value = store.resources;
-}
-
-async function loadResourceParams(resourceId: number) {
-  try {
-    const fullResource = await store.fetchResourceById(String(resourceId));
-    currentResource.value = fullResource;
-    const params = fullResource.resource_params || {};
-    // Извлекаем текущие значения параметров (игнорируем служебные поля)
-    const { measurements, ...paramValues } = params;
-    currentResourceParams.value = paramValues;
-  } catch (err) {
-    console.error(err);
+  if (resourceIdFromCard.value) {
+    selectedResourceId.value = resourceIdFromCard.value;
+    await onResourceSelect();
   }
 }
 
-function onResourceSelect() {
+async function onResourceSelect() {
   if (selectedResourceId.value) {
-    loadResourceParams(selectedResourceId.value);
+    try {
+      currentResource.value = await store.fetchResourceById(selectedResourceId.value);
+      const params = currentResource.value.resource_params || {};
+      if (params.voltage) measurementParams.voltage = params.voltage.value;
+      if (params.resistance) measurementParams.resistance = params.resistance.value;
+      if (params.capacity) measurementParams.capacity = params.capacity.value;
+    } catch (err) {
+      console.error(err);
+    }
   } else {
     currentResource.value = null;
-    currentResourceParams.value = {};
+    resetParams();
   }
 }
 
-function getUnitHint(key: string): string {
-  const units: Record<string, string> = {
-    capacity: '%',
-    voltage: 'В',
-    resistance: 'Ом',
-    remainingLife: 'лет',
-  };
-  return units[key] || '';
+function resetParams() {
+  measurementParams.voltage = null;
+  measurementParams.voltage_main = false;
+  measurementParams.resistance = null;
+  measurementParams.resistance_main = false;
+  measurementParams.capacity = null;
+  measurementParams.capacity_main = false;
+  customParams.value = [];
+}
+
+function addCustomParam() {
+  customParams.value.push({ name: '', value: '', unit: '', is_main: false });
+}
+
+function removeCustomParam(idx: number) {
+  customParams.value.splice(idx, 1);
 }
 
 function reset() {
   selectedResourceId.value = null;
   currentResource.value = null;
-  currentResourceParams.value = {};
   form.measurementDate = getCurrentDate();
   error.value = '';
   editMode.value = false;
   editId.value = null;
+  resetParams();
 }
 
-async function open(measurement?: any) {
+async function open(resourceId?: string, measurement?: any) {
+  resourceIdFromCard.value = resourceId || null;
   reset();
   await loadResources();
+  
   if (measurement) {
     editMode.value = true;
-    editId.value = measurement.measurement_id;
-    selectedResourceId.value = measurement.resource_id;
-    await loadResourceParams(measurement.resource_id);
-    form.measurementDate = measurement.measurement_date;
-    // восстановить значения параметров из измерения
+    editId.value = measurement.id;
+    selectedResourceId.value = measurement.resourceId;
+    await onResourceSelect();
+    form.measurementDate = measurement.measurementDate;
     if (measurement.parameters) {
-      for (const [key, val] of Object.entries(measurement.parameters)) {
-        if (currentResourceParams.value.hasOwnProperty(key)) {
-          currentResourceParams.value[key] = val as number;
-        }
+      measurementParams.voltage = measurement.parameters.voltage || null;
+      measurementParams.voltage_main = measurement.parameters.voltage_main || false;
+      measurementParams.resistance = measurement.parameters.resistance || null;
+      measurementParams.resistance_main = measurement.parameters.resistance_main || false;
+      measurementParams.capacity = measurement.parameters.capacity || null;
+      measurementParams.capacity_main = measurement.parameters.capacity_main || false;
+      if (measurement.parameters.custom) {
+        customParams.value = [...measurement.parameters.custom];
       }
     }
   }
@@ -156,54 +210,62 @@ async function save() {
     return;
   }
 
-  const resourceId = String(selectedResourceId.value);
+  const parameters: any = {};
+  if (measurementParams.voltage !== null) {
+    parameters.voltage = measurementParams.voltage;
+    parameters.voltage_main = measurementParams.voltage_main;
+  }
+  if (measurementParams.resistance !== null) {
+    parameters.resistance = measurementParams.resistance;
+    parameters.resistance_main = measurementParams.resistance_main;
+  }
+  if (measurementParams.capacity !== null) {
+    parameters.capacity = measurementParams.capacity;
+    parameters.capacity_main = measurementParams.capacity_main;
+  }
+  if (customParams.value.length > 0) {
+    parameters.custom = customParams.value;
+  }
+
   const newMeasurement = {
     measurement_date: form.measurementDate,
-    parameters: { ...currentResourceParams.value },
+    parameters,
   };
 
   try {
-    const fullResource = await store.fetchResourceById(resourceId);
+    const fullResource = await store.fetchResourceById(selectedResourceId.value);
     const params = fullResource.resource_params || {};
     let measurements = params.measurements || [];
 
     if (editMode.value && editId.value) {
-      const index = measurements.findIndex((m: any) => m.measurement_id === editId.value);
+      const index = measurements.findIndex((m: any) => m.id === editId.value);
       if (index !== -1) {
         measurements[index] = { ...measurements[index], ...newMeasurement };
       }
     } else {
       const newId = Date.now();
-      measurements.push({ measurement_id: newId, ...newMeasurement });
+      measurements.push({ id: newId, ...newMeasurement });
     }
 
-    const updatedParams = {
-      ...params,
-      measurements: measurements,
-    };
-
-    // ⚠️ СТАРЫЙ ВЫЗОВ (удаляем):
-    // await store.updateResource(resourceId, { resource_params: updatedParams });
+    const updatedParams = { ...params, measurements };
     
-    // ✅ НОВЫЙ КОД (вставляем):
-    const resource = await store.fetchResourceById(resourceId);
     const payload = {
-      name: resource.name,
-      mark: resource.mark,
-      type: resource.type,
-      production_date: resource.production_date,
-      registration_number: resource.registration_number,
-      service_life: resource.service_life,
-      time_to_service: resource.time_to_service,
-      initial_resource: resource.initial_resource,
-      remaining_resource: resource.remaining_resource,
-      installed_in: resource.installed_in,
-      location: resource.location,
-      note: resource.note,
+      name: fullResource.name,
+      mark: fullResource.mark,
+      type: fullResource.type,
+      production_date: fullResource.production_date,
+      registration_number: fullResource.registration_number,
+      service_life: fullResource.service_life,
+      time_to_service: fullResource.time_to_service,
+      initial_resource: fullResource.initial_resource,
+      remaining_resource: fullResource.remaining_resource,
+      installed_in: fullResource.installed_in,
+      location: fullResource.location,
+      note: fullResource.note,
       resource_params: updatedParams,
     };
-    await store.upsertResource(resourceId, payload);
-
+    
+    await store.upsertResource(selectedResourceId.value, payload);
     close();
     window.dispatchEvent(new Event('resource-saved'));
   } catch (err: any) {
@@ -226,8 +288,6 @@ defineExpose({ open });
   color: #2c3e50;
 }
 .params-list {
-  max-height: 300px;
-  overflow-y: auto;
   margin-bottom: 15px;
 }
 .param-row {
@@ -241,19 +301,31 @@ defineExpose({ open });
 }
 .param-info {
   flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 5px;
 }
 .param-name {
   font-weight: 500;
 }
-.param-unit {
-  font-size: 12px;
-  color: #6c757d;
-}
 .param-input {
   width: 120px;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.custom-params {
+  margin-top: 15px;
+}
+.custom-param-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.custom-param-row {
+  background: #fff;
+  border: 1px solid #e0e4e8;
 }
 .modal-footer {
   display: flex;

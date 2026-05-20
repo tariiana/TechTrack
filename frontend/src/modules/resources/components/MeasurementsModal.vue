@@ -1,6 +1,6 @@
 <template>
   <div class="modal-overlay" v-if="visible">
-    <div class="modal-content" style="width: 1000px">
+    <div class="modal-content" style="width: 1200px">
       <div class="modal-header">
         <h3>Журнал измерения остаточных ресурсов</h3>
         <div class="header-buttons">
@@ -9,28 +9,29 @@
           <div class="dropdown">
             <button class="btn btn-sm btn-secondary" @click="toggleExportDropdown">📎 Экспорт</button>
             <div v-if="exportDropdownOpen" class="dropdown-menu">
-              <button class="dropdown-item" @click="exportToExcel">Excel</button>
-              <button class="dropdown-item" @click="exportToWord">Word</button>
+              <button class="dropdown-item" @click="exportToExcel">Microsoft Excel (.xlsx)</button>
+              <button class="dropdown-item" @click="exportToWord">Microsoft Word (.docx)</button>
             </div>
           </div>
+          <button class="btn btn-sm btn-primary" @click="openAddMeasurement">+ Добавить измерение</button>
         </div>
       </div>
 
       <!-- Фильтр -->
       <div v-if="showFilterPanel" class="filter-panel">
-        <div class="filter-row">
-          <input v-model="filters.resourceName" placeholder="Наименование" class="form-control">
-          <input v-model="filters.mark" placeholder="Марка" class="form-control">
-          <input v-model="filters.registrationNumber" placeholder="Учётный №" class="form-control">
-          <input type="date" v-model="filters.dateFrom" placeholder="Дата от" class="form-control">
-          <input type="date" v-model="filters.dateTo" placeholder="Дата до" class="form-control">
+        <div class="filter-grid">
+          <input v-model="filters.resourceName" placeholder="Наименование" class="form-control" @input="applyFilters" />
+          <input v-model="filters.mark" placeholder="Марка" class="form-control" @input="applyFilters" />
+          <input v-model="filters.registrationNumber" placeholder="Учётный №" class="form-control" @input="applyFilters" />
+          <input type="date" v-model="filters.dateFrom" placeholder="Дата от" class="form-control" @change="applyFilters" />
+          <input type="date" v-model="filters.dateTo" placeholder="Дата до" class="form-control" @change="applyFilters" />
           <button class="btn btn-primary btn-sm" @click="applyFilters">Найти</button>
           <button class="btn btn-secondary btn-sm" @click="resetFilters">Сбросить</button>
         </div>
       </div>
 
-      <!-- Таблица -->
-      <div class="table-wrapper">
+      <!-- Таблица измерений -->
+      <div class="table-scroll-container">
         <table class="data-table">
           <thead>
             <tr>
@@ -50,7 +51,7 @@
               </td>
             </tr>
             <tr v-if="filteredAndSortedMeasurements.length === 0">
-              <td :colspan="visibleColumns.length + 1" style="text-align: center">Нет измерений</td>
+              <td :colspan="visibleColumns.length + 1" class="empty-data">Нет измерений</td>
             </tr>
           </tbody>
         </table>
@@ -67,7 +68,9 @@
     <div class="modal-content" style="width: 400px">
       <div class="modal-header">Настройка колонок</div>
       <div v-for="col in allColumns" :key="col.key" style="margin-bottom: 8px">
-        <label><input type="checkbox" v-model="selectedColumns" :value="col.key"> {{ col.label }}</label>
+        <label>
+          <input type="checkbox" v-model="selectedColumns" :value="col.key" /> {{ col.label }}
+        </label>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" @click="showColumnSettings = false">Закрыть</button>
@@ -75,26 +78,28 @@
     </div>
   </div>
 
-  <AddMeasurementModal ref="editModalRef" @saved="refresh" />
+  <AddMeasurementModal ref="addMeasurementModalRef" @saved="refresh" />
   <ConfirmDialog ref="confirmDialog" />
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useResourcesStore } from '../stores/resourcesStore';
 import AddMeasurementModal from './AddMeasurementModal.vue';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import { formatDate } from '@/utils/dateUtils';
-import * as XLSX from 'xlsx';
+import * as exportUtils from '@/utils/exportUtils';
 
 const store = useResourcesStore();
-const editModalRef = ref();
+const addMeasurementModalRef = ref();
 const confirmDialog = ref();
+
 const visible = ref(false);
 const measurements = ref<any[]>([]);
+const resourceIdFilter = ref<string | null>(null);
 const exportDropdownOpen = ref(false);
 const showColumnSettings = ref(false);
-const showFilterPanel = ref(false);
+const showFilterPanel = ref(true);
 const sortField = ref('measurementDate');
 const sortOrder = ref<'asc' | 'desc'>('desc');
 
@@ -116,21 +121,21 @@ const allColumns = [
 const selectedColumns = ref(allColumns.map(c => c.key));
 const visibleColumns = computed(() => allColumns.filter(c => selectedColumns.value.includes(c.key)));
 
-function getParametersSummary(measurement: any): string {
-  const params = measurement.parameters || {};
+function getParametersSummary(m: any): string {
+  const params = m.parameters || {};
   const parts: string[] = [];
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null) {
-      parts.push(`${key}=${value}`);
-    }
-  }
+  if (params.voltage !== undefined && params.voltage !== null) parts.push(`U = ${params.voltage}`);
+  if (params.resistance !== undefined && params.resistance !== null) parts.push(`R = ${params.resistance}`);
+  if (params.capacity !== undefined && params.capacity !== null) parts.push(`C = ${params.capacity}%`);
   return parts.length ? parts.join('; ') : '-';
 }
 
 function formatCell(m: any, key: string): string {
-  if (key === 'measurementDate') return formatDate(m.measurementDate);
-  if (key === 'parametersSummary') return getParametersSummary(m);
-  return m[key] || '-';
+  switch (key) {
+    case 'measurementDate': return formatDate(m.measurementDate);
+    case 'parametersSummary': return getParametersSummary(m);
+    default: return m[key] || '-';
+  }
 }
 
 function sortBy(field: string) {
@@ -145,11 +150,24 @@ function sortBy(field: string) {
 const filteredMeasurements = computed(() => {
   let list = [...measurements.value];
   const f = filters.value;
-  if (f.resourceName) list = list.filter(m => (m.resourceName || '').toLowerCase().includes(f.resourceName.toLowerCase()));
-  if (f.mark) list = list.filter(m => (m.mark || '').toLowerCase().includes(f.mark.toLowerCase()));
-  if (f.registrationNumber) list = list.filter(m => String(m.registrationNumber || '').includes(f.registrationNumber));
-  if (f.dateFrom) list = list.filter(m => m.measurementDate >= f.dateFrom);
-  if (f.dateTo) list = list.filter(m => m.measurementDate <= f.dateTo);
+  if (resourceIdFilter.value) {
+    list = list.filter(m => m.resourceId === resourceIdFilter.value);
+  }
+  if (f.resourceName) {
+    list = list.filter(m => (m.resourceName || '').toLowerCase().includes(f.resourceName.toLowerCase()));
+  }
+  if (f.mark) {
+    list = list.filter(m => (m.mark || '').toLowerCase().includes(f.mark.toLowerCase()));
+  }
+  if (f.registrationNumber) {
+    list = list.filter(m => String(m.registrationNumber || '').includes(f.registrationNumber));
+  }
+  if (f.dateFrom) {
+    list = list.filter(m => m.measurementDate >= f.dateFrom);
+  }
+  if (f.dateTo) {
+    list = list.filter(m => m.measurementDate <= f.dateTo);
+  }
   return list;
 });
 
@@ -181,21 +199,28 @@ const filteredAndSortedMeasurements = computed(() => {
   return list;
 });
 
-async function loadMeasurements() {
+function applyFilters() {}
+function resetFilters() {
+  filters.value = { resourceName: '', mark: '', registrationNumber: '', dateFrom: '', dateTo: '' };
+}
+
+async function loadMeasurements(resourceId?: string) {
+  resourceIdFilter.value = resourceId || null;
   await store.fetchResources();
   const allResources = store.resources;
   const allMeasurements: any[] = [];
   for (const res of allResources) {
     const measurementsList = res.resource_params?.measurements || [];
     for (const m of measurementsList) {
+      const params = m.parameters || {};
       allMeasurements.push({
         id: m.id,
-        resourceId: res.node_id,   // ← добавить
+        resourceId: res.resource_id,
         resourceName: res.name,
         mark: res.mark,
         registrationNumber: res.registration_number,
-        measurementDate: m.date,
-        parameters: m.parameters || {},
+        measurementDate: m.measurement_date,
+        parameters: params,
       });
     }
   }
@@ -203,49 +228,42 @@ async function loadMeasurements() {
   measurements.value = allMeasurements;
 }
 
-async function open() {
-  await loadMeasurements();
+async function open(resourceId?: string) {
+  await loadMeasurements(resourceId);
   visible.value = true;
 }
 
-function close() { visible.value = false; exportDropdownOpen.value = false; }
-function editMeasurement(m: any) { editModalRef.value?.open(m); }
+function close() {
+  visible.value = false;
+  exportDropdownOpen.value = false;
+}
+
+function openAddMeasurement() {
+  addMeasurementModalRef.value?.open();
+}
+
+function editMeasurement(m: any) {
+  addMeasurementModalRef.value?.open(m.resourceId, m);
+}
+
 async function confirmDeleteMeasurement(id: number) {
   const ok = await confirmDialog.value?.show('Удаление', 'Удалить измерение?');
   if (ok) {
     await deleteMeasurement(id);
   }
 }
+
 async function deleteMeasurement(measurementId: number) {
-  const ok = await confirmDialog.value?.show('Удаление', 'Удалить измерение?');
-  if (!ok) return;
-
-  // Находим измерение по id
   const measurement = measurements.value.find(m => m.id === measurementId);
-  if (!measurement) {
-    console.error('Измерение не найдено');
-    return;
-  }
-
-  // resourceId – это node_id ресурса, который мы должны были сохранить при загрузке
-  const resourceId = measurement.resourceId;
-  if (!resourceId) {
-    console.error('resourceId не найден в измерении');
-    return;
-  }
+  if (!measurement) return;
 
   try {
-    // Загружаем текущий ресурс
-    const resource = await store.fetchResourceById(resourceId);
+    const resource = await store.fetchResourceById(measurement.resourceId);
     const params = resource.resource_params || {};
     let measurementsList = params.measurements || [];
-
-    // Удаляем измерение
     measurementsList = measurementsList.filter((m: any) => m.id !== measurementId);
-
     const updatedParams = { ...params, measurements: measurementsList };
-
-    // Формируем полный payload для upsertResource
+    
     const payload = {
       name: resource.name,
       mark: resource.mark,
@@ -261,75 +279,74 @@ async function deleteMeasurement(measurementId: number) {
       note: resource.note,
       resource_params: updatedParams,
     };
-
-    await store.upsertResource(resourceId, payload);
-    await loadMeasurements(); // обновляем список измерений
+    await store.upsertResource(measurement.resourceId, payload);
+    await loadMeasurements(resourceIdFilter.value || undefined);
   } catch (err) {
     console.error('Ошибка удаления измерения:', err);
   }
 }
-function refresh() { loadMeasurements(); }
-function applyFilters() {}
-function resetFilters() {
-  filters.value = { resourceName: '', mark: '', registrationNumber: '', dateFrom: '', dateTo: '' };
+
+function refresh() {
+  loadMeasurements(resourceIdFilter.value || undefined);
+  window.dispatchEvent(new Event('resource-saved'));
 }
 
 function getExportData() {
-  return filteredAndSortedMeasurements.value.map(m => {
-    return {
-      'Наименование': m.resourceName || '-',
-      'Марка': m.mark || '-',
-      'Учётный №': m.registrationNumber || '-',
-      'Дата измерения': formatDate(m.measurementDate),
-      'Параметры (основные)': getParametersSummary(m),
-    };
-  });
+  return filteredAndSortedMeasurements.value.map(m => ({
+    'Наименование': m.resourceName || '-',
+    'Марка': m.mark || '-',
+    'Учётный №': m.registrationNumber || '-',
+    'Дата измерения': formatDate(m.measurementDate),
+    'Параметры (основные)': getParametersSummary(m),
+  }));
 }
 
 function exportToExcel() {
   const data = getExportData();
-  if (data.length === 0) { alert('Нет данных для экспорта'); return; }
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Журнал измерений');
-  XLSX.writeFile(wb, `Журнал_измерений_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  if (data.length === 0) {
+    alert('Нет данных для экспорта');
+    return;
+  }
+  const filename = `Журнал_измерений_${new Date().toISOString().slice(0, 19).replace(/:/g, '-').replace(/-/g, '_')}`;
+  exportUtils.exportToExcel(data, filename);
   exportDropdownOpen.value = false;
 }
 
 function exportToWord() {
   const data = getExportData();
-  if (data.length === 0) { alert('Нет данных для экспорта'); return; }
-  const firstItem = data[0];
-  if (!firstItem) return;
-  const headers = Object.keys(firstItem);
-  let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Журнал измерений</title>`;
-  html += `<style>body{font-family:Arial;} table{border-collapse:collapse;width:100%} th,td{border:1px solid #000;padding:6px;text-align:left}</style></head><body>`;
-  html += `<h1>Журнал измерения остаточных ресурсов</h1><p>Дата: ${new Date().toLocaleDateString()}</p>`;
-  html += `<table><thead><tr>`;
-  for (const h of headers) html += `<th>${h}</th>`;
-  html += `</tr></thead><tbody>`;
-  for (const row of data) {
-    html += `<tr>`;
-    for (const h of headers) {
-      const value = (row as any)[h] || '-';
-      html += `<td>${value}</td>`;
-    }
-    html += `</tr>`;
+  if (data.length === 0) {
+    alert('Нет данных для экспорта');
+    return;
   }
-  html += `</tbody></table></body></html>`;
-  const blob = new Blob([html], { type: 'application/msword' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `Журнал_измерений_${new Date().toISOString().slice(0, 10)}.doc`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  const firstItem = data[0];
+  if (!firstItem) {
+    alert('Нет данных для экспорта');
+    return;
+  }
+  const headers = Object.keys(firstItem);
+  const filename = `Журнал_измерений_${new Date().toISOString().slice(0, 19).replace(/:/g, '-').replace(/-/g, '_')}`;
+  exportUtils.exportToWord(data, headers, filename);
   exportDropdownOpen.value = false;
 }
 
-function toggleExportDropdown() { exportDropdownOpen.value = !exportDropdownOpen.value; }
+function toggleExportDropdown() {
+  exportDropdownOpen.value = !exportDropdownOpen.value;
+}
+
+function handleClickOutside(event: MouseEvent) {
+  const target = event.target as HTMLElement;
+  if (!target.closest('.dropdown')) {
+    exportDropdownOpen.value = false;
+  }
+}
+
+watch(() => visible.value, (newVal) => {
+  if (newVal) {
+    document.addEventListener('click', handleClickOutside);
+  } else {
+    document.removeEventListener('click', handleClickOutside);
+  }
+});
 
 defineExpose({ open, refresh });
 </script>
@@ -355,16 +372,61 @@ defineExpose({ open, refresh });
   padding: 15px;
   margin-bottom: 20px;
 }
-.filter-row {
-  display: flex;
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 10px;
-  flex-wrap: wrap;
+  align-items: end;
 }
-.filter-row .form-control {
-  width: auto;
-  min-width: 130px;
+.table-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  max-height: 500px;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  background: white;
 }
-.dropdown { position: relative; }
+.table-scroll-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #e0e4e8;
+  border-radius: 6px;
+}
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #2c5f8a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #1e4566;
+}
+.table-scroll-container .data-table {
+  min-width: 800px;
+}
+.actions-cell {
+  white-space: nowrap;
+}
+.actions-cell .btn {
+  margin-right: 4px;
+}
+.empty-data {
+  text-align: center;
+  padding: 20px;
+  color: #999;
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 10px;
+  border-top: 1px solid #e0e4e8;
+}
+.dropdown {
+  position: relative;
+}
 .dropdown-menu {
   position: absolute;
   top: 100%;
@@ -375,7 +437,7 @@ defineExpose({ open, refresh });
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   z-index: 100;
-  min-width: 120px;
+  min-width: 150px;
 }
 .dropdown-item {
   display: block;
@@ -387,19 +449,7 @@ defineExpose({ open, refresh });
   cursor: pointer;
   font-size: 14px;
 }
-.dropdown-item:hover { background-color: #f0f2f5; }
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-  padding-top: 10px;
-  border-top: 1px solid #e0e4e8;
-}
-.actions-cell {
-  white-space: nowrap;
-}
-.actions-cell .btn {
-  margin-right: 4px;
+.dropdown-item:hover {
+  background-color: #f0f2f5;
 }
 </style>
