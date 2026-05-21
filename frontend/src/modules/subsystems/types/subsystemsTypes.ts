@@ -1,41 +1,38 @@
 export interface Subsystem {
-  subsys_id: number;
+  subsys_id: string;
   name: string;
-  parent_id: number | null;
-  location?: string;
+  parent_id: string | null;
+  location: string;
   note?: string;
-  created_at: string;
-  updated_at: string;
-  is_deleted: boolean;
 }
 
-export interface SubsystemPlan {
-  plan_id: number;
-  subsystem_id: number;
-  name: string;
-  description?: string;
-  start_date: string;
-  end_date: string;
-  status: 'pending' | 'in_progress' | 'completed';
-  created_at: string;
-  updated_at: string;
-  is_deleted: boolean;
+export interface SubsystemTreeItem extends Subsystem {
+  children: SubsystemTreeItem[];
 }
 
-// Тип для модуля
-export interface Module {
+export interface SubsystemTreeNode {
   id: string;
   name: string;
-  icon: string;
-  order: number;
+  type: 'subsystem';
+  children: SubsystemTreeNode[];
 }
 
-// Тип для элемента содержимого модуля
-export interface ModuleContent {
-  id: number;
-  moduleId: string;
-  entityId: number;
+export interface SubsystemNode {
+  node_id: string;
+  name: string | null;
+  manufacturer: string;
+  model: string;
+  serial_number: string | null;
+  inventory_number: string | null;
+  status: string;
+  location: string;
+  node_type_name: string | null;
+  is_aggregate: boolean;
+}
+
+export interface SubsystemPayload {
   name: string;
-  status?: string;
-  type: string;
+  location: string;
+  parent_id: string | null;
+  note?: string | null;
 }

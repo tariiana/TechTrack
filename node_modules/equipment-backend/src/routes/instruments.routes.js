@@ -21,5 +21,6 @@ router.put('/:id', instrumentController.update);
 router.delete('/:id/write-off', instrumentController.writeOff);
 router.get('/:id/verifications', instrumentController.getVerifications);
 router.post('/:id/verifications', instrumentController.addVerification);
+router.put('/:id/verifications/:verificationId', instrumentController.updateVerification);
 
 module.exports = router;

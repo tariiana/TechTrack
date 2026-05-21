@@ -1,90 +1,108 @@
 <template>
-  <div class="modal-overlay" v-if="visible">
-    <div class="modal-content" style="width: 500px">
-      <div class="modal-header">{{ isEdit ? 'Редактирование подсистемы' : 'Добавление подсистемы' }}</div>
+  <div v-if="visible" class="modal-overlay">
+    <form class="modal-content subsystem-form" @submit.prevent="save">
+      <div class="modal-header">
+        {{ isEdit ? 'Редактирование подсистемы' : 'Добавление подсистемы' }}
+      </div>
+
       <div class="form-group">
-        <label>Наименование*</label>
-        <input type="text" v-model="form.name" class="form-control" :class="{ 'invalid': errors.name }" />
+        <label for="subsystem-name">Наименование*</label>
+        <input
+          id="subsystem-name"
+          v-model="form.name"
+          type="text"
+          class="form-control"
+          :class="{ invalid: errors.name }"
+          autocomplete="off"
+        />
         <span v-if="errors.name" class="error-text">{{ errors.name }}</span>
       </div>
+
       <div class="form-group">
-        <label>Расположение*</label>
-        <input type="text" v-model="form.location" class="form-control" :class="{ 'invalid': errors.location }" />
+        <label for="subsystem-location">Расположение*</label>
+        <input
+          id="subsystem-location"
+          v-model="form.location"
+          type="text"
+          class="form-control"
+          :class="{ invalid: errors.location }"
+          autocomplete="off"
+        />
         <span v-if="errors.location" class="error-text">{{ errors.location }}</span>
       </div>
+
       <div class="form-group">
-        <label>Родительская подсистема</label>
-        <select v-model="form.parent_id" class="form-control">
-          <option :value="null">-- Корневая (без родителя) --</option>
-          <option v-for="sub in subsystems" :key="sub.subsys_id" :value="sub.subsys_id">
+        <label for="subsystem-parent">Родительская подсистема</label>
+        <select id="subsystem-parent" v-model="form.parent_id" class="form-control">
+          <option :value="null">Корневая подсистема</option>
+          <option v-for="sub in parentOptions" :key="sub.subsys_id" :value="sub.subsys_id">
             {{ sub.name }}
           </option>
         </select>
       </div>
+
       <div class="form-group">
-        <label>Примечания</label>
-        <textarea v-model="form.note" rows="3" class="form-control"></textarea>
+        <label for="subsystem-note">Примечание</label>
+        <textarea id="subsystem-note" v-model="form.note" rows="3" class="form-control"></textarea>
       </div>
-      <div v-if="error" class="error-text">{{ error }}</div>
+
+      <div v-if="error" class="error-text form-error">{{ error }}</div>
+
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="close">Отмена</button>
-        <button class="btn btn-primary" @click="save">Сохранить</button>
+        <button class="btn btn-secondary" type="button" @click="close">Отмена</button>
+        <button class="btn btn-primary" type="submit" :disabled="isSaving">
+          {{ isSaving ? 'Сохранение...' : 'Сохранить' }}
+        </button>
       </div>
-    </div>
+    </form>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { reactive, ref } from 'vue';
 import { useSubsystemStore } from '../stores/subsystemsStore';
+import type { Subsystem, SubsystemPayload, SubsystemTreeItem } from '../types/subsystemsTypes';
 
 const store = useSubsystemStore();
 const visible = ref(false);
 const isEdit = ref(false);
+const isSaving = ref(false);
 const editId = ref<string | null>(null);
 const error = ref('');
-const subsystems = ref<any[]>([]);
+const parentOptions = ref<Subsystem[]>([]);
+
+const emit = defineEmits<{ (event: 'saved', subsystem: Subsystem): void }>();
 
 const errors = reactive({
   name: '',
   location: '',
 });
 
-const form = reactive({
+const form = reactive<SubsystemPayload>({
   name: '',
   location: '',
-  parent_id: null as string | null,
+  parent_id: null,
   note: '',
 });
 
-async function loadSubsystems() {
-  await store.fetchAll();
-  subsystems.value = Array.isArray(store.subsystems) 
-  ? store.subsystems.filter(s => s.subsys_id !== editId.value)
-  : [];
-}
-
-function validate(): boolean {
-  let isValid = true;
-  errors.name = '';
-  errors.location = '';
-  if (!form.name.trim()) { errors.name = 'Введите наименование'; isValid = false; }
-  if (!form.location.trim()) { errors.location = 'Введите расположение'; isValid = false; }
-  return isValid;
-}
-
-function open(subsys?: any) {
-  reset();
-  loadSubsystems();
-  if (subsys) {
-    isEdit.value = true;
-    editId.value = subsys.subsys_id;
-    form.name = subsys.name;
-    form.location = subsys.location;
-    form.parent_id = subsys.parent_id || null;
-    form.note = subsys.note || '';
+function collectDescendantIds(nodes: SubsystemTreeItem[], id: string, found = false, result = new Set<string>()) {
+  for (const node of nodes) {
+    const isInsideTarget = found || node.subsys_id === id;
+    if (isInsideTarget) result.add(node.subsys_id);
+    collectDescendantIds(node.children || [], id, isInsideTarget, result);
   }
-  visible.value = true;
+
+  return result;
+}
+
+async function loadParentOptions() {
+  await Promise.all([store.fetchAll(), store.fetchTree()]);
+
+  const blockedIds = editId.value
+    ? collectDescendantIds(store.rawTree, editId.value)
+    : new Set<string>();
+
+  parentOptions.value = store.subsystems.filter((subsystem) => !blockedIds.has(subsystem.subsys_id));
 }
 
 function reset() {
@@ -99,23 +117,85 @@ function reset() {
   errors.location = '';
 }
 
-function close() { visible.value = false; }
+function validate(): boolean {
+  let isValid = true;
+  errors.name = '';
+  errors.location = '';
+
+  if (!form.name.trim()) {
+    errors.name = 'Введите наименование';
+    isValid = false;
+  }
+
+  if (!form.location.trim()) {
+    errors.location = 'Введите расположение';
+    isValid = false;
+  }
+
+  return isValid;
+}
+
+async function open(subsystem?: Subsystem, parentId: string | null = null) {
+  reset();
+
+  if (subsystem) {
+    isEdit.value = true;
+    editId.value = subsystem.subsys_id;
+    form.name = subsystem.name;
+    form.location = subsystem.location;
+    form.parent_id = subsystem.parent_id;
+    form.note = subsystem.note || '';
+  } else {
+    form.parent_id = parentId;
+  }
+
+  await loadParentOptions();
+  visible.value = true;
+}
+
+function close() {
+  visible.value = false;
+}
 
 async function save() {
   if (!validate()) return;
-  const data = { name: form.name, location: form.location, parent_id: form.parent_id, note: form.note };
+
+  const data: SubsystemPayload = {
+    name: form.name.trim(),
+    location: form.location.trim(),
+    parent_id: form.parent_id || null,
+    note: form.note?.trim() || null,
+  };
+
   try {
-    if (isEdit.value && editId.value) {
-      await store.update(editId.value, data);
-    } else {
-      await store.create(data);
-    }
+    isSaving.value = true;
+    const saved = isEdit.value && editId.value
+      ? await store.update(editId.value, data)
+      : await store.create(data);
+
     close();
-    window.dispatchEvent(new Event('subsystem-saved'));
+    emit('saved', saved);
   } catch (err: any) {
     error.value = err.message || 'Ошибка сохранения подсистемы';
+  } finally {
+    isSaving.value = false;
   }
 }
 
 defineExpose({ open });
 </script>
+
+<style scoped>
+.subsystem-form {
+  width: 520px;
+}
+
+.form-error {
+  margin-top: 8px;
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+</style>

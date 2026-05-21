@@ -22,7 +22,6 @@ import ResourceCardView from '@/modules/resources/views/ResourceCardView.vue';
 import MaintenanceView from '@/modules/maintenance/views/MaintenanceView.vue';
 import MaintenancePlanView from '@/modules/maintenance/views/MaintenancePlanView.vue';
 
-import SubsystemCard from '@/modules/subsystems/components/SubsystemCard.vue';
 import SubsystemsView from '@/modules/subsystems/views/SubsystemsView.vue';
 import PlanView from '@/modules/subsystems/views/PlanView.vue';
 
@@ -54,14 +53,9 @@ const routes = [
       // Модуль Обслуживание
       { path: 'maintenance', component: MaintenanceView },
       { path: 'maintenance/:id', component: MaintenancePlanView },
-      { path: 'subsystems', component: SubsystemsView },
-      { path: 'subsystems/:id', component: SubsystemsView }, // для карточки подсистемы
       { path: 'subsystems/plan/:id', component: PlanView },
-      {
-          path: '/subsystems/:id',
-          name: 'SubsystemCard',
-          component: () => import('@/modules/subsystems/components/SubsystemCard.vue'),
-      },
+      { path: 'subsystems', component: SubsystemsView },
+      { path: 'subsystems/:id', component: SubsystemsView },
     ],
   },
 ];

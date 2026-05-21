@@ -79,6 +79,24 @@ async function addVerification(req, res, next) {
     next(err);
   }
 }
+
+async function updateVerification(req, res, next) {
+  try {
+    const verification = await MeasuringInstrument.updateVerification(
+      req.params.id,
+      req.params.verificationId,
+      req.body,
+      null
+    );
+    res.json(verification);
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json(ResponseFormatter.error(err.message, err.status));
+    }
+    next(err);
+  }
+}
+
 module.exports = {
   getAll,
   getById,
@@ -86,5 +104,6 @@ module.exports = {
   update,
   writeOff,
   getVerifications,
-  addVerification
+  addVerification,
+  updateVerification
 };

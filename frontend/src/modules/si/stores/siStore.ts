@@ -120,6 +120,12 @@ export const useSIStore = defineStore('si', () => {
     return newVer;
   }
 
+  async function updateVerification(siId: EntityId, verificationId: EntityId, data: any) {
+    const updated = await apiFetch(`/instruments/${siId}/verifications/${verificationId}`, { method: 'PUT', body: JSON.stringify(data) });
+    await fetchVerifications(siId);
+    return updated;
+  }
+
   function setFilterParams(params: any) {
     filterParams.value = { ...filterParams.value, ...params };
     fetchInstruments();
@@ -142,6 +148,7 @@ export const useSIStore = defineStore('si', () => {
     updateInstrument,
     writeOffInstrument,
     addVerification,
+    updateVerification,
     setFilterParams,
   };
 });

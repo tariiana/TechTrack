@@ -72,12 +72,53 @@ function toClientResult(result) {
   return DB_TO_CLIENT_RESULT[result] || result;
 }
 
+function parseVerificationNotes(notes, fallbackDate = null) {
+  const fallback = normalizeDate(fallbackDate);
+  if (!notes) {
+    return {
+      transferDate: fallback,
+      receiptDate: fallback,
+      notes: null,
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(notes);
+    if (parsed && parsed.__siVerification === true) {
+      return {
+        transferDate: normalizeDate(parsed.transferDate) || fallback,
+        receiptDate: normalizeDate(parsed.receiptDate) || fallback,
+        notes: parsed.notes || null,
+      };
+    }
+  } catch (err) {
+    // Старые записи хранили в notes обычный текст.
+  }
+
+  return {
+    transferDate: fallback,
+    receiptDate: fallback,
+    notes,
+  };
+}
+
+function serializeVerificationNotes(data) {
+  const notes = data.notes ?? data.note ?? null;
+  return JSON.stringify({
+    __siVerification: true,
+    transferDate: normalizeDate(data.transferDate || data.calibrationDate || data.receiptDate),
+    receiptDate: normalizeDate(data.receiptDate || data.calibrationDate || data.transferDate),
+    notes,
+  });
+}
+
 function normalizeInstrument(row) {
   if (!row) return null;
 
   const status = toClientStatus(row.dbStatus);
   const lastVerificationDate = normalizeDate(row.lastVerificationDate);
   const nextVerificationDate = normalizeDate(row.nextVerificationDate);
+  const verificationNotes = parseVerificationNotes(row.lastVerificationNotes, lastVerificationDate);
 
   return {
     ...row,
@@ -118,8 +159,8 @@ function normalizeInstrument(row) {
     additionalData: row.mainParams || {},
     notes: row.notes,
     note: row.notes,
-    transferDate: lastVerificationDate,
-    receiptDate: lastVerificationDate,
+    transferDate: verificationNotes.transferDate,
+    receiptDate: verificationNotes.receiptDate,
     isDeleted: row.dbStatus === 'списано',
     is_deleted: row.dbStatus === 'списано',
   };
@@ -130,6 +171,7 @@ function normalizeVerification(row, interval) {
 
   const calibrationDate = normalizeDate(row.calibrationDate);
   const nextCalibrationDate = normalizeDate(row.nextCalibrationDate);
+  const verificationNotes = parseVerificationNotes(row.notes, calibrationDate);
 
   return {
     ...row,
@@ -140,8 +182,8 @@ function normalizeVerification(row, interval) {
     node_id: row.siId,
     calibrationDate,
     calibration_date: calibrationDate,
-    transferDate: calibrationDate,
-    receiptDate: calibrationDate,
+    transferDate: verificationNotes.transferDate,
+    receiptDate: verificationNotes.receiptDate,
     verifier: row.verifier,
     calibrator: row.verifier,
     certificateNumber: row.certificateNumber,
@@ -151,6 +193,7 @@ function normalizeVerification(row, interval) {
     verificationInterval: Number(interval || row.verificationInterval || 1),
     result: toClientResult(row.result),
     dbResult: row.result,
+    notes: verificationNotes.notes,
   };
 }
 
@@ -187,7 +230,8 @@ class MeasuringInstrument {
         (last_cal.calibration_date + (i.calibration_interval * INTERVAL '1 year'))::date AS "nextVerificationDate",
         last_cal.calibrator AS "verifier",
         last_cal.certificate_number AS "certificateNumber",
-        last_cal.result AS "lastVerificationResult"
+        last_cal.result AS "lastVerificationResult",
+        last_cal.notes AS "lastVerificationNotes"
       FROM equipment.nodes n
       JOIN equipment.instruments_history i
         ON i.node_id = n.node_id
@@ -488,7 +532,11 @@ class MeasuringInstrument {
       calibrator,
       data.certificateNumber || data.certificate_number || null,
       result,
-      data.notes || data.note || null,
+      serializeVerificationNotes({
+        ...data,
+        receiptDate: data.receiptDate || calibrationDate,
+        transferDate: data.transferDate || calibrationDate,
+      }),
       userId || null,
     ]);
 
@@ -674,6 +722,72 @@ class MeasuringInstrument {
 
       await client.query('COMMIT');
       return verification;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async updateVerification(instrumentId, verificationId, data, userId = null) {
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const instrument = await MeasuringInstrument.getCurrentInstrument(client, instrumentId);
+      if (!instrument) throw makeHttpError('СИ не найдено', 404);
+
+      const current = await client.query(`
+        SELECT *
+        FROM equipment.calibration_history
+        WHERE history_id = $1 AND node_id = $2
+        LIMIT 1
+      `, [verificationId, instrumentId]);
+      if (!current.rows[0]) throw makeHttpError('Поверка не найдена', 404);
+
+      const oldNotes = parseVerificationNotes(current.rows[0].notes, current.rows[0].calibration_date);
+      const receiptDate = normalizeDate(data.receiptDate || data.calibrationDate || current.rows[0].calibration_date);
+      const transferDate = normalizeDate(data.transferDate || oldNotes.transferDate || receiptDate);
+      const result = normalizeResult(data.result || current.rows[0].result);
+
+      const updated = await client.query(`
+        UPDATE equipment.calibration_history
+        SET
+          calibration_date = $1,
+          calibrator = $2,
+          certificate_number = $3,
+          result = $4,
+          notes = $5,
+          performed_by_user = COALESCE($6, performed_by_user),
+          performed_at = CURRENT_TIMESTAMP
+        WHERE history_id = $7 AND node_id = $8
+        RETURNING
+          history_id AS "id",
+          node_id AS "siId",
+          calibration_date AS "calibrationDate",
+          calibrator AS "verifier",
+          certificate_number AS "certificateNumber",
+          result,
+          notes
+      `, [
+        receiptDate,
+        data.verifier || data.calibrator || current.rows[0].calibrator,
+        data.certificateNumber || data.certificate_number || current.rows[0].certificate_number || null,
+        result,
+        serializeVerificationNotes({
+          transferDate,
+          receiptDate,
+          notes: data.notes ?? data.note ?? oldNotes.notes,
+        }),
+        userId || null,
+        verificationId,
+        instrumentId,
+      ]);
+
+      await client.query('COMMIT');
+      return normalizeVerification(updated.rows[0], instrument.calibration_interval);
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;

@@ -185,9 +185,9 @@ async function save() {
 
   try {
     if (editId.value && instrumentId.value) {
-      // Редактирование поверки (если реализовано в бэкенде)
-      error.value = 'Редактирование поверки пока недоступно. Удалите и добавьте заново.'
-      return
+      await store.updateVerification(instrumentId.value, editId.value, payload)
+      emit('verification-saved')
+      close()
     } else if (instrumentId.value) {
       await store.addVerification({
         siId: instrumentId.value,

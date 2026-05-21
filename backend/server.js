@@ -25,6 +25,7 @@ app.use(morgan('combined'));
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
+  skip: (req) => req.method === 'OPTIONS',
   message: { error: 'Слишком много запросов, попробуйте позже' },
 });
 app.use('/api/', limiter);

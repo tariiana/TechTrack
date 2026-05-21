@@ -182,6 +182,21 @@ function getRemainingLife(res: any): number {
   return Number.isFinite(result) ? result : Number.NaN
 }
 
+async function loadDashboardData() {
+  const results = await Promise.allSettled([
+    equipmentStore.init(false),
+    siStore.fetchInstruments(),
+    resourcesStore.fetchResources(),
+    maintenanceStore.fetchPlans(),
+  ])
+
+  results.forEach((result) => {
+    if (result.status === 'rejected') {
+      console.error('Dashboard data load error:', result.reason)
+    }
+  })
+}
+
 async function loadStats() {
   // Статистика оборудования
   // Используем rawNodes (все узлы) или nodes (отфильтрованные)
@@ -254,8 +269,9 @@ async function loadStats() {
   }
 }
 
-onMounted(() => {
-  loadStats()
+onMounted(async () => {
+  await loadDashboardData()
+  await loadStats()
 })
 </script>
 
