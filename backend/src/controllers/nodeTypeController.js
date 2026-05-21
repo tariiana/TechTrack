@@ -4,7 +4,7 @@ const ResponseFormatter = require('../utils/responseFormatter');
 async function getAll(req, res, next) {
   try {
     const types = await NodeType.getAll();
-    res.json(ResponseFormatter.success(types));
+    res.json(types);
   } catch (err) { next(err); }
 }
 
@@ -12,7 +12,7 @@ async function getById(req, res, next) {
   try {
     const type = await NodeType.getById(req.params.id);
     if (!type) return res.status(404).json(ResponseFormatter.error('Вид узла не найден', 404));
-    res.json(ResponseFormatter.success(type));
+    res.json(type);
   } catch (err) { next(err); }
 }
 

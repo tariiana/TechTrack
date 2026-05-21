@@ -142,6 +142,15 @@ import MeasurementsModal from '../components/MeasurementsModal.vue';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import * as exportUtils from '@/utils/exportUtils';
 
+function toNumber(value: any): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const match = String(value).replace(',', '.').match(/-?\d+(\.\d+)?/);
+  if (!match) return null;
+  const result = Number(match[0]);
+  return Number.isFinite(result) ? result : null;
+}
+
 const router = useRouter();
 const store = useResourcesStore();
 const equipmentStore = useEquipmentStore();
@@ -188,8 +197,8 @@ const canEdit = computed(() => {
 // Определение статуса ресурса (по ТЗ: получен, исправен, неисправен, в ремонте, на поверке, законсервирован, списан)
 function getResourceStatus(res: any): string {
   if (res.is_deleted) return 'Списан';
-  const remaining = res.remaining_resource;
-  if (remaining !== undefined) {
+  const remaining = toNumber(res.remaining_resource);
+  if (remaining !== null) {
     if (remaining <= 20) return 'Неисправен';
     if (remaining <= 50) return 'В ремонте';
     if (remaining <= 80) return 'На поверке';
@@ -203,10 +212,10 @@ const alerts = computed(() => {
   const result: { type: string; message: string }[] = [];
   for (const res of store.resources) {
     if (res.is_deleted) continue;
-    const remaining = res.remaining_resource;
-    if (remaining !== undefined && remaining <= 20) {
+    const remaining = toNumber(res.remaining_resource);
+    if (remaining !== null && remaining <= 20) {
       result.push({ type: 'danger', message: `🔴 ${res.name}: остаточный ресурс критический (${remaining}%)` });
-    } else if (remaining !== undefined && remaining <= 50) {
+    } else if (remaining !== null && remaining <= 50) {
       result.push({ type: 'warning', message: `⚠️ ${res.name}: остаточный ресурс менее 50% (${remaining}%)` });
     }
   }

@@ -151,7 +151,7 @@ const filteredMeasurements = computed(() => {
   let list = [...measurements.value];
   const f = filters.value;
   if (resourceIdFilter.value) {
-    list = list.filter(m => m.resourceId === resourceIdFilter.value);
+    list = list.filter(m => String(m.resourceId) === String(resourceIdFilter.value));
   }
   if (f.resourceName) {
     list = list.filter(m => (m.resourceName || '').toLowerCase().includes(f.resourceName.toLowerCase()));

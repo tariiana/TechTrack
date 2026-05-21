@@ -73,7 +73,7 @@ const emit = defineEmits(['verification-saved'])
 
 const visible = ref(false)
 const instrumentId = ref<string | null>(null)
-const editId = ref<number | null>(null)
+const editId = ref<string | null>(null)
 const error = ref('')
 
 // Список поверителей (храним в localStorage)

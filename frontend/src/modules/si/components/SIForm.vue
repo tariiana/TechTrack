@@ -43,7 +43,7 @@
         </div>
         <div class="form-group">
           <label>Узел (ID)</label>
-          <input type="number" v-model.number="form.nodeId" class="form-control" />
+          <input v-model="form.nodeId" class="form-control" />
         </div>
       </div>
 
@@ -114,7 +114,7 @@ import { useSIStore } from '../stores/siStore';
 const store = useSIStore();
 const visible = ref(false);
 const isEdit = ref(false);
-const editId = ref<number | null>(null);
+const editId = ref<string | null>(null);
 const error = ref('');
 const jsonError = ref('');
 
@@ -137,7 +137,7 @@ const form = reactive({
   serialNumber: '',
   inventoryNumber: '',
   tabNumber: '',
-  nodeId: undefined as number | undefined,
+  nodeId: undefined as string | undefined,
   status: 'в эксплуатации' as 'в эксплуатации' | 'на поверке' | 'в ремонте' | 'выведено',
   location: '',
   mainParams: {} as Record<string, any>,

@@ -147,13 +147,13 @@ const isWarning = computed(() => {
 });
 
 async function loadData() {
-  const id = Number(route.params.id);
+  const id = String(route.params.id);
   instrument.value = await store.fetchInstrumentById(id);
   if (instrument.value) {
     const data = await store.fetchVerifications(id);
     verifications.value = data;
-    lastVerificationDate.value = store.getLastVerificationDate(id);
-    nextVerificationDate.value = store.getNextVerificationDate(id);
+    lastVerificationDate.value = store.getLastVerificationDate(id) || instrument.value.lastVerificationDate || '';
+    nextVerificationDate.value = store.getNextVerificationDate(id) || instrument.value.nextVerificationDate || '';
   }
 }
 

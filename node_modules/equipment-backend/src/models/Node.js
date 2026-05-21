@@ -1,271 +1,378 @@
 const pool = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 
+function normalizeDate(value) {
+  if (!value) return null;
+  if (typeof value === 'string') return value.slice(0, 10);
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return value;
+}
+
+function normalizeNode(row) {
+  if (!row) return row;
+
+  return {
+    ...row,
+    manufactured_date: normalizeDate(row.manufactured_date),
+    commission_date: normalizeDate(row.commission_date),
+    decommission_date: normalizeDate(row.decommission_date),
+    write_off_date: normalizeDate(row.write_off_date),
+    type: row.is_aggregate ? 'aggregate' : 'block',
+  };
+}
+
+function normalizeNodes(rows) {
+  return rows.map(normalizeNode);
+}
+
 class Node {
-  // Получить список узлов с фильтрацией (без детей, плоский список)
-  static async getAll(filters = {}) {
-  let sql = `
-    SELECT 
-      n.node_id,
-      n.name,
-      n.manufacturer,
-      n.model,
-      n.serial_number,
-      n.inventory_number,
-      n.status,
-      n.location,
-      n.note,
-      n.parameters,
-      n.installed_in_node,
-      n.subsystem_id,
-      n.commission_date,
-      n.operation_mode,
-      (SELECT s.name FROM equipment.subsystems s WHERE s.subsys_id = n.subsystem_id) as subsystem_name,
-      (SELECT p.name FROM equipment.nodes p WHERE p.node_id = n.installed_in_node) as parent_name,
-      EXISTS(SELECT 1 FROM equipment.nodes WHERE installed_in_node = n.node_id) as is_aggregate,
-      EXISTS(SELECT 1 FROM equipment.measuring_instruments WHERE instrument_id::text = n.node_id::text) as is_si
-    FROM equipment.nodes n
-  `;
-    const values = [];
-    let idx = 1;
-    if (filters.search) {
-      sql += ` AND (n.name ILIKE $${idx} OR n.manufacturer ILIKE $${idx} OR n.model ILIKE $${idx})`;
-      values.push(`%${filters.search}%`);
-      idx++;
-    }
-    if (filters.status) {
-      sql += ` AND n.status = $${idx}`;
-      values.push(filters.status);
-      idx++;
-    }
-    if (filters.subsystem_id) {
-      sql += ` AND n.subsystem_id = $${idx}`;
-      values.push(filters.subsystem_id);
-      idx++;
-    }
-    if (filters.node_type_id) {
-      sql += ` AND n.node_type_id = $${idx}`;
-      values.push(filters.node_type_id);
-      idx++;
-    }
-    sql += ` ORDER BY n.name`;
-    const result = await pool.query(sql, values);
-    return result.rows;
-  }
-
-  // Получить дерево узлов (иерархия)
-  static async getTree() {
-    const nodes = await this.getAll();
-    const map = new Map();
-    const roots = [];
-    for (const node of nodes) {
-      map.set(node.node_id, { ...node, children: [] });
-    }
-    for (const node of nodes) {
-      if (node.installed_in_node && map.has(node.installed_in_node)) {
-        const parent = map.get(node.installed_in_node);
-        parent.children.push(map.get(node.node_id));
-      } else {
-        roots.push(map.get(node.node_id));
-      }
-    }
-    return roots;
-  }
-
-  // Получить один узел по ID
-  static async getById(id) {
-    const result = await pool.query(`
-      SELECT 
+  static baseSelect() {
+    return `
+      SELECT
         n.node_id,
         n.node_type_id,
         n.name,
         n.manufacturer,
         n.model,
+        n.manufactured_date,
         n.serial_number,
         n.inventory_number,
         n.registration_number,
         n.status,
-        n.location,
-        n.note,
-        n.parameters,
-        n.installed_in_node,
-        n.subsystem_id,
         n.commission_date,
         n.operation_mode,
-        n.production_date,
-        (SELECT name FROM equipment.subsystems WHERE subsys_id = n.subsystem_id) as subsystem_name,
-        (SELECT name FROM equipment.nodes WHERE node_id = n.installed_in_node) as parent_name,
-        EXISTS(SELECT 1 FROM equipment.nodes WHERE installed_in_node = n.node_id) as is_aggregate,
-        EXISTS(SELECT 1 FROM equipment.measuring_instruments WHERE instrument_id::text = n.node_id::text) as is_si
-      FROM equipment.nodes n
-      WHERE n.node_id = $1 AND n.valid_to IS NULL
-    `, [id]);
-    return result.rows[0];
-  }
-
-  // Получить дочерние узлы (состав агрегата)
-  static async getChildren(id) {
-    const result = await pool.query(`
-      SELECT 
-        n.node_id,
-        n.name,
-        n.manufacturer,
-        n.model,
-        n.status,
+        n.decommission_date,
+        n.write_off_date,
         n.location,
         n.parameters,
         n.note,
-        (SELECT name FROM equipment.node_types WHERE node_type_id = n.node_type_id) as type_name
+        n.installed_in_node,
+        n.subsystem_id,
+        nt.name AS node_type_name,
+        s.name AS subsystem_name,
+        p.name AS parent_name,
+        EXISTS (
+          SELECT 1 FROM equipment.nodes child
+          WHERE child.installed_in_node = n.node_id
+        ) AS is_aggregate,
+        EXISTS (
+          SELECT 1 FROM equipment.instruments_history ih
+          WHERE ih.node_id = n.node_id AND ih.valid_to IS NULL
+        ) AS is_si,
+        EXISTS (
+          SELECT 1 FROM equipment.resources_history rh
+          WHERE rh.node_id = n.node_id AND rh.valid_to IS NULL
+        ) AS has_resource
       FROM equipment.nodes n
-      WHERE n.installed_in_node = $1 AND n.valid_to IS NULL
-      ORDER BY n.name
-    `, [id]);
-    return result.rows;
+      LEFT JOIN equipment.node_types nt ON nt.node_type_id = n.node_type_id
+      LEFT JOIN equipment.subsystems s ON s.subsys_id = n.subsystem_id
+      LEFT JOIN equipment.nodes p ON p.node_id = n.installed_in_node
+    `;
   }
 
-  // Получить историю перемещений узла (из представления)
+  static async getAll(filters = {}) {
+    const where = [];
+    const values = [];
+    let idx = 1;
+
+    if (filters.search) {
+      where.push(`(
+        n.name ILIKE $${idx}
+        OR n.manufacturer ILIKE $${idx}
+        OR n.model ILIKE $${idx}
+        OR n.serial_number ILIKE $${idx}
+        OR n.inventory_number ILIKE $${idx}
+        OR n.registration_number ILIKE $${idx}
+      )`);
+      values.push(`%${filters.search}%`);
+      idx++;
+    }
+
+    if (filters.status) {
+      where.push(`n.status = $${idx}`);
+      values.push(filters.status);
+      idx++;
+    }
+
+    if (filters.subsystem_id) {
+      where.push(`n.subsystem_id = $${idx}`);
+      values.push(filters.subsystem_id);
+      idx++;
+    }
+
+    if (filters.node_type_id) {
+      where.push(`n.node_type_id = $${idx}`);
+      values.push(filters.node_type_id);
+      idx++;
+    }
+
+    const sql = `
+      ${Node.baseSelect()}
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY n.name NULLS LAST, n.model NULLS LAST
+    `;
+
+    const result = await pool.query(sql, values);
+    return normalizeNodes(result.rows);
+  }
+
+  static async getTree() {
+    const nodes = await Node.getAll();
+    const map = new Map();
+    const roots = [];
+
+    for (const node of nodes) {
+      map.set(node.node_id, { ...node, children: [] });
+    }
+
+    for (const node of nodes) {
+      if (node.installed_in_node && map.has(node.installed_in_node)) {
+        map.get(node.installed_in_node).children.push(map.get(node.node_id));
+      } else {
+        roots.push(map.get(node.node_id));
+      }
+    }
+
+    return roots;
+  }
+
+  static async getById(id) {
+    const result = await pool.query(`
+      ${Node.baseSelect()}
+      WHERE n.node_id = $1
+    `, [id]);
+
+    return normalizeNode(result.rows[0]);
+  }
+
+  static async getChildren(id) {
+    const result = await pool.query(`
+      ${Node.baseSelect()}
+      WHERE n.installed_in_node = $1
+      ORDER BY n.name NULLS LAST, n.model NULLS LAST
+    `, [id]);
+
+    return normalizeNodes(result.rows);
+  }
+
   static async getMovementHistory(id) {
     const result = await pool.query(`
-      SELECT 
+      SELECT
         moved_at,
         previous_location,
         new_location,
-        (SELECT login FROM equipment.users WHERE user_id = moved_by_user) as user_name
-      FROM equipment.node_movement_history_view
-      WHERE node_id = $1
+        moved_by_user,
+        u.login AS user_name
+      FROM equipment.node_movement_history_view mh
+      LEFT JOIN equipment.users u ON u.user_id = mh.moved_by_user
+      WHERE mh.node_id = $1
       ORDER BY moved_at DESC
     `, [id]);
+
     return result.rows;
   }
 
-  // Создать узел (вставить первую версию)
-static async create(data, userId) {
-  const {
-    name,
-    manufacturer,
-    model,
-    serial_number,
-    inventory_number,
-    accounting_number,
-    status,
-    location,
-    note,
-    parent_id,
-    commission_date,
-    operation_mode,
-    production_date,    // из фронта
-    type_name,
-    subsystem_name,
-  } = data;
+  static async resolveNodeTypeId(data) {
+    if (data.node_type_id || data.nodeTypeId) return data.node_type_id || data.nodeTypeId;
 
-  // Найти node_type_id по имени
-  let node_type_id = null;
-  if (type_name) {
-    const typeRes = await pool.query(`SELECT node_type_id FROM equipment.node_types WHERE name = $1`, [type_name]);
-    if (typeRes.rows.length) node_type_id = typeRes.rows[0].node_type_id;
-  }
-
-  // Найти subsystem_id по имени
-  let subsystem_id = null;
-  if (subsystem_name) {
-    const subsysRes = await pool.query(`SELECT subsys_id FROM equipment.subsystems WHERE name = $1`, [subsystem_name]);
-    if (subsysRes.rows.length) subsystem_id = subsysRes.rows[0].subsys_id;
-  }
-
-  const nodeId = uuidv4();
-  await pool.query(`
-    INSERT INTO equipment.nodes_history (
-      node_id, node_type_id, name, manufacturer, model, serial_number,
-      inventory_number, registration_number, status, location, parameters,
-      note, installed_in_node, subsystem_id, commission_date, operation_mode,
-      manufactured_date, valid_from, created_by_user
-    ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP, $18
-    )
-  `, [
-    nodeId, node_type_id, name, manufacturer, model, serial_number || null,
-    inventory_number || null, accounting_number || null, status || 'получен',
-    location, {}, note || null, parent_id || null, subsystem_id,
-    commission_date || null, operation_mode || null, production_date || null,
-    userId
-  ]);
-  return { node_id: nodeId };
-}
-
-
-  // Обновить узел (версионирование)
-  static async update(id, data, userId) {
-    const old = await this.getById(id);
-    if (!old) throw new Error('Узел не найден');
-    // закрыть старую версию
-    await pool.query(`UPDATE equipment.nodes_history SET valid_to = CURRENT_TIMESTAMP WHERE node_id = $1 AND valid_to IS NULL`, [id]);
-    // вставить новую
-    fields: ['node_type_id', 'name', 'manufacturer', 'model', 'serial_number',
-         'inventory_number', 'registration_number', 'status', 'location',
-         'parameters', 'note', 'installed_in_node', 'subsystem_id',
-         'commission_date', 'operation_mode', 'manufactured_date']   // ← здесь
-    const values = [];
-    let idx = 1;
-    for (const f of fields) {
-      let val = data[f] !== undefined ? data[f] : old[f];
-      if (val === undefined || val === null) val = null;
-      values.push(val);
-      idx++;
+    if (data.type_name || data.node_type_name) {
+      const type = await pool.query(
+        `SELECT node_type_id FROM equipment.node_types WHERE name = $1 LIMIT 1`,
+        [data.type_name || data.node_type_name]
+      );
+      if (type.rows[0]) return type.rows[0].node_type_id;
     }
-    values.push(id, userId);
+
+    const fallback = await pool.query(`
+      SELECT node_type_id FROM equipment.node_types ORDER BY name LIMIT 1
+    `);
+    if (!fallback.rows[0]) throw new Error('Не найден ни один вид узла');
+    return fallback.rows[0].node_type_id;
+  }
+
+  static async resolveSubsystemId(data) {
+    if (data.subsystem_id || data.subsys_id) return data.subsystem_id || data.subsys_id;
+
+    if (data.subsystem_name) {
+      const subsystem = await pool.query(
+        `SELECT subsys_id FROM equipment.subsystems WHERE name = $1 LIMIT 1`,
+        [data.subsystem_name]
+      );
+      if (subsystem.rows[0]) return subsystem.rows[0].subsys_id;
+    }
+
+    const fallback = await pool.query(`
+      SELECT subsys_id FROM equipment.subsystems ORDER BY name LIMIT 1
+    `);
+    if (!fallback.rows[0]) throw new Error('Не найдена ни одна подсистема');
+    return fallback.rows[0].subsys_id;
+  }
+
+  static async buildHistoryValues(id, data, old = null, userId = null) {
+    const merged = { ...(old || {}), ...data };
+    const nodeTypeId = await Node.resolveNodeTypeId(merged);
+    const subsystemId = await Node.resolveSubsystemId(merged);
+
+    return {
+      node_id: id,
+      node_type_id: nodeTypeId,
+      name: merged.name,
+      manufacturer: merged.manufacturer || '',
+      model: merged.model || '',
+      manufactured_date: merged.manufactured_date || null,
+      serial_number: merged.serial_number || null,
+      inventory_number: merged.inventory_number || null,
+      registration_number: merged.registration_number || merged.accounting_number || null,
+      status: merged.status || 'получен',
+      commission_date: merged.commission_date || null,
+      operation_mode: merged.operation_mode || null,
+      decommission_date: merged.decommission_date || null,
+      write_off_date: merged.write_off_date || null,
+      location: merged.location || '',
+      parameters: merged.parameters || {},
+      note: merged.note || null,
+      installed_in_node: Object.prototype.hasOwnProperty.call(merged, 'installed_in_node')
+        ? merged.installed_in_node
+        : merged.parent_id || null,
+      subsystem_id: subsystemId,
+      created_by_user: userId || null,
+    };
+  }
+
+  static async insertHistory(values) {
     await pool.query(`
       INSERT INTO equipment.nodes_history (
-        node_id, node_type_id, name, manufacturer, model, serial_number,
-        inventory_number, registration_number, status, location, parameters,
-        note, installed_in_node, subsystem_id, commission_date, operation_mode,
-        production_date, valid_from, created_by_user
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP, $18)
-    `, [id, ...values]);
+        node_id,
+        node_type_id,
+        name,
+        manufacturer,
+        model,
+        manufactured_date,
+        serial_number,
+        inventory_number,
+        registration_number,
+        status,
+        commission_date,
+        operation_mode,
+        decommission_date,
+        write_off_date,
+        location,
+        parameters,
+        note,
+        installed_in_node,
+        subsystem_id,
+        valid_from,
+        created_by_user
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+        $11, $12, $13, $14, $15, $16, $17, $18, $19,
+        CURRENT_TIMESTAMP, $20
+      )
+    `, [
+      values.node_id,
+      values.node_type_id,
+      values.name,
+      values.manufacturer,
+      values.model,
+      values.manufactured_date,
+      values.serial_number,
+      values.inventory_number,
+      values.registration_number,
+      values.status,
+      values.commission_date,
+      values.operation_mode,
+      values.decommission_date,
+      values.write_off_date,
+      values.location,
+      values.parameters,
+      values.note,
+      values.installed_in_node,
+      values.subsystem_id,
+      values.created_by_user,
+    ]);
+  }
+
+  static async create(data, userId) {
+    const id = uuidv4();
+    const values = await Node.buildHistoryValues(id, data, null, userId);
+    await Node.insertHistory(values);
     return { node_id: id };
   }
 
-  // Логическое удаление (списание)
+  static async update(id, data, userId) {
+    const old = await Node.getById(id);
+    if (!old) throw new Error('Узел не найден');
+
+    const values = await Node.buildHistoryValues(id, data, old, userId);
+
+    await pool.query(`
+      UPDATE equipment.nodes_history
+      SET valid_to = CURRENT_TIMESTAMP
+      WHERE node_id = $1 AND valid_to IS NULL
+    `, [id]);
+
+    await Node.insertHistory(values);
+    return { node_id: id };
+  }
+
   static async writeOff(id, userId) {
-    const node = await this.getById(id);
+    const node = await Node.getById(id);
     if (!node) throw new Error('Узел не найден');
-    if (node.is_aggregate) {
-      const children = await this.getChildren(id);
-      if (children.length) throw new Error('Нельзя списать агрегат, содержащий узлы');
+
+    const children = await Node.getChildren(id);
+    if (children.length > 0) {
+      throw new Error('Нельзя списать агрегат, содержащий узлы');
     }
-    await this.update(id, { status: 'списан' }, userId);
+
+    await Node.update(id, {
+      status: 'списан',
+      write_off_date: new Date().toISOString().slice(0, 10),
+    }, userId);
+
     return { success: true };
   }
 
-  // Установка узла в другой узел (комплектация)
+  static async assertNoCycle(childId, parentId) {
+    const result = await pool.query(`
+      WITH RECURSIVE ancestors AS (
+        SELECT node_id, installed_in_node
+        FROM equipment.nodes
+        WHERE node_id = $1
+        UNION ALL
+        SELECT n.node_id, n.installed_in_node
+        FROM equipment.nodes n
+        JOIN ancestors a ON n.node_id = a.installed_in_node
+      )
+      SELECT EXISTS (
+        SELECT 1 FROM ancestors WHERE node_id = $2
+      ) AS has_cycle
+    `, [parentId, childId]);
+
+    if (result.rows[0]?.has_cycle) {
+      throw new Error('Циклическая вложенность узлов запрещена');
+    }
+  }
+
   static async install(childId, parentId, userId) {
-    const child = await this.getById(childId);
+    const child = await Node.getById(childId);
     if (!child) throw new Error('Дочерний узел не найден');
     if (child.installed_in_node) throw new Error('Узел уже установлен в другой агрегат');
-    const parent = await this.getById(parentId);
+
+    const parent = await Node.getById(parentId);
     if (!parent) throw new Error('Родительский узел не найден');
-    // проверка циклической вложенности
-    const cycleCheck = await pool.query(`
-      WITH RECURSIVE ancestors AS (
-        SELECT node_id, installed_in_node FROM equipment.nodes WHERE node_id = $1
-        UNION ALL
-        SELECT n.node_id, n.installed_in_node FROM equipment.nodes n
-        JOIN ancestors a ON n.node_id = a.installed_in_node
-        WHERE n.valid_to IS NULL
-      )
-      SELECT EXISTS(SELECT 1 FROM ancestors WHERE node_id = $2) as has_cycle
-    `, [parentId, childId]);
-    if (cycleCheck.rows[0].has_cycle) throw new Error('Циклическая вложенность запрещена');
-    // обновляем
-    await this.update(childId, { installed_in_node: parentId }, userId);
+
+    await Node.assertNoCycle(childId, parentId);
+    await Node.update(childId, { installed_in_node: parentId }, userId);
+
     return { success: true };
   }
 
-  // Извлечение узла из агрегата
   static async uninstall(childId, userId) {
-    const child = await this.getById(childId);
+    const child = await Node.getById(childId);
     if (!child) throw new Error('Узел не найден');
     if (!child.installed_in_node) throw new Error('Узел не установлен ни в какой агрегат');
-    await this.update(childId, { installed_in_node: null }, userId);
+
+    await Node.update(childId, { installed_in_node: null }, userId);
     return { success: true };
   }
 }

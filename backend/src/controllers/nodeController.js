@@ -5,14 +5,14 @@ async function getAll(req, res, next) {
   try {
     const { search, status, subsystem_id, node_type_id } = req.query;
     const nodes = await Node.getAll({ search, status, subsystem_id, node_type_id });
-    res.json(ResponseFormatter.success(nodes));
+    res.json(nodes);
   } catch (err) { next(err); }
 }
 
 async function getTree(req, res, next) {
   try {
     const tree = await Node.getTree();
-    res.json(ResponseFormatter.success(tree));
+    res.json(tree);
   } catch (err) { next(err); }
 }
 
@@ -20,21 +20,21 @@ async function getById(req, res, next) {
   try {
     const node = await Node.getById(req.params.id);
     if (!node) return res.status(404).json(ResponseFormatter.error('Узел не найден', 404));
-    res.json(ResponseFormatter.success(node));
+    res.json(node);
   } catch (err) { next(err); }
 }
 
 async function getChildren(req, res, next) {
   try {
     const children = await Node.getChildren(req.params.id);
-    res.json(ResponseFormatter.success(children));
+    res.json(children);
   } catch (err) { next(err); }
 }
 
 async function getMovementHistory(req, res, next) {
   try {
     const history = await Node.getMovementHistory(req.params.id);
-    res.json(ResponseFormatter.success(history));
+    res.json(history);
   } catch (err) { next(err); }
 }
 

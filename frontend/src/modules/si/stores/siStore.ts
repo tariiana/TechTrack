@@ -3,6 +3,8 @@ import { ref, computed } from 'vue';
 import { apiFetch } from '@/api/client';
 import { addYears } from '@/utils/dateUtils';
 
+type EntityId = string | number;
+
 export const useSIStore = defineStore('si', () => {
   const instruments = ref<any[]>([]);
   const verifications = ref<any[]>([]);
@@ -42,16 +44,20 @@ export const useSIStore = defineStore('si', () => {
     }
   }
 
-  async function fetchInstrumentById(id: number) {
+  async function fetchInstrumentById(id: EntityId) {
     try {
-      return await apiFetch(`/instruments/${id}`);
+      const data = await apiFetch(`/instruments/${id}`);
+      const index = instruments.value.findIndex(si => String(si.id) === String(id));
+      if (data && index >= 0) instruments.value[index] = data;
+      else if (data) instruments.value.push(data);
+      return data;
     } catch (err: any) {
       error.value = err.message;
       return null;
     }
   }
 
-  async function fetchVerifications(siId: number) {
+  async function fetchVerifications(siId: EntityId) {
     try {
       const data = await apiFetch(`/instruments/${siId}/verifications`);
       verifications.value = data;
@@ -62,21 +68,29 @@ export const useSIStore = defineStore('si', () => {
     }
   }
 
-  function getVerificationsForSI(siId: number) {
-    return verifications.value.filter(v => v.siId === siId).sort((a, b) => b.id - a.id);
+  function getVerificationsForSI(siId: EntityId) {
+    return verifications.value
+      .filter(v => String(v.siId) === String(siId))
+      .sort((a, b) => new Date(b.receiptDate || b.calibrationDate || 0).getTime() - new Date(a.receiptDate || a.calibrationDate || 0).getTime());
   }
 
-  function getLastVerificationDate(siId: number): string {
+  function getLastVerificationDate(siId: EntityId): string {
     const verificationsForSI = getVerificationsForSI(siId);
     const lastGood = verificationsForSI
       .filter(v => v.result === 'годен')
       .sort((a, b) => new Date(b.receiptDate).getTime() - new Date(a.receiptDate).getTime())[0];
-    return lastGood?.receiptDate || '';
+    if (lastGood?.receiptDate) return lastGood.receiptDate;
+
+    const si = instruments.value.find(s => String(s.id) === String(siId));
+    return si?.lastVerificationDate || si?.last_verification_date || '';
   }
 
-  function getNextVerificationDate(siId: number): string {
+  function getNextVerificationDate(siId: EntityId): string {
     const lastDate = getLastVerificationDate(siId);
-    const si = instruments.value.find(s => s.id === siId);
+    const si = instruments.value.find(s => String(s.id) === String(siId));
+    if (si?.nextVerificationDate || si?.next_verification_date) {
+      return si.nextVerificationDate || si.next_verification_date;
+    }
     if (lastDate && si?.verificationInterval) {
       return addYears(lastDate, si.verificationInterval);
     }
@@ -89,13 +103,13 @@ export const useSIStore = defineStore('si', () => {
     return newInstrument;
   }
 
-  async function updateInstrument(id: number, data: any) {
+  async function updateInstrument(id: EntityId, data: any) {
     const updated = await apiFetch(`/instruments/${id}`, { method: 'PUT', body: JSON.stringify(data) });
     await fetchInstruments();
     return updated;
   }
 
-  async function writeOffInstrument(id: number) {
+  async function writeOffInstrument(id: EntityId) {
     await apiFetch(`/instruments/${id}/write-off`, { method: 'DELETE' });
     await fetchInstruments();
   }

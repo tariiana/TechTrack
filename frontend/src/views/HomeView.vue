@@ -175,8 +175,11 @@ function getDaysUntil(dateStr: string): number {
 
 function getRemainingLife(res: any): number {
   const params = res.resource_params || {}
-  const remaining = params.remaining_life || params.remainingLife || 100
-  return parseFloat(remaining)
+  const raw = res.remaining_resource ?? params.remaining_resource ?? params.remaining_life ?? params.remainingLife ?? params.health ?? params.battery_level
+  const value = typeof raw === 'object' && raw !== null && 'value' in raw ? raw.value : raw
+  if (value === null || value === undefined || value === '') return Number.NaN
+  const result = parseFloat(String(value).replace(',', '.'))
+  return Number.isFinite(result) ? result : Number.NaN
 }
 
 async function loadStats() {
@@ -212,6 +215,7 @@ async function loadStats() {
   let warning = 0
   for (const res of resourcesList) {
     const remaining = getRemainingLife(res)
+    if (!Number.isFinite(remaining)) continue
     if (remaining <= 20) critical++
     else if (remaining <= 50) warning++
   }
@@ -239,6 +243,7 @@ async function loadStats() {
 
   for (const res of resourcesList) {
     const remaining = getRemainingLife(res)
+    if (!Number.isFinite(remaining)) continue
     if (remaining <= 20) {
       urgentAlerts.value.push({
         id: res.resource_id,

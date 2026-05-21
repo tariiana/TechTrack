@@ -21,7 +21,7 @@ import { ref, watch, onMounted } from 'vue';
 import { useResourcesStore } from '../stores/resourcesStore';
 
 const props = defineProps<{
-  resourceId: number;
+  resourceId: number | string;
 }>();
 
 const store = useResourcesStore();

@@ -1,16 +1,16 @@
 import type { InstrumentStatus } from "@/types"
 
 export interface MeasuringInstrument {
-  id: number
+  id: string
   tabNumber: string
   name: string
   manufacturer?: string
   model?: string
   serialNumber?: string
   inventoryNumber?: string
-  nodeId?: number
+  nodeId?: string
   nodeName?: string
-  typeId?: number
+  typeId?: string
   typeName?: string
   location?: string
   mainParams?: Record<string, any>  // изменено на JSON объект
@@ -23,14 +23,14 @@ export interface MeasuringInstrument {
   nextVerificationDate?: string
   verifier?: string
   notes?: string
-  subsystemId?: number
+  subsystemId?: string
   additionalData?: any
   isDeleted: boolean
 }
 
 export interface Verification {
-  id: number
-  siId: number
+  id: string
+  siId: string
   transferDate: string
   receiptDate: string
   verifier: string

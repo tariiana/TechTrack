@@ -4,16 +4,84 @@ import { apiFetch } from '@/api/client';
 
 // Определение интерфейса для измерения
 interface ResourceMeasurement {
-  id: number;
-  resourceId: number;
-  nodeId: number;
+  id: number | string;
+  resourceId: string;
+  nodeId: string;
   nodeName?: string;
   resourceName?: string;
   mark?: string;
-  registrationNumber?: number;
+  registrationNumber?: number | string;
   measurementDate: string;
   parameters: Record<string, any>;
   createdAt: string;
+}
+
+function isBlank(value: any): boolean {
+  return value === null || value === undefined || value === '';
+}
+
+function readParam(params: Record<string, any>, key: string): any {
+  const value = params?.[key];
+  if (value && typeof value === 'object' && !Array.isArray(value) && 'value' in value) {
+    return value.value;
+  }
+  return value;
+}
+
+function firstPresent(...values: any[]): any {
+  return values.find(value => !isBlank(value));
+}
+
+function toNumber(value: any): number | null {
+  if (isBlank(value)) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const match = String(value).replace(',', '.').match(/-?\d+(\.\d+)?/);
+  if (!match) return null;
+  const result = Number(match[0]);
+  return Number.isFinite(result) ? result : null;
+}
+
+function normalizeResource(resource: any): any {
+  const params = resource?.resource_params || {};
+  const remaining = firstPresent(
+    resource?.remaining_resource,
+    readParam(params, 'remaining_resource'),
+    readParam(params, 'remaining_life'),
+    readParam(params, 'remainingLife'),
+    readParam(params, 'health'),
+    readParam(params, 'battery_level')
+  );
+  const remainingNumber = toNumber(remaining);
+  const initial = firstPresent(
+    resource?.initial_resource,
+    readParam(params, 'initial_resource'),
+    readParam(params, 'initial_life'),
+    readParam(params, 'initialLife'),
+    remainingNumber !== null ? 100 : null
+  );
+  const registrationNumber = firstPresent(
+    resource?.registration_number,
+    resource?.registrationNumber,
+    readParam(params, 'registration_number'),
+    resource?.inventory_number
+  );
+
+  return {
+    ...resource,
+    id: String(resource?.id ?? resource?.resource_id ?? resource?.node_id ?? ''),
+    resource_id: String(resource?.resource_id ?? resource?.id ?? resource?.node_id ?? ''),
+    node_id: String(resource?.node_id ?? resource?.nodeId ?? ''),
+    nodeId: String(resource?.nodeId ?? resource?.node_id ?? ''),
+    nodeName: resource?.nodeName ?? resource?.node_name,
+    registration_number: registrationNumber,
+    registrationNumber,
+    initial_resource: toNumber(initial) ?? initial,
+    remaining_resource: remainingNumber,
+    resource_params: {
+      ...params,
+      measurements: Array.isArray(params.measurements) ? params.measurements : [],
+    },
+  };
 }
 
 export const useResourcesStore = defineStore('resources', () => {
@@ -31,7 +99,8 @@ export const useResourcesStore = defineStore('resources', () => {
       if (filters?.search) params.append('search', filters.search);
       const query = params.toString() ? `?${params.toString()}` : '';
       const response = await apiFetch(`/resources${query}`);
-      resources.value = response.data || response;
+      const data = response.data || response;
+      resources.value = Array.isArray(data) ? data.map(normalizeResource) : [];
       
       // Загружаем измерения из ресурсов
       loadMeasurementsFromResources();
@@ -46,16 +115,18 @@ export const useResourcesStore = defineStore('resources', () => {
   function loadMeasurementsFromResources() {
     const allMeasurements: ResourceMeasurement[] = [];
     for (const res of resources.value) {
-      const measurementsList = res.resource_params?.measurements || [];
+      const measurementsList = Array.isArray(res.resource_params?.measurements)
+        ? res.resource_params.measurements
+        : [];
       for (const m of measurementsList) {
         allMeasurements.push({
           id: m.id,
-          resourceId: res.id,
-          nodeId: res.nodeId,
-          nodeName: res.nodeName,
+          resourceId: String(res.resource_id ?? res.id),
+          nodeId: String(res.node_id ?? res.nodeId),
+          nodeName: res.nodeName ?? res.node_name,
           resourceName: res.name,
           mark: res.mark,
-          registrationNumber: res.registrationNumber,
+          registrationNumber: res.registrationNumber ?? res.registration_number,
           measurementDate: m.measurement_date,
           parameters: m.parameters || {},
           createdAt: m.created_at || new Date().toISOString(),
@@ -67,8 +138,13 @@ export const useResourcesStore = defineStore('resources', () => {
 
   async function fetchResourceById(id: string) {
     const response = await apiFetch(`/resources/${id}`);
-  const data = response.data || response;
-  return data;
+    const data = response.data || response;
+    const normalized = normalizeResource(data);
+    const index = resources.value.findIndex((resource: any) => String(resource.resource_id) === String(normalized.resource_id));
+    if (index >= 0) resources.value[index] = normalized;
+    else resources.value.push(normalized);
+    loadMeasurementsFromResources();
+    return normalized;
   }
 
   async function fetchResourcesForNode(nodeId: string) {
@@ -98,15 +174,15 @@ export const useResourcesStore = defineStore('resources', () => {
   }
 
   // ========== Измерения (журнал) ==========
-  function getMeasurementsForResource(resourceId: number): ResourceMeasurement[] {
-    return measurements.value.filter((m: ResourceMeasurement) => m.resourceId === resourceId).sort((a: ResourceMeasurement, b: ResourceMeasurement) =>
+  function getMeasurementsForResource(resourceId: number | string): ResourceMeasurement[] {
+    return measurements.value.filter((m: ResourceMeasurement) => String(m.resourceId) === String(resourceId)).sort((a: ResourceMeasurement, b: ResourceMeasurement) =>
       new Date(b.measurementDate).getTime() - new Date(a.measurementDate).getTime()
     );
   }
 
   // Получить параметры ресурса
-  function getParametersForResource(resourceId: number): any[] {
-    const resource = resources.value.find((r: any) => r.id === resourceId);
+  function getParametersForResource(resourceId: number | string): any[] {
+    const resource = resources.value.find((r: any) => String(r.id) === String(resourceId));
     if (!resource || !resource.resource_params) return [];
     const params = resource.resource_params;
     const result: any[] = [];
@@ -126,8 +202,8 @@ export const useResourcesStore = defineStore('resources', () => {
   }
 
   // Обновить ресурс
-  async function updateResource(id: number, data: any) {
-    const resource = resources.value.find((r: any) => r.id === id);
+  async function updateResource(id: number | string, data: any) {
+    const resource = resources.value.find((r: any) => String(r.id) === String(id));
     if (!resource) return;
     await upsertResource(String(resource.nodeId), data);
   }

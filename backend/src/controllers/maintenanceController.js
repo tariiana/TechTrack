@@ -75,8 +75,8 @@ async function getEquipmentNodes(req, res, next) {
 
 async function generatePlan(req, res, next) {
   try {
-    const { start_date, end_date, node_ids } = req.body;
-    const result = await Maintenance.generatePlan(start_date, end_date, node_ids);
+    const { start_date, end_date, node_ids, plan_id } = req.body;
+    const result = await Maintenance.generatePlan(start_date, end_date, node_ids, plan_id);
     res.json(ResponseFormatter.success(result, 'План сгенерирован'));
   } catch (err) { next(err); }
 }

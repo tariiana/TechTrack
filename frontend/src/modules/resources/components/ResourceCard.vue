@@ -40,7 +40,7 @@
         <div class="info-label">Дата регистрации</div>
         <div class="info-value">{{ formatDate(resource.registration_date) }}</div>
         <div class="info-label">Учётный номер</div>
-        <div class="info-value">{{ resource.registration_number || '-' }}</div>
+        <div class="info-value">{{ formatOptional(resource.registration_number) }}</div>
       </div>
       <div class="info-row">
         <div class="info-label">Дата последнего ТО</div>
@@ -50,13 +50,13 @@
       </div>
       <div class="info-row">
         <div class="info-label">Исходный ресурс</div>
-        <div class="info-value">{{ resource.initial_resource || '-' }}</div>
+        <div class="info-value">{{ formatOptional(resource.initial_resource) }}</div>
         <div class="info-label">Остаточный ресурс</div>
-        <div class="info-value">{{ resource.remaining_resource || '-' }}</div>
+        <div class="info-value">{{ formatOptional(resource.remaining_resource) }}</div>
       </div>
       <div class="info-row">
         <div class="info-label">Установлен в</div>
-        <div class="info-value">{{ resource.installed_in || '-' }}</div>
+        <div class="info-value">{{ formatOptional(resource.installed_in) }}</div>
       </div>
     </div>
 
@@ -142,6 +142,19 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import { formatDate } from '@/utils/dateUtils';
 import * as exportUtils from '@/utils/exportUtils';
 
+function toNumber(value: any): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const match = String(value).replace(',', '.').match(/-?\d+(\.\d+)?/);
+  if (!match) return null;
+  const result = Number(match[0]);
+  return Number.isFinite(result) ? result : null;
+}
+
+function formatOptional(value: any): string {
+  return value === null || value === undefined || value === '' ? '-' : String(value);
+}
+
 const route = useRoute();
 const router = useRouter();
 const store = useResourcesStore();
@@ -167,9 +180,8 @@ const alerts = computed(() => {
   const result: { type: string; message: string }[] = [];
   if (!resource.value) return result;
   
-  const remaining = resource.value.remaining_resource;
-  if (remaining !== undefined) {
-    const remainingNum = parseFloat(remaining);
+  const remainingNum = toNumber(resource.value.remaining_resource);
+  if (remainingNum !== null) {
     if (remainingNum <= 20) {
       result.push({ type: 'danger', message: `🔴 Остаточный ресурс критический (${remainingNum}%)` });
     } else if (remainingNum <= 50) {
@@ -177,7 +189,8 @@ const alerts = computed(() => {
     }
   }
   
-  if (resource.value.time_to_service !== undefined && resource.value.time_to_service < 1) {
+  const timeToService = toNumber(resource.value.time_to_service);
+  if (timeToService !== null && timeToService < 1) {
     result.push({ type: 'warning', message: `⚠️ Срок до ТО менее года (${resource.value.time_to_service} лет)` });
   }
   
@@ -262,12 +275,12 @@ function getExportData() {
     'Узел': resource.value.node_name || '-',
     'Срок службы': resource.value.service_life ? `${resource.value.service_life} лет` : '-',
     'Дата регистрации': resource.value.registration_date || '-',
-    'Учётный номер': resource.value.registration_number || '-',
+    'Учётный номер': formatOptional(resource.value.registration_number),
     'Дата последнего ТО': resource.value.last_service_date || '-',
     'Срок до ТО': resource.value.time_to_service ? `${resource.value.time_to_service} лет` : '-',
-    'Исходный ресурс': resource.value.initial_resource || '-',
-    'Остаточный ресурс': resource.value.remaining_resource || '-',
-    'Установлен в': resource.value.installed_in || '-',
+    'Исходный ресурс': formatOptional(resource.value.initial_resource),
+    'Остаточный ресурс': formatOptional(resource.value.remaining_resource),
+    'Установлен в': formatOptional(resource.value.installed_in),
     'Примечание': resource.value.note || '-',
   }];
 }
