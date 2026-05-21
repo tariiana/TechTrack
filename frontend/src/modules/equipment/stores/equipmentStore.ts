@@ -42,6 +42,9 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const userId = getUserId();
   if (userId) headers['x-user-id'] = userId;
 
+  const token = localStorage.getItem('token');
+  if (token) headers.Authorization = `Bearer ${token}`;
+
   const response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
 
   if (!response.ok) {

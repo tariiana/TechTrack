@@ -1,4 +1,4 @@
-const pool = require('../config/db');
+const { pool } = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 
 function normalizeDate(value) {

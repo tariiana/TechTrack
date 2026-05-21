@@ -2,6 +2,10 @@ const User = require('../models/User');
 const Role = require('../models/Role');
 const ResponseFormatter = require('../utils/responseFormatter');
 
+function getRequestUserId(req) {
+  return req.user?.user_id || req.user?.id || null;
+}
+
 async function getAll(req, res, next) {
   try {
     const { search, role_id, is_active } = req.query;
@@ -20,7 +24,7 @@ async function getById(req, res, next) {
 
 async function create(req, res, next) {
   try {
-    const newUser = await User.create(req.body, null);
+    const newUser = await User.create(req.body, getRequestUserId(req));
     res.status(201).json(ResponseFormatter.created(newUser, 'Пользователь создан'));
   } catch (err) {
     if (err.message.includes('уже существует')) {
@@ -32,7 +36,7 @@ async function create(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const updated = await User.update(req.params.id, req.body, null);
+    const updated = await User.update(req.params.id, req.body, getRequestUserId(req));
     res.json(ResponseFormatter.success(updated, 'Пользователь обновлён'));
   } catch (err) {
     if (err.message.includes('уже существует')) {

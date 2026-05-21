@@ -1,4 +1,4 @@
-const pool = require('../config/db');
+const { pool } = require('../config/db');
 
 const STATUS_TO_DB = {
   pending: 'ожидает',

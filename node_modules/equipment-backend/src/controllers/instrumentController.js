@@ -1,6 +1,10 @@
 const MeasuringInstrument = require('../models/MeasuringInstrument');
 const ResponseFormatter = require('../utils/responseFormatter');
 
+function getRequestUserId(req) {
+  return req.user?.user_id || req.user?.id || null;
+}
+
 async function getAll(req, res, next) {
   try {
     const { search, status } = req.query;
@@ -19,7 +23,7 @@ async function getById(req, res, next) {
 
 async function create(req, res, next) {
   try {
-    const instrument = await MeasuringInstrument.create(req.body);
+    const instrument = await MeasuringInstrument.create(req.body, getRequestUserId(req));
     res.status(201).json(instrument);
   } catch (err) {
     if (err.status) {
@@ -34,7 +38,7 @@ async function create(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const updated = await MeasuringInstrument.update(req.params.id, req.body);
+    const updated = await MeasuringInstrument.update(req.params.id, req.body, getRequestUserId(req));
     if (!updated) return res.status(404).json(ResponseFormatter.error('СИ не найдено', 404));
     res.json(updated);
   } catch (err) {
@@ -50,7 +54,7 @@ async function update(req, res, next) {
 
 async function writeOff(req, res, next) {
   try {
-    const instrument = await MeasuringInstrument.writeOff(req.params.id);
+    const instrument = await MeasuringInstrument.writeOff(req.params.id, getRequestUserId(req));
     if (!instrument) return res.status(404).json(ResponseFormatter.error('СИ не найдено', 404));
     res.json(instrument);
   } catch (err) {
@@ -70,7 +74,7 @@ async function getVerifications(req, res, next) {
 
 async function addVerification(req, res, next) {
   try {
-    const verification = await MeasuringInstrument.addVerification(req.params.id, req.body, null);
+    const verification = await MeasuringInstrument.addVerification(req.params.id, req.body, getRequestUserId(req));
     res.status(201).json(verification);
   } catch (err) {
     if (err.status) {
@@ -86,7 +90,7 @@ async function updateVerification(req, res, next) {
       req.params.id,
       req.params.verificationId,
       req.body,
-      null
+      getRequestUserId(req)
     );
     res.json(verification);
   } catch (err) {

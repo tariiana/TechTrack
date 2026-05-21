@@ -39,7 +39,7 @@ app.use(async (req, res, next) => {
     const userId = req.headers['x-user-id'];
     if (userId) {
         try {
-            await pool.query(`SET myapp.current_user_id = $1`, [userId]);
+            await pool.query(`SELECT set_config('myapp.current_user_id', $1, true)`, [userId]);
         } catch (e) {
             console.error("Ошибка установки user_id в БД", e);
         }

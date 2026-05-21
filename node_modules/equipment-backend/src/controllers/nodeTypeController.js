@@ -1,6 +1,10 @@
 const NodeType = require('../models/NodeType');
 const ResponseFormatter = require('../utils/responseFormatter');
 
+function getRequestUserId(req) {
+  return req.user?.user_id || req.user?.id || null;
+}
+
 async function getAll(req, res, next) {
   try {
     const types = await NodeType.getAll();
@@ -18,14 +22,14 @@ async function getById(req, res, next) {
 
 async function create(req, res, next) {
   try {
-    const newType = await NodeType.create(req.body, null);
+    const newType = await NodeType.create(req.body, getRequestUserId(req));
     res.status(201).json(ResponseFormatter.created(newType, 'Вид узла создан'));
   } catch (err) { next(err); }
 }
 
 async function update(req, res, next) {
   try {
-    await NodeType.update(req.params.id, req.body, null);
+    await NodeType.update(req.params.id, req.body, getRequestUserId(req));
     res.json(ResponseFormatter.success(null, 'Вид узла обновлён'));
   } catch (err) { next(err); }
 }
