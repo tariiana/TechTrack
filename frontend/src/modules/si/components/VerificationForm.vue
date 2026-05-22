@@ -5,23 +5,20 @@
 
       <div class="form-group">
         <label>Дата передачи*</label>
-        <input type="date" v-model="form.transferDate" class="form-control" />
+        <input type="date" v-model="form.transferDate" class="form-control" :class="{ 'is-invalid': errors.transferDate }" @change="validateDates" />
+        <span v-if="errors.transferDate" class="error-text">{{ errors.transferDate }}</span>
       </div>
 
       <div class="form-group">
         <label>Дата получения*</label>
-        <input type="date" v-model="form.receiptDate" class="form-control" />
+        <input type="date" v-model="form.receiptDate" class="form-control" :class="{ 'is-invalid': errors.receiptDate }" @change="validateDates" />
+        <span v-if="errors.receiptDate" class="error-text">{{ errors.receiptDate }}</span>
       </div>
 
       <div class="form-group">
         <label>Поверитель*</label>
-        <div style="display: flex; gap: 8px">
-          <select v-model="form.verifier" class="form-control" style="flex: 1">
-            <option value="">-- Выберите поверителя --</option>
-            <option v-for="ver in verifierOptions" :key="ver" :value="ver">{{ ver }}</option>
-          </select>
-          <button type="button" class="btn btn-secondary btn-sm" @click="openAddVerifierModal">+ Добавить</button>
-        </div>
+        <input type="text" v-model="form.verifier" class="form-control" :class="{ 'is-invalid': errors.verifier }" placeholder="Введите наименование поверителя" />
+        <span v-if="errors.verifier" class="error-text">{{ errors.verifier }}</span>
       </div>
 
       <div class="form-group">
@@ -45,27 +42,12 @@
       </div>
     </div>
   </div>
-
-  <!-- Модалка добавления нового поверителя -->
-  <div class="modal-overlay" v-if="showVerifierModal">
-    <div class="modal-content" style="width: 400px">
-      <div class="modal-header">Добавление поверителя</div>
-      <div class="form-group">
-        <label>Новый поверитель</label>
-        <input type="text" v-model="newVerifier" class="form-control" placeholder="Например: Нижегородский ЦСМ" />
-      </div>
-      <div v-if="verifierError" class="error-text">{{ verifierError }}</div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" @click="closeVerifierModal">Отмена</button>
-        <button class="btn btn-primary" @click="addNewVerifier">Добавить</button>
-      </div>
-    </div>
-  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useSIStore } from '../stores/siStore'
+import { showToast } from '@/utils/toast';
 import type { Verification } from '../types/siTypes'
 
 const store = useSIStore()
@@ -76,11 +58,11 @@ const instrumentId = ref<string | null>(null)
 const editId = ref<string | null>(null)
 const error = ref('')
 
-// Список поверителей (храним в localStorage)
-const verifierOptions = ref<string[]>([])
-const showVerifierModal = ref(false)
-const newVerifier = ref('')
-const verifierError = ref('')
+const errors = reactive({
+  transferDate: '',
+  receiptDate: '',
+  verifier: ''
+})
 
 const form = reactive({
   transferDate: '',
@@ -90,45 +72,46 @@ const form = reactive({
   notes: '',
 })
 
-// Загрузка списка поверителей
-function loadVerifiers() {
-  const saved = localStorage.getItem('si_verifiers')
-  if (saved) {
-    verifierOptions.value = JSON.parse(saved)
-  } else {
-    verifierOptions.value = ['Самарский ЦСМ', 'Саратовский ЦСМ', 'Московский ЦСМ', 'Казанский ЦСМ', 'Поверочная лаборатория']
-    localStorage.setItem('si_verifiers', JSON.stringify(verifierOptions.value))
+function validateDates() {
+  errors.transferDate = ''
+  errors.receiptDate = ''
+  
+  if (!form.transferDate) {
+    errors.transferDate = 'Укажите дату передачи'
+  }
+  if (!form.receiptDate) {
+    errors.receiptDate = 'Укажите дату получения'
+  }
+  
+  if (form.transferDate && form.receiptDate && form.receiptDate < form.transferDate) {
+    errors.receiptDate = 'Дата получения не может быть раньше даты передачи'
   }
 }
 
-function saveVerifiers() {
-  localStorage.setItem('si_verifiers', JSON.stringify(verifierOptions.value))
-}
-
-function openAddVerifierModal() {
-  newVerifier.value = ''
-  verifierError.value = ''
-  showVerifierModal.value = true
-}
-
-function closeVerifierModal() {
-  showVerifierModal.value = false
-}
-
-function addNewVerifier() {
-  const trimmed = newVerifier.value.trim()
-  if (!trimmed) {
-    verifierError.value = 'Введите название поверителя'
-    return
+function validate(): boolean {
+  let isValid = true
+  errors.transferDate = ''
+  errors.receiptDate = ''
+  errors.verifier = ''
+  
+  if (!form.transferDate) {
+    errors.transferDate = 'Укажите дату передачи'
+    isValid = false
   }
-  if (verifierOptions.value.includes(trimmed)) {
-    verifierError.value = 'Такой поверитель уже существует'
-    return
+  if (!form.receiptDate) {
+    errors.receiptDate = 'Укажите дату получения'
+    isValid = false
   }
-  verifierOptions.value.push(trimmed)
-  saveVerifiers()
-  form.verifier = trimmed
-  closeVerifierModal()
+  if (form.transferDate && form.receiptDate && form.receiptDate < form.transferDate) {
+    errors.receiptDate = 'Дата получения не может быть раньше даты передачи'
+    isValid = false
+  }
+  if (!form.verifier.trim()) {
+    errors.verifier = 'Укажите поверителя'
+    isValid = false
+  }
+  
+  return isValid
 }
 
 function reset() {
@@ -137,6 +120,9 @@ function reset() {
   form.verifier = ''
   form.result = 'годен'
   form.notes = ''
+  errors.transferDate = ''
+  errors.receiptDate = ''
+  errors.verifier = ''
   error.value = ''
   editId.value = null
   instrumentId.value = null
@@ -144,7 +130,6 @@ function reset() {
 
 function open(instrId: string, existing?: Verification) {
   reset()
-  loadVerifiers()
   instrumentId.value = instrId
   if (existing) {
     editId.value = existing.id
@@ -162,18 +147,7 @@ function close() {
 }
 
 async function save() {
-  if (!form.transferDate) {
-    error.value = 'Укажите дату передачи'
-    return
-  }
-  if (!form.receiptDate) {
-    error.value = 'Укажите дату получения'
-    return
-  }
-  if (!form.verifier) {
-    error.value = 'Укажите поверителя'
-    return
-  }
+  if (!validate()) return;
 
   const payload = {
     transferDate: form.transferDate,
@@ -181,27 +155,26 @@ async function save() {
     verifier: form.verifier,
     result: form.result,
     notes: form.notes,
-  }
+  };
 
   try {
     if (editId.value && instrumentId.value) {
-      await store.updateVerification(instrumentId.value, editId.value, payload)
-      emit('verification-saved')
-      close()
+      await store.updateVerification(instrumentId.value, editId.value, payload);
+      showToast('Поверка успешно обновлена', 'success');
+      emit('verification-saved');
+      close();
     } else if (instrumentId.value) {
       await store.addVerification({
         siId: instrumentId.value,
-        transferDate: form.transferDate,
-        receiptDate: form.receiptDate,
-        verifier: form.verifier,
-        result: form.result,
-        notes: form.notes,
-      })
-      emit('verification-saved')
-      close()
+        ...payload
+      });
+      showToast('Поверка успешно добавлена', 'success');
+      emit('verification-saved');
+      close();
     }
   } catch (err: any) {
-    error.value = err.message || 'Ошибка добавления поверки'
+    error.value = err.message || 'Ошибка добавления поверки';
+    showToast(error.value, 'error');
   }
 }
 
@@ -215,9 +188,60 @@ defineExpose({ open })
   gap: 10px;
   margin-top: 15px;
 }
+
 .error-text {
   color: #c0392b;
   font-size: 12px;
-  margin-top: 8px;
+  margin-top: 4px;
+}
+
+.is-invalid {
+  border-color: #c0392b;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-primary {
+  background-color: #2c5f8a;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #1e4566;
+}
+
+.btn-secondary {
+  background-color: #e9ecef;
+  color: #2c3e50;
+  border: 1px solid #ced4da;
+}
+
+.btn-secondary:hover {
+  background-color: #dee2e6;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.form-control {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
 }
 </style>

@@ -13,7 +13,7 @@ export interface MeasuringInstrument {
   typeId?: string
   typeName?: string
   location?: string
-  mainParams?: Record<string, any>  // изменено на JSON объект
+  mainParams?: Record<string, any>
   productionDate?: string
   transferDate?: string
   receiptDate?: string

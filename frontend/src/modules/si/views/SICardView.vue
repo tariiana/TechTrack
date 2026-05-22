@@ -1,13 +1,13 @@
 <template>
   <div class="card" v-if="instrument">
-    <div style="display: flex; justify-content: space-between; margin-bottom: 20px">
-      <h2>Средства измерения</h2>
-      <div>
-        <button class="btn btn-secondary" @click="goBack">← Назад</button>
-        <button v-if="canEdit" class="btn btn-primary" @click="editInstrument">Редактировать</button>
-        <button v-if="canEdit && instrument.status !== 'выведено'" class="btn btn-danger" @click="writeOffInstrument">Списать</button>
-      </div>
+    <!-- Кнопки сверху справа -->
+    <div class="card-actions">
+      <button class="btn btn-secondary" @click="goBack">← Назад</button>
+      <button v-if="canEdit" class="btn btn-primary" @click="editInstrument">Редактировать</button>
+      <button v-if="canEdit && instrument.status !== 'списано'" class="btn btn-danger" @click="writeOffInstrument">Списать</button>
     </div>
+
+    <h2>Средства измерения</h2>
 
     <div class="card-detail-grid">
       <div class="detail-col">
@@ -27,14 +27,22 @@
           <div class="detail-label">Узел</div>
           <div class="detail-value">{{ instrument.nodeName || '-' }}</div>
           <div class="detail-label">Статус</div>
-          <div class="detail-value" :class="{ 'status-disabled': instrument.status === 'выведено' }">{{ instrument.status || '-' }}</div>
+          <div class="detail-value" :class="{ 'status-disabled': instrument.status === 'списано' }">
+            {{ instrument.status === 'списано' ? 'Списано' : instrument.status }}
+          </div>
         </div>
         <div class="detail-row">
           <div class="detail-label">Размещение</div>
           <div class="detail-value">{{ instrument.location || '-' }}</div>
           <div class="detail-label">Основные параметры</div>
           <div class="detail-value">
-            <pre v-if="instrument.mainParams && Object.keys(instrument.mainParams).length > 0">{{ JSON.stringify(instrument.mainParams, null, 2) }}</pre>
+            <div v-if="paramsList.length > 0" class="params-list">
+              <div v-for="param in paramsList" :key="param.name" class="param-item">
+                <span class="param-name">{{ param.name }}:</span>
+                <span class="param-value">{{ param.value }}</span>
+                <span v-if="param.unit" class="param-unit">{{ param.unit }}</span>
+              </div>
+            </div>
             <span v-else>-</span>
           </div>
         </div>
@@ -49,7 +57,7 @@
           <div class="detail-value">{{ lastVerificationDate ? formatDate(lastVerificationDate) : '-' }}</div>
           <div class="detail-label">Дата следующей поверки</div>
           <div class="detail-value">
-            <template v-if="nextVerificationDate">{{ formatDate(nextVerificationDate) }}<span v-if="isWarning && instrument.status !== 'выведено'" class="warning-badge">(менее 30 дней)</span></template>
+            <template v-if="nextVerificationDate">{{ formatDate(nextVerificationDate) }}<span v-if="isWarning && instrument.status !== 'списано'" class="warning-badge">(менее 30 дней)</span></template>
             <template v-else>-</template>
           </div>
         </div>
@@ -72,7 +80,7 @@
     <div style="margin-top: 20px">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px">
         <h3>История поверок</h3>
-        <button v-if="canEdit && instrument.status !== 'выведено'" class="btn btn-primary btn-sm" @click="openAddVerification">+ Добавить поверку</button>
+        <button v-if="canEdit && instrument.status !== 'списано'" class="btn btn-primary btn-sm" @click="openAddVerification">+ Добавить поверку</button>
       </div>
       
       <div class="table-scroll-container">
@@ -131,6 +139,7 @@ const instrument = ref<any>(null);
 const verifications = ref<any[]>([]);
 const lastVerificationDate = ref('');
 const nextVerificationDate = ref('');
+const paramsList = ref<any[]>([]);
 
 const canEdit = computed(() => {
   const user = localStorage.getItem('user');
@@ -140,11 +149,42 @@ const canEdit = computed(() => {
 });
 
 const isWarning = computed(() => {
-  if (!instrument.value || instrument.value.status === 'выведено') return false;
+  if (!instrument.value || instrument.value.status === 'списано') return false;
   if (!nextVerificationDate.value) return false;
   const days = getDaysUntilVerification(nextVerificationDate.value);
   return days <= 30 && days >= 0;
 });
+
+// Преобразование JSON параметров в список для отображения
+function loadParamsFromJson() {
+  if (!instrument.value?.mainParams) {
+    paramsList.value = [];
+    return;
+  }
+  
+  const params = instrument.value.mainParams;
+  const list: any[] = [];
+  
+  for (const [key, rawValue] of Object.entries(params)) {
+    let value = String(rawValue);
+    let unit = '';
+    
+    // Пробуем отделить значение от единицы измерения
+    const match = value.match(/^([\d.,]+)\s*(.+)$/);
+    if (match && match[1] && match[2]) {
+      value = match[1];
+      unit = match[2].trim();
+    }
+    
+    list.push({
+      name: key,
+      value: value,
+      unit: unit
+    });
+  }
+  
+  paramsList.value = list;
+}
 
 async function loadData() {
   const id = String(route.params.id);
@@ -154,6 +194,7 @@ async function loadData() {
     verifications.value = data;
     lastVerificationDate.value = store.getLastVerificationDate(id) || instrument.value.lastVerificationDate || '';
     nextVerificationDate.value = store.getNextVerificationDate(id) || instrument.value.nextVerificationDate || '';
+    loadParamsFromJson();
   }
 }
 
@@ -178,17 +219,39 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e0e4e8;
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.card-actions h2 {
+  margin: 0;
+}
+
 .card-detail-grid {
   background: #f8f9fa;
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 20px;
 }
+
 .detail-col {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+
 .detail-row {
   display: grid;
   grid-template-columns: 180px 1fr 180px 1fr;
@@ -197,26 +260,32 @@ onMounted(() => {
   padding: 4px 0;
   border-bottom: 1px solid #e0e4e8;
 }
+
 .detail-row:last-child {
   border-bottom: none;
 }
+
 .detail-label {
   font-weight: 600;
   color: #2c3e50;
   font-size: 13px;
 }
+
 .detail-value {
   color: #1a2a3a;
   font-size: 13px;
 }
+
 .status-disabled {
   color: #999;
   font-style: italic;
 }
+
 .result-bad {
   color: #c0392b;
   font-weight: 500;
 }
+
 .warning-badge {
   background-color: #e67e22;
   color: white;
@@ -225,6 +294,34 @@ onMounted(() => {
   font-size: 10px;
   margin-left: 8px;
 }
+
+/* Стили для параметров */
+.params-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.param-item {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.param-name {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.param-value {
+  color: #1a2a3a;
+}
+
+.param-unit {
+  color: #6c757d;
+  font-size: 12px;
+}
+
 pre {
   background: #f8f9fa;
   padding: 8px;
@@ -266,7 +363,6 @@ pre {
   background: #1e4566;
 }
 
-/* Стили для таблицы внутри контейнера */
 .table-scroll-container .data-table {
   min-width: 600px;
 }
@@ -275,6 +371,10 @@ pre {
   .detail-row {
     grid-template-columns: 1fr 1fr;
     gap: 8px;
+  }
+  
+  .card-actions {
+    justify-content: center;
   }
 }
 </style>

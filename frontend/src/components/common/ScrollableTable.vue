@@ -11,8 +11,8 @@
 <style scoped>
 .scrollable-table-container {
   width: 100%;
-  flex: 1;
-  min-height: 0;
+  height: 500px;
+  max-height: calc(100vh - 300px);
   display: flex;
   flex-direction: column;
   margin-top: 15px;
@@ -57,5 +57,13 @@
   width: 100%;
   border-collapse: collapse;
   min-width: max-content;
+}
+
+/* Фиксируем заголовок */
+.table-wrapper :deep(th) {
+  position: sticky;
+  top: 0;
+  background: #f8f9fa;
+  z-index: 10;
 }
 </style>

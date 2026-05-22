@@ -332,17 +332,17 @@ body {
 
 /* ===== ЦВЕТОВЫЕ КЛАССЫ ДЛЯ ТАБЛИЦ ===== */
 .warning-row {
-  background-color: #fff3e0;
+  background-color: #ffd699;
 }
 .warning-row:hover {
-  background-color: #ffe8c7;
+  background-color: #ffbb55;
 }
 
 .expired-row {
-  background-color: #ffe0e0;
+  background-color: #ffb3b3;
 }
 .expired-row:hover {
-  background-color: #ffd0d0;
+  background-color: #ff8080;
 }
 
 .disabled-row {
