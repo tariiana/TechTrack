@@ -355,7 +355,10 @@ onUnmounted(() => {
 .disabled-row:hover { background-color: #d0d0d0; }
 .card { overflow-x: hidden; }
 .scrollable-table-container { width: 100%; }
-
+:deep(.scrollable-table-container) {
+  height: 650px;
+  max-height: calc(100vh - 250px);
+}
 .dropdown {
   position: relative;
 }

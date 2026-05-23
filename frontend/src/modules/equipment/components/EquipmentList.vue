@@ -54,7 +54,7 @@
 
     <div v-if="store.loading" class="loading">Загрузка...</div>
 
-    <!-- Таблица с прокруткой (используем компонент ScrollableTable) -->
+    <!-- Таблица с прокруткой через ScrollableTable -->
     <ScrollableTable>
       <table class="data-table">
         <thead>
@@ -67,8 +67,15 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="node in sortedNodes" :key="node.node_id" :class="getRowClass(node)" :title="getTooltip(node)">
-            <td v-for="col in visibleColumns" :key="col.key">{{ formatCellValue(node, col.key) }}</td>
+          <tr
+            v-for="node in sortedNodes"
+            :key="node.node_id"
+            :class="getRowClass(node)"
+            :title="getTooltip(node)"
+          >
+            <td v-for="col in visibleColumns" :key="col.key">
+              {{ formatCellValue(node, col.key) }}
+            </td>
             <td class="actions-cell">
               <button class="btn btn-sm btn-secondary" @click="viewCard(node.node_id)">Просмотр</button>
               <button
@@ -91,7 +98,7 @@
       </table>
     </ScrollableTable>
 
-    <!-- Модальное окно настройки колонок (с drag-and-drop) -->
+    <!-- Модальное окно настройки колонок (drag-and-drop) -->
     <div class="modal-overlay" v-if="showColumnSettings" @click.self="showColumnSettings = false">
       <div class="modal-content" style="width: 500px;">
         <div class="modal-header">Настройка колонок</div>
@@ -120,7 +127,6 @@
       </div>
     </div>
 
-    <!-- Модальные окна компонентов -->
     <EquipmentForm
       :visible="showFormModal"
       :nodeId="editingNodeId"
@@ -133,7 +139,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useEquipmentStore } from '../stores/equipmentStore';
 import EquipmentForm from './EquipmentForm.vue';
@@ -142,13 +148,6 @@ import AdvancedFilter from './AdvancedFilter.vue';
 import ScrollableTable from '@/components/common/ScrollableTable.vue';
 import * as exportUtils from '@/utils/exportUtils';
 
-onMounted(() => {
-  document.body.classList.add('equipment-page-scroll');
-});
-
-onUnmounted(() => {
-  document.body.classList.remove('equipment-page-scroll');
-});
 const router = useRouter();
 const store = useEquipmentStore();
 
@@ -185,13 +184,41 @@ const allColumnKeys = allColumns.map(c => c.key);
 const columnOrder = ref<string[]>([...allColumnKeys]);
 const selectedColumns = ref<string[]>([...allColumnKeys]);
 
+function getColumnLabel(key: string) {
+  return allColumns.find(c => c.key === key)?.label || key;
+}
+
+function saveColumnSettings() {
+  localStorage.setItem('equipment_column_order', JSON.stringify(columnOrder.value));
+  localStorage.setItem('equipment_selected_columns', JSON.stringify(selectedColumns.value));
+}
+
+function loadColumnSettings() {
+  const savedOrder = localStorage.getItem('equipment_column_order');
+  if (savedOrder) {
+    try { columnOrder.value = JSON.parse(savedOrder); } catch {}
+  }
+  const savedSelected = localStorage.getItem('equipment_selected_columns');
+  if (savedSelected) {
+    try { selectedColumns.value = JSON.parse(savedSelected); } catch {}
+  }
+}
+
+function resetColumnSettings() {
+  columnOrder.value = [...allColumnKeys];
+  selectedColumns.value = [...allColumnKeys];
+  saveColumnSettings();
+}
+
 // Drag-and-drop для колонок
 let dragStartIndex = ref<number | null>(null);
 function onDragStart(event: DragEvent, index: number) {
   dragStartIndex.value = index;
   if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
 }
-function onDragEnd() { dragStartIndex.value = null; }
+function onDragEnd() {
+  dragStartIndex.value = null;
+}
 function onDrop(event: DragEvent, dropIndex: number) {
   const startIdx = dragStartIndex.value;
   if (startIdx === null || startIdx === dropIndex) return;
@@ -205,7 +232,6 @@ function onDrop(event: DragEvent, dropIndex: number) {
   dragStartIndex.value = null;
 }
 
-// Computed – видимые колонки
 const visibleColumns = computed(() => {
   return columnOrder.value
     .filter(key => selectedColumns.value.includes(key))
@@ -219,10 +245,12 @@ const canEdit = computed(() => {
   try {
     const role = JSON.parse(user).role;
     return role === 'operator' || role === 'admin';
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 });
 
-// Вспомогательные функции для отображения фильтров
+// Вспомогательные функции для фильтров
 function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     получен: 'Получен',
@@ -239,27 +267,53 @@ function getFieldLabel(field: string): string {
   return allColumns.find(c => c.key === field)?.label || field;
 }
 function getOperatorLabel(op: string): string {
-  const map: Record<string, string> = { contains: 'содержит', equals: 'равно', greater: 'больше', less: 'меньше' };
+  const map: Record<string, string> = {
+    contains: 'содержит',
+    equals: 'равно',
+    greater: 'больше',
+    less: 'меньше',
+  };
   return map[op] || op;
 }
-function removeAdvancedCondition(idx: number) { advancedConditions.value.splice(idx, 1); }
-const hasActiveFilters = computed(() => !!(quickSearch.value || quickStatus.value || advancedConditions.value.length));
+function removeAdvancedCondition(idx: number) {
+  advancedConditions.value.splice(idx, 1);
+}
+const hasActiveFilters = computed(() =>
+  !!(quickSearch.value || quickStatus.value || advancedConditions.value.length)
+);
 
 // Форматирование ячейки
 function formatCellValue(node: any, key: string): string {
   if (key === 'is_si') return node.is_si ? 'Да' : 'Нет';
   if (key === 'parameters') {
     if (!node.parameters) return '-';
-    return typeof node.parameters === 'object' ? JSON.stringify(node.parameters) : node.parameters;
+    let params = node.parameters;
+    if (typeof params === 'string') {
+      try { params = JSON.parse(params); } catch { return params; }
+    }
+    const extractValue = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      if (typeof val === 'object') {
+        if (val.value !== undefined) return String(val.value);
+        const firstVal = Object.values(val).find(v => typeof v !== 'object');
+        return firstVal !== undefined ? String(firstVal) : '';
+      }
+      return String(val);
+    };
+    if (Array.isArray(params)) {
+      const values = params.map(extractValue).filter(v => v);
+      return values.join(', ') || '-';
+    }
+    const values = Object.values(params).map(extractValue).filter(v => v);
+    return values.length ? values.join(', ') : '-';
   }
   const val = node[key];
   return val !== undefined && val !== null && val !== '' ? String(val) : '-';
 }
 
-// Сортировка с помещением списанных в конец
-const sortedNodes = computed(() => {
+// Сортировка (списанные в конец)
+const sortedNodes = computed<any[]>(() => {
   let list = [...store.nodes];
-  // Расширенные фильтры
   if (advancedConditions.value.length) {
     list = list.filter(node => {
       return advancedConditions.value.every(cond => {
@@ -276,7 +330,6 @@ const sortedNodes = computed(() => {
       });
     });
   }
-  // Сортировка: списанные в конец, затем по выбранному полю
   list.sort((a, b) => {
     const aOff = a.status === 'списан';
     const bOff = b.status === 'списан';
@@ -293,76 +346,80 @@ const sortedNodes = computed(() => {
 });
 
 function sortBy(field: string) {
-  if (sortField.value === field) sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
-  else { sortField.value = field; sortOrder.value = 'asc'; }
+  if (sortField.value === field) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortField.value = field;
+    sortOrder.value = 'asc';
+  }
 }
-function applyQuickFilter() { store.setFilterParams({ search: quickSearch.value, status: quickStatus.value }); }
+function applyQuickFilter() {
+  store.setFilterParams({ search: quickSearch.value, status: quickStatus.value });
+}
 function resetFilters() {
   quickSearch.value = '';
   quickStatus.value = '';
   advancedConditions.value = [];
   store.setFilterParams({ search: '', status: '' });
 }
-function openAdvancedFilter() { advancedFilterRef.value?.open(); }
-function applyAdvancedFilters(conditions: any[]) { advancedConditions.value = conditions; }
-function viewCard(id: string) { router.push(`/equipment/${id}`); }
-function openForm() { editingNodeId.value = null; showFormModal.value = true; }
-function editNode(nodeId: string) { editingNodeId.value = nodeId; showFormModal.value = true; }
+function openAdvancedFilter() {
+  advancedFilterRef.value?.open();
+}
+function applyAdvancedFilters(conditions: any[]) {
+  advancedConditions.value = conditions;
+}
+function viewCard(id: string) {
+  router.push(`/equipment/${id}`);
+}
+function openForm() {
+  editingNodeId.value = null;
+  showFormModal.value = true;
+}
+function editNode(nodeId: string) {
+  editingNodeId.value = nodeId;
+  showFormModal.value = true;
+}
 async function deleteNode(id: string) {
   const ok = await confirmDialog.value?.show('Списание', 'Списать узел?');
   if (ok) await store.deleteNode(id);
 }
-function refresh() { store.fetchNodes(); }
+function refresh() {
+  store.fetchNodes();
+}
 
 // Экспорт
 function getExportData() {
   return sortedNodes.value.map(node => {
     const row: any = {};
-    for (const col of visibleColumns.value) row[col.label] = formatCellValue(node, col.key);
+    for (const col of visibleColumns.value) {
+      row[col.label] = formatCellValue(node, col.key);
+    }
     return row;
   });
 }
 function exportToExcel() {
   const data = getExportData();
-  if (!data.length) { alert('Нет данных для экспорта'); return; }
-  const filename = `Оборудование_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}`;
+  if (!data.length) {
+    alert('Нет данных для экспорта');
+    return;
+  }
+  const filename = `Оборудование_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}`;
   exportUtils.exportToExcel(data, filename);
 }
 function exportToWord() {
   const data = getExportData();
-  if (!data.length) { alert('Нет данных для экспорта'); return; }
+  if (!data.length) {
+    alert('Нет данных для экспорта');
+    return;
+  }
   const headers = Object.keys(data[0]);
-  const filename = `Оборудование_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}`;
+  const filename = `Оборудование_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}`;
   exportUtils.exportToWord(data, headers, filename);
 }
 
-// Настройка колонок (drag-and-drop + localStorage)
-function getColumnLabel(key: string) { return allColumns.find(c => c.key === key)?.label || key; }
-function saveColumnSettings() {
-  localStorage.setItem('equipment_column_order', JSON.stringify(columnOrder.value));
-  localStorage.setItem('equipment_selected_columns', JSON.stringify(selectedColumns.value));
-}
-function loadColumnSettings() {
-  const so = localStorage.getItem('equipment_column_order');
-  if (so) try { columnOrder.value = JSON.parse(so); } catch {}
-  const ss = localStorage.getItem('equipment_selected_columns');
-  if (ss) try { selectedColumns.value = JSON.parse(ss); } catch {}
-}
-function resetColumnSettings() {
-  columnOrder.value = [...allColumnKeys];
-  selectedColumns.value = [...allColumnKeys];
-  saveColumnSettings();
-}
-
-// Дополнительные функции для стилей строк (аналогично SI)
-function getDaysUntilStatus(node: any): number {
-  // Для оборудования можно вычислить, например, оставшиеся дни до списания или ресурса.
-  // Пока возвращаем большое число, чтобы не влиять на сортировку.
-  return Infinity;
-}
+// Стилизация строк
 function getRowClass(node: any): string {
   if (node.status === 'списан') return 'disabled-row';
-  // Можно добавить предупреждения по типу ресурса (если нужно)
   return '';
 }
 function getTooltip(node: any): string {
@@ -370,23 +427,50 @@ function getTooltip(node: any): string {
   return '';
 }
 
+// Жизненный цикл
 onMounted(async () => {
   loadColumnSettings();
   await store.init();
+  await nextTick();
 });
 </script>
 
 <style scoped>
-/* Локальные стили только для специфичных элементов */
-.action-buttons { display: flex; gap: 10px; }
-.btn-fixed { min-width: 140px; text-align: center; }
-.badge-disabled { display: inline-block; padding: 4px 8px; background-color: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 12px; }
-.actions-cell { white-space: nowrap; }
-.actions-cell .btn { margin-right: 4px; }
-.empty { text-align: center; padding: 20px; color: #999; }
-.loading { text-align: center; padding: 20px; color: #1976d2; font-weight: normal; }
+.action-buttons {
+  display: flex;
+  gap: 10px;
+}
+.btn-fixed {
+  min-width: 140px;
+  text-align: center;
+}
+.badge-disabled {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #e9ecef;
+  color: #6c757d;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.actions-cell {
+  white-space: nowrap;
+}
+.actions-cell .btn {
+  margin-right: 4px;
+}
+.empty {
+  text-align: center;
+  padding: 20px;
+  color: #999;
+}
+.loading {
+  text-align: center;
+  padding: 20px;
+  color: #1976d2;
+  font-weight: normal;
+}
 
-/* Активные фильтры (как в SI) */
+/* Активные фильтры (чипсы) */
 .active-filters {
   margin-bottom: 20px;
   display: flex;
@@ -397,35 +481,110 @@ onMounted(async () => {
   padding: 8px 12px;
   border-radius: 8px;
 }
-.full-width-table {
-  overflow-x: visible;   /* не создаём свою прокрутку */
+.filter-label {
+  font-weight: 500;
+  color: #1e293b;
 }
-.data-table {
-  min-width: max-content;  /* таблица растягивается на всю ширину содержимого */
-  width: auto;
-  white-space: nowrap;     /* текст в ячейках не переносится */
+.filter-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
-/* Если нужно убрать ограничения у родительских карточек */
-.card {
-  overflow-x: visible !important;
-  max-width: none !important;
+.filter-tag {
+  background: #e2e8f0;
+  padding: 4px 8px;
+  border-radius: 16px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
-body.equipment-page-scroll {
-  overflow-x: auto !important;
+.filter-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #c0392b;
+  font-weight: bold;
+  font-size: 14px;
+  padding: 0 4px;
 }
-.filter-label { font-weight: 500; color: #1e293b; }
-.filter-tags { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.filter-tag { background: #e2e8f0; padding: 4px 8px; border-radius: 16px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
-.filter-remove { background: none; border: none; cursor: pointer; color: #c0392b; font-weight: bold; font-size: 14px; padding: 0 4px; }
-.btn-reset-filters { background: none; border: 1px solid #cbd5e1; border-radius: 16px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
-.btn-reset-filters:hover { background: #e2e8f0; }
+.btn-reset-filters {
+  background: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn-reset-filters:hover {
+  background: #e2e8f0;
+}
 
-/* Стили для модального окна настройки колонок */
-.modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; }
-.modal-content { background:white; border-radius:8px; width:500px; max-width:90%; }
-.modal-header { padding:12px 16px; border-bottom:1px solid #e2e8f0; font-weight:600; }
-.modal-footer { padding:10px 16px; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px; }
-.column-list { max-height:400px; overflow-y:auto; padding:8px; }
-.column-item { display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid #e2e8f0; cursor:grab; }
-.drag-handle { color:#94a3b8; font-size:16px; cursor:grab; }
+/* Стили для ScrollableTable */
+:deep(.scrollable-table-container) {
+  height: 650px;
+  max-height: calc(100vh - 250px);
+}
+
+:deep(.table-scroll) {
+  overflow-y: auto !important;
+}
+
+:deep(th) {
+  position: sticky;
+  top: 0;
+  background: #f8f9fa;
+  z-index: 10;
+}
+
+/* Модальное окно настройки колонок */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 500px;
+  max-width: 90%;
+}
+.modal-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  font-weight: 600;
+}
+.modal-footer {
+  padding: 10px 16px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.column-list {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 8px;
+}
+.column-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  cursor: grab;
+}
+.drag-handle {
+  color: #94a3b8;
+  font-size: 16px;
+  cursor: grab;
+}
 </style>

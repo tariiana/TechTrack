@@ -1,7 +1,7 @@
 <!-- src/modules/equipment/components/ParametersEditor.vue -->
 <template>
   <div class="parameters-editor">
-    <div class="table-wrapper">
+    <ScrollableTable>
       <table class="data-table">
         <thead>
           <tr>
@@ -22,7 +22,7 @@
           </tr>
         </tbody>
       </table>
-    </div>
+    </ScrollableTable>
     <div class="add-row">
       <button class="btn btn-sm btn-secondary" @click="openAddModal">+ Добавить параметр</button>
     </div>
@@ -59,7 +59,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue';
-
+import ScrollableTable from '@/components/common/ScrollableTable.vue';
 const props = defineProps<{
   modelValue: Record<string, any>;
   template?: Record<string, any> | null;
@@ -261,5 +261,20 @@ watch(localParams, () => syncToExternal(), { deep: true });
   padding: 6px 12px;
   border-radius: 4px;
   cursor: pointer;
+}
+:deep(.scrollable-table-container) {
+  height: 300px;
+  max-height: 300px;
+}
+
+:deep(.table-scroll) {
+  overflow-y: auto !important;
+}
+
+:deep(th) {
+  position: sticky;
+  top: 0;
+  background: #f8f9fa;
+  z-index: 10;
 }
 </style>

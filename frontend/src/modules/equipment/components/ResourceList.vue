@@ -1,124 +1,64 @@
 <template>
-  <div style="margin-top: 20px">
-    <div class="resource-header">
-      <h3>Ресурсы</h3>
-      <div class="resource-actions">
-        <button class="btn btn-sm btn-secondary" @click="goToResources">📊 Полный учёт</button>
-        <button v-if="canEdit" class="btn btn-sm btn-primary" @click="$emit('add')">+ Добавить ресурс</button>
-      </div>
-    </div>
-
-    <div v-if="isLoading" class="loading">Загрузка...</div>
-    <div v-else-if="resources.length === 0" class="empty-message">Ресурсы не добавлены</div>
-    <div v-else class="table-wrapper">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Наименование</th>
-            <th>Значение</th>
-            <th>Ед. изм.</th>
-            <th>Обновлено</th>
-            <th v-if="canEdit">Действия</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="res in resources" :key="res.resource_id">
-            <td>{{ res.name }}</td>
-            <td>{{ res.value }}</td>
-            <td>{{ res.unit || '-' }}</td>
-            <td>{{ formatDate(res.updated_at || res.created_at) }}</td>
-            <td v-if="canEdit">
-              <button class="btn btn-sm btn-secondary" @click="$emit('edit', res)">✏️</button>
-              <button class="btn btn-sm btn-danger" @click="deleteResource(res.resource_id)">🗑️</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+  <ScrollableTable v-if="resources.length">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Наименование</th>
+          <th>Значение</th>
+          <th>Ед. изм.</th>
+          <th>Дата регистрации</th>
+          <th>Примечание</th>
+          <th v-if="canEdit">Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="res in resources" :key="res.id || res.registration_date">
+          <td>
+            <span class="clickable-link" @click="$emit('goToResource', res.id || res.resource_id)">
+              {{ res.resource_params?.name || res.name || 'Ресурс' }}
+            </span>
+          </td>
+          <td>{{ res.resource_params?.value ?? res.value ?? '-' }}</td>
+          <td>{{ res.resource_params?.unit || res.unit || '-' }}</td>
+          <td>{{ formatDate(res.registration_date) }}</td>
+          <td>{{ res.note || '-' }}</td>
+          <td v-if="canEdit">
+            <button class="btn btn-sm btn-secondary" @click="$emit('edit', res)">✏️</button>
+            <button class="btn btn-sm btn-danger" @click="$emit('delete', res.node_id || res.id)">🗑️</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </ScrollableTable>
+  <div v-else class="empty-message">Ресурсы не добавлены</div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
-import { useEquipmentStore } from '@/modules/equipment/stores/equipmentStore';
+import ScrollableTable from '@/components/common/ScrollableTable.vue';
 import { formatDate } from '@/utils/dateUtils';
 
-const props = defineProps<{ nodeId: number }>();
-const emit = defineEmits(['add', 'edit']);
-const router = useRouter();
-const store = useEquipmentStore();
+defineProps<{
+  resources: any[];
+  canEdit: boolean;
+}>();
 
-const resources = ref<any[]>([]);
-const isLoading = ref(false);
-
-const canEdit = computed(() => {
-  const user = localStorage.getItem('user');
-  if (!user) return false;
-  const role = JSON.parse(user).role;
-  return role === 'operator' || role === 'admin';
-});
-
-async function loadResources() {
-  isLoading.value = true;
-  try {
-    resources.value = await store.getResourcesForNode(String(props.nodeId));
-  } catch (err) {
-    console.error('Ошибка загрузки ресурсов:', err);
-    resources.value = [];
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-function goToResources() {
-  router.push({ path: '/resources', query: { nodeId: String(props.nodeId) } });
-}
-
-async function deleteResource(id: string) {
-  if (confirm('Удалить ресурс?')) {
-    await store.deleteResource(id);
-    await loadResources();
-    window.dispatchEvent(new Event('resource-saved'));
-  }
-}
-function handleResourceSaved() {
-  loadResources();
-}
-
-onMounted(() => {
-  loadResources();
-  window.addEventListener('resource-saved', handleResourceSaved);
-});
-
-onUnmounted(() => {
-  window.removeEventListener('resource-saved', handleResourceSaved);
-});
-
-watch(() => props.nodeId, () => {
-  loadResources();
-}, { immediate: true });
+defineEmits(['edit', 'delete', 'goToResource']);
 </script>
 
 <style scoped>
-.resource-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
+:deep(.scrollable-table-container) {
+  height: 300px;
+  max-height: 300px;
 }
-.resource-actions {
-  display: flex;
-  gap: 8px;
+
+:deep(.table-scroll) {
+  overflow-y: auto !important;
 }
-.empty-message {
-  color: #999;
-  font-style: italic;
-  padding: 10px;
-}
-.loading {
-  text-align: center;
-  padding: 20px;
-  color: #666;
+
+:deep(th) {
+  position: sticky;
+  top: 0;
+  background: #f8f9fa;
+  z-index: 10;
 }
 </style>
