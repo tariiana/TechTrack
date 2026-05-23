@@ -17,6 +17,7 @@
         </div>
       </div>
 
+      
       <!-- Фильтр -->
       <div v-if="showFilterPanel" class="filter-panel">
         <div class="filter-grid">

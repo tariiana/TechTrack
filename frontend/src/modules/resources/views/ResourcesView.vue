@@ -23,10 +23,10 @@
       </div>
     </div>
 
-    <!-- Панель фильтрации (простой фильтр) -->
+    <!-- Панель фильтрации -->
     <div class="filter-panel">
       <div class="filter-row">
-        <input v-model="filters.search" type="text" placeholder="Поиск по наименованию, производитель..." class="form-control" style="width: 300px" @input="applyFilters" />
+        <input v-model="filters.search" type="text" placeholder="Поиск по наименованию..." class="form-control" style="width: 300px" @input="applyFilters" />
         <select v-model="filters.status" class="form-control" style="width: 180px" @change="applyFilters">
           <option value="">Все статусы</option>
           <option value="Получен">Получен</option>
@@ -84,17 +84,20 @@
         </div>
       </div>
     </div>
-<div class="modal-overlay" v-if="showColumnSettings">
-  <div class="modal-content" style="width: 450px;">
-    <div class="modal-header">Настройка колонок</div>
-    <div v-for="col in allColumns" :key="col.key" style="margin-bottom: 8px;">
-      <label><input type="checkbox" v-model="selectedColumns" :value="col.key"> {{ col.label }}</label>
+
+    <!-- Настройка колонок -->
+    <div class="modal-overlay" v-if="showColumnSettings">
+      <div class="modal-content" style="width: 450px;">
+        <div class="modal-header">Настройка колонок</div>
+        <div v-for="col in allColumns" :key="col.key" style="margin-bottom: 8px;">
+          <label><input type="checkbox" v-model="selectedColumns" :value="col.key"> {{ col.label }}</label>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="showColumnSettings = false">Закрыть</button>
+        </div>
+      </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" @click="showColumnSettings = false">Закрыть</button>
-    </div>
-  </div>
-</div>
+
     <!-- Таблица ресурсов -->
     <div class="table-scroll-container">
       <table class="data-table">
@@ -112,8 +115,9 @@
             <td v-for="col in visibleColumns" :key="col.key">{{ formatCell(res, col.key) }}</td>
             <td class="actions-cell">
               <button class="btn btn-sm btn-secondary" @click="viewCard(res.resource_id)">Просмотр</button>
-              <button v-if="canEdit" class="btn btn-sm btn-secondary" @click="editResource(res)">✏️</button>
-              <button v-if="canEdit" class="btn btn-sm btn-danger" @click="deleteResource(res.resource_id)">🗑️</button>
+              <button v-if="canEdit && res.status !== 'Списан'" class="btn btn-sm btn-secondary" @click="editResource(res)">✏️</button>
+              <button v-if="canEdit && res.status !== 'Списан'" class="btn btn-sm btn-danger" @click="writeOffResource(res.resource_id)">📝 Списать</button>
+              <span v-if="res.status === 'Списан'" class="badge-disabled">Списан</span>
             </td>
           </tr>
           <tr v-if="sortedAndFilteredResources.length === 0">
@@ -159,7 +163,6 @@ const addMeasurementModalRef = ref();
 const measurementsModalRef = ref();
 const confirmDialog = ref();
 
-// Фильтры
 const filters = ref({ search: '', status: '' });
 const advancedFilters = ref<{ field: string; operator: string; value: string }[]>([]);
 const showAdvancedFilter = ref(false);
@@ -170,7 +173,6 @@ const exportDropdownOpen = ref(false);
 const alertsCollapsed = ref(false);
 const showColumnSettings = ref(false);
 
-// Колонки таблицы
 const allColumns = [
   { key: 'name', label: 'Наименование' },
   { key: 'mark', label: 'Марка' },
@@ -194,24 +196,14 @@ const canEdit = computed(() => {
   } catch { return false; }
 });
 
-// Определение статуса ресурса (по ТЗ: получен, исправен, неисправен, в ремонте, на поверке, законсервирован, списан)
 function getResourceStatus(res: any): string {
-  if (res.is_deleted) return 'Списан';
-  const remaining = toNumber(res.remaining_resource);
-  if (remaining !== null) {
-    if (remaining <= 20) return 'Неисправен';
-    if (remaining <= 50) return 'В ремонте';
-    if (remaining <= 80) return 'На поверке';
-    return 'Исправен';
-  }
-  return 'Получен';
+  return res.status || 'Получен';
 }
 
-// Предупреждения
 const alerts = computed(() => {
   const result: { type: string; message: string }[] = [];
   for (const res of store.resources) {
-    if (res.is_deleted) continue;
+    if (res.status === 'Списан') continue;
     const remaining = toNumber(res.remaining_resource);
     if (remaining !== null && remaining <= 20) {
       result.push({ type: 'danger', message: `🔴 ${res.name}: остаточный ресурс критический (${remaining}%)` });
@@ -225,43 +217,29 @@ const alerts = computed(() => {
 function toggleAlerts() { alertsCollapsed.value = !alertsCollapsed.value; }
 
 function getRowClass(res: any): string {
-  if (res.is_deleted) return 'row-disabled';
-  const status = getResourceStatus(res);
-  if (status === 'Неисправен') return 'row-critical';
-  if (status === 'В ремонте' || status === 'На поверке') return 'row-warning';
+  if (res.status === 'Списан') return 'row-disabled';
+  const remaining = toNumber(res.remaining_resource);
+  if (remaining !== null && remaining <= 20) return 'row-critical';
+  if (remaining !== null && remaining <= 50) return 'row-warning';
   return '';
 }
 
-// Фильтрация
 const filteredResources = computed(() => {
   let list = [...store.resources];
   const f = filters.value;
-  
-  // Простой фильтр
   if (f.search) {
     const s = f.search.toLowerCase();
-    list = list.filter(r => 
-      (r.name || '').toLowerCase().includes(s) ||
-      (r.mark || '').toLowerCase().includes(s) ||
-      (r.manufacturer || '').toLowerCase().includes(s)
-    );
+    list = list.filter(r => (r.name || '').toLowerCase().includes(s) || (r.mark || '').toLowerCase().includes(s));
   }
   if (f.status) {
     list = list.filter(r => getResourceStatus(r) === f.status);
   }
-  
-  // Расширенный фильтр
   for (const cond of advancedFilters.value) {
     if (!cond.field || !cond.value) continue;
     list = list.filter(r => {
-      let value = '';
-      if (cond.field === 'status') {
-        value = getResourceStatus(r);
-      } else {
-        value = String(r[cond.field] || '');
-      }
-      const filterValue = cond.value.toLowerCase();
+      let value = cond.field === 'status' ? getResourceStatus(r) : String(r[cond.field] || '');
       const strValue = value.toLowerCase();
+      const filterValue = cond.value.toLowerCase();
       switch (cond.operator) {
         case 'contains': return strValue.includes(filterValue);
         case 'equals': return strValue === filterValue;
@@ -271,42 +249,32 @@ const filteredResources = computed(() => {
       }
     });
   }
-  
   return list;
 });
 
-function addFilterCondition() {
-  advancedFilters.value.push({ field: '', operator: 'contains', value: '' });
-}
-
-function removeFilterCondition(idx: number) {
-  advancedFilters.value.splice(idx, 1);
-}
-
-function resetAdvancedFilters() {
-  advancedFilters.value = [];
-}
-
-function applyAdvancedFilters() {
-  showAdvancedFilter.value = false;
-  applyFilters();
-}
+function addFilterCondition() { advancedFilters.value.push({ field: '', operator: 'contains', value: '' }); }
+function removeFilterCondition(idx: number) { advancedFilters.value.splice(idx, 1); }
+function resetAdvancedFilters() { advancedFilters.value = []; }
+function applyAdvancedFilters() { showAdvancedFilter.value = false; }
 
 const sortedAndFilteredResources = computed(() => {
   const list = [...filteredResources.value];
-  const field = sortField.value;
-  const order = sortOrder.value;
   list.sort((a, b) => {
-    let valA: any = a[field];
-    let valB: any = b[field];
-    if (field === 'status') {
-      valA = getResourceStatus(a);
-      valB = getResourceStatus(b);
-    }
-    if (typeof valA === 'string') valA = valA.toLowerCase();
-    if (typeof valB === 'string') valB = valB.toLowerCase();
-    if (valA < valB) return order === 'asc' ? -1 : 1;
-    if (valA > valB) return order === 'asc' ? 1 : -1;
+    const getPriority = (res: any) => {
+      if (res.status === 'Списан') return 3;
+      const r = toNumber(res.remaining_resource);
+      if (r !== null && r <= 20) return 0;
+      if (r !== null && r <= 50) return 1;
+      return 2;
+    };
+    const pa = getPriority(a), pb = getPriority(b);
+    if (pa !== pb) return pa - pb;
+    let va = a[sortField.value], vb = b[sortField.value];
+    if (sortField.value === 'status') { va = getResourceStatus(a); vb = getResourceStatus(b); }
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return sortOrder.value === 'asc' ? -1 : 1;
+    if (va > vb) return sortOrder.value === 'asc' ? 1 : -1;
     return 0;
   });
   return list;
@@ -314,10 +282,10 @@ const sortedAndFilteredResources = computed(() => {
 
 function formatCell(res: any, key: string): string {
   if (key === 'status') return getResourceStatus(res);
-  const value = res[key];
-  if (value === undefined || value === null) return '-';
-  if (key === 'initial_resource' || key === 'remaining_resource') return `${value}%`;
-  return String(value);
+  const val = res[key];
+  if (val === undefined || val === null) return '-';
+  if (key === 'initial_resource' || key === 'remaining_resource') return `${val}%`;
+  return String(val);
 }
 
 function sortBy(field: string) {
@@ -342,50 +310,50 @@ function openForm() { formRef.value?.open(); }
 function openAddMeasurementModal() { addMeasurementModalRef.value?.open(); }
 function openMeasurementsModal() { measurementsModalRef.value?.open(); }
 function editResource(res: any) { formRef.value?.open(res); }
-async function deleteResource(id: string) {
-  const ok = await confirmDialog.value?.show('Удаление', 'Удалить ресурс?');
-  if (ok) await store.deleteResource(id);
+async function writeOffResource(id: string) {
+  const resource = store.resources.find(r => r.resource_id === id);
+  if (!resource) return;
+  
+  const ok = await confirmDialog.value?.show(
+    'Списание оборудования',
+    `Списать ресурс "${resource.name}"?`
+  );
+  if (ok) {
+    try {
+      await store.writeOffResource(id);
+      await refresh();
+    } catch (err: any) {
+      alert('Ошибка при списании');
+    }
+  }
 }
+
 function viewCard(id: string) { router.push(`/resources/${id}`); }
-function refresh() { applyFilters(); }
+async function refresh() { await store.fetchResources(); }
 
 function getExportData() {
   return sortedAndFilteredResources.value.map(r => {
     const row: Record<string, any> = {};
-    for (const col of visibleColumns.value) {
-      row[col.label] = formatCell(r, col.key);
-    }
+    for (const col of visibleColumns.value) row[col.label] = formatCell(r, col.key);
     return row;
   });
 }
 
 function exportToExcel() {
   const data = getExportData();
-  if (data.length === 0) {
-    alert('Нет данных для экспорта');
-    return;
-  }
-  const filename = `Ресурсы_${new Date().toISOString().slice(0, 19).replace(/:/g, '-').replace(/-/g, '_')}`;
-  exportUtils.exportToExcel(data, filename);
+  if (data.length === 0) { alert('Нет данных для экспорта'); return; }
+  exportUtils.exportToExcel(data, `Ресурсы_${new Date().toISOString().slice(0,19).replace(/:/g,'-').replace(/-/g,'_')}`);
   exportDropdownOpen.value = false;
 }
 
 function exportToWord() {
   const data = getExportData();
-  if (data.length === 0) {
-    alert('Нет данных для экспорта');
-    return;
-  }
-  const firstItem = data[0];
-  if (!firstItem) {
-    alert('Нет данных для экспорта');
-    return;
-  }
-  const headers = Object.keys(firstItem);
-  const filename = `Ресурсы_${new Date().toISOString().slice(0, 19).replace(/:/g, '-').replace(/-/g, '_')}`;
-  exportUtils.exportToWord(data, headers, filename);
+  if (data.length === 0) { alert('Нет данных для экспорта'); return; }
+  if (!data[0]) return;
+  exportUtils.exportToWord(data, Object.keys(data[0]), `Ресурсы_${new Date().toISOString().slice(0,19).replace(/:/g,'-').replace(/-/g,'_')}`);
   exportDropdownOpen.value = false;
 }
+
 function toggleExportDropdown() { exportDropdownOpen.value = !exportDropdownOpen.value; }
 function handleClickOutside(event: MouseEvent) {
   const target = event.target as HTMLElement;
@@ -429,15 +397,12 @@ onMounted(() => {
 .alert-item.danger { color: #c0392b; font-weight: 500; }
 .alert-item.warning { color: #e67e22; }
 .table-scroll-container { width: 100%; overflow-x: auto; max-height: 500px; border: 1px solid #e0e4e8; border-radius: 8px; background: white; }
-.table-scroll-container::-webkit-scrollbar { width: 12px; height: 12px; }
-.table-scroll-container::-webkit-scrollbar-track { background: #e0e4e8; border-radius: 6px; }
-.table-scroll-container::-webkit-scrollbar-thumb { background: #2c5f8a; border-radius: 6px; cursor: pointer; }
-.table-scroll-container::-webkit-scrollbar-thumb:hover { background: #1e4566; }
 .table-scroll-container .data-table { min-width: 1000px; }
 .actions-cell { white-space: nowrap; }
 .actions-cell .btn { margin-right: 4px; }
 .empty-data { text-align: center; padding: 20px; color: #999; }
-.row-critical { background-color: #ffe0e0; }
-.row-warning { background-color: #fff3e0; }
-.row-disabled { background-color: #f0f0f0; color: #999; opacity: 0.7; }
+.row-critical { background-color: #ffcccc !important; }
+.row-warning { background-color: #ffe6b3 !important; }
+.row-disabled { background-color: #e0e0e0 !important; color: #999; opacity: 0.7; }
+.badge-disabled { display: inline-block; padding: 4px 8px; background-color: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 12px; }
 </style>
