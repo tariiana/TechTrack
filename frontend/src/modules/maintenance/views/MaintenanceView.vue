@@ -15,7 +15,6 @@
     </div>
 
     <!-- Поиск и фильтры -->
-    <div class="filter-panel">
       <div class="filter-row">
         <input
           v-model="searchQuery"
@@ -42,8 +41,7 @@
         />
         <button class="btn btn-secondary" @click="resetFilters">Сбросить</button>
       </div>
-    </div>
-
+    <br>
     <!-- Таблица планов с прокруткой -->
     <div class="table-scroll-container">
       <table class="data-table">
@@ -103,6 +101,10 @@ const sortOrder = ref<'asc' | 'desc'>('asc')
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
+  
+  // Если уже в формате DD.MM.YYYY, возвращается как есть
+  if (dateStr.includes('.')) return dateStr;
+  
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) return dateStr;
   const day = date.getDate().toString().padStart(2, '0');
@@ -123,21 +125,82 @@ function sortBy(field: 'name' | 'startDate' | 'endDate') {
 const filteredAndSortedPlans = computed(() => {
   let list = [...store.plans]
 
+  // Поиск по названию
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     list = list.filter((p) => p.name.toLowerCase().includes(q))
   }
 
-  if (dateFrom.value) {
-    list = list.filter((p) => p.start_date >= dateFrom.value)
+  // Функция для парсинга даты
+function parseDate(dateStr: string): Date | null {
+  if (!dateStr) return null
+  
+  // Проверяем формат DD.MM.YYYY
+  if (dateStr.includes('.')) {
+    const parts = dateStr.split('.')
+    if (parts.length === 3) {
+      const day = parseInt(parts[0] || '0', 10)
+      const month = parseInt(parts[1] || '0', 10) - 1
+      const year = parseInt(parts[2] || '0', 10)
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year) && day > 0 && month >= 0) {
+        return new Date(year, month, day)
+      }
+    }
   }
-  if (dateTo.value) {
-    list = list.filter((p) => p.start_date <= dateTo.value)
+  
+  // Формат YYYY-MM-DD
+  const date = new Date(dateStr)
+  return isNaN(date.getTime()) ? null : date
+}
+
+  const fromDate = dateFrom.value ? parseDate(dateFrom.value) : null
+  const toDate = dateTo.value ? parseDate(dateTo.value) : null
+
+  if (fromDate && !toDate) {
+    // Только дата начала
+    list = list.filter((p) => {
+      const planStart = parseDate(p.start_date)
+      if (!planStart) return false
+      return planStart.toDateString() === fromDate.toDateString()
+    })
+  } 
+  else if (!fromDate && toDate) {
+    // Только дата окончания
+    list = list.filter((p) => {
+      if (!p.end_date) return false
+      const planEnd = parseDate(p.end_date)
+      if (!planEnd) return false
+      return planEnd.toDateString() === toDate.toDateString()
+    })
+  }
+  else if (fromDate && toDate) {
+    // Обе даты - проверка на пересечение диапазонов
+    list = list.filter((p) => {
+      const planStart = parseDate(p.start_date)
+      if (!planStart) return false
+      
+      const planEnd = p.end_date ? parseDate(p.end_date) : planStart
+      if (!planEnd) return false
+      
+      // Проверка: план пересекается с выбранным диапазоном
+      return planStart <= toDate && planEnd >= fromDate
+    })
   }
 
+  // Сортировка
   list.sort((a, b) => {
     let valA = a[sortField.value === 'startDate' ? 'start_date' : sortField.value === 'endDate' ? 'end_date' : sortField.value]
     let valB = b[sortField.value === 'startDate' ? 'start_date' : sortField.value === 'endDate' ? 'end_date' : sortField.value]
+    
+    // Парсим даты для корректного сравнения
+    if (sortField.value === 'startDate' || sortField.value === 'endDate') {
+      const dateA = parseDate(valA)
+      const dateB = parseDate(valB)
+      if (dateA && dateB) {
+        return sortOrder.value === 'asc' ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime()
+      }
+    }
+    
     if (valA < valB) return sortOrder.value === 'asc' ? -1 : 1
     if (valA > valB) return sortOrder.value === 'asc' ? 1 : -1
     return 0

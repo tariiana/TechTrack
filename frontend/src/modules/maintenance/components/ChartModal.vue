@@ -90,8 +90,8 @@ function prepareChartData(tasks: any[]) {
   }
   
   for (const task of tasks) {
-    if (task.recommendedDate) {
-      const month = new Date(task.recommendedDate).getMonth() + 1;
+    if (task.completed_date) {
+    const month = new Date(task.completed_date).getMonth() + 1;
       const type = task.serviceType;
       const monthRecord = monthlyData[month];
       if (monthRecord && monthRecord[type] !== undefined) {
