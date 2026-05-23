@@ -5,18 +5,28 @@
       <div class="action-buttons">
         <button v-if="canEdit" class="btn btn-primary btn-fixed" @click="openAddForm">+ Добавить СИ</button>
         <button class="btn btn-secondary btn-fixed" @click="openColumnSettings">⚙️ Колонки</button>
-        <button class="btn btn-secondary btn-fixed" @click="openExportDialog">📎 Экспорт</button>
+        
+        <!-- Выпадающий список экспорта -->
+        <div class="dropdown">
+          <button class="btn btn-secondary btn-fixed" @click="toggleExportDropdown">
+            📎 Экспорт {{ exportDropdownOpen ? '▲' : '▼' }}
+          </button>
+          <div v-if="exportDropdownOpen" class="dropdown-menu">
+            <button class="dropdown-item" @click="exportToExcel">Microsoft Excel (.xlsx)</button>
+            <button class="dropdown-item" @click="exportToWord">Microsoft Word (.docx)</button>
+          </div>
+        </div>
       </div>
     </div>
 
     <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px">
-      <input v-model="filters.search" type="text" placeholder="Поиск по номеру/наименованию" class="form-control" style="width: 250px" @input="onSearchInput" />
+      <input v-model="filters.search" type="text" placeholder="Поиск по всем полям" class="form-control" style="width: 250px" @input="onSearchInput" />
       <select v-model="filters.status" class="form-control" style="width: 150px" @change="applyFilters">
         <option value="">Все статусы</option>
         <option value="в эксплуатации">В эксплуатации</option>
         <option value="на поверке">На поверке</option>
         <option value="в ремонте">В ремонте</option>
-        <option value="выведено">Выведено</option>
+        <option value="списано">Списано</option>
       </select>
       <button class="btn btn-secondary" @click="resetFilters">Сбросить</button>
     </div>
@@ -38,9 +48,9 @@
             <td v-for="colKey in visibleOrderedColumns" :key="colKey">{{ formatCell(si, colKey) }}</td>
             <td class="actions-cell">
               <button class="btn btn-sm btn-secondary" @click="viewCard(si.id)">Просмотр</button>
-              <button v-if="canEdit && si.status !== 'выведено'" class="btn btn-sm btn-secondary" @click="editSI(si)">✏️</button>
-              <button v-if="canEdit && si.status !== 'выведено'" class="btn btn-sm btn-danger" @click="writeOffSI(si.id)">📝 Списать</button>
-              <span v-if="si.status === 'выведено'" class="badge-disabled">Списан</span>
+              <button v-if="canEdit && si.status !== 'списано'" class="btn btn-sm btn-secondary" @click="editSI(si)">✏️</button>
+              <button v-if="canEdit && si.status !== 'списано'" class="btn btn-sm btn-danger" @click="writeOffSI(si.id)">📝 Списать</button>
+              <span v-if="si.status === 'списано'" class="badge-disabled">Списано</span>
             </td>
           </tr>
           <tr v-if="sortedList.length === 0">
@@ -52,27 +62,32 @@
 
     <SIForm ref="siFormRef" @si-saved="refresh" />
     <VerificationForm ref="verFormRef" @verification-saved="refresh" />
-    <ExportDialog ref="exportDialogRef" :data="exportDataList" />
-    <ConfirmDialog ref="confirmDialog" />
     <ColumnSettings ref="columnSettingsRef" />
+    <ConfirmDialog ref="confirmDialog" />
+    <ExportDialog ref="exportDialogRef" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSIStore } from '../stores/siStore';
 import SIForm from './SIForm.vue';
 import VerificationForm from './VerificationForm.vue';
-import ExportDialog from './ExportDialog.vue';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import ColumnSettings from './ColumnSettings.vue';
+import ExportDialog from './ExportDialog.vue';
 import ScrollableTable from '@/components/common/ScrollableTable.vue';
 import { formatDate, getDaysUntilVerification } from '@/utils/dateUtils';
+import { showToast } from '@/utils/toast';
 
 const router = useRouter();
 const store = useSIStore();
 const columnSettingsRef = ref();
+const exportDialogRef = ref();
+const siFormRef = ref();
+const verFormRef = ref();
+const confirmDialog = ref();
 
 const COLUMN_LABELS: Record<string, string> = {
   name: 'Наименование',
@@ -109,6 +124,27 @@ const columnOrder = ref<ColumnKey[]>([
   'verificationInterval', 'location', 'notes'
 ]);
 
+const filters = ref({ search: '', status: '' });
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+const sortField = ref<ColumnKey>('tabNumber');
+const sortDir = ref<'asc' | 'desc'>('asc');
+const exportDropdownOpen = ref(false);
+
+const canEdit = computed(() => {
+  const user = localStorage.getItem('user');
+  if (!user) return false;
+  const role = JSON.parse(user).role;
+  return role === 'operator' || role === 'admin';
+});
+
+const visibleOrderedColumns = computed(() => {
+  return columnOrder.value.filter(key => visibleColumns.value[key]);
+});
+
+function getColumnLabel(key: ColumnKey): string {
+  return COLUMN_LABELS[key] || key;
+}
+
 function loadColumnSettings() {
   const saved = localStorage.getItem('si_column_visibility');
   if (saved) {
@@ -126,16 +162,8 @@ function loadColumnSettings() {
   }
 }
 
-function getColumnLabel(key: ColumnKey): string {
-  return COLUMN_LABELS[key] || key;
-}
-
-const visibleOrderedColumns = computed(() => {
-  return columnOrder.value.filter(key => visibleColumns.value[key]);
-});
-
-function openColumnSettings() { columnSettingsRef.value?.open(); }
 function onColumnSettingsChange() { loadColumnSettings(); }
+function openColumnSettings() { columnSettingsRef.value?.open(); }
 
 function getLastVerificationDate(id: number): string { return store.getLastVerificationDate(id); }
 function getNextVerificationDate(id: number): string { return store.getNextVerificationDate(id); }
@@ -150,43 +178,22 @@ function formatCell(si: any, key: ColumnKey): string {
     return date ? formatDate(date) : '-';
   }
   if (key === 'verificationInterval') return `${si.verificationInterval} год`;
-  if (key === 'mainParams') {
-    if (si.mainParams && Object.keys(si.mainParams).length > 0) {
-      const params = Object.entries(si.mainParams).slice(0, 2);
-      return params.map(([k, v]) => `${k}: ${v}`).join(', ') + (Object.keys(si.mainParams).length > 2 ? '...' : '');
-    }
-    return '-';
+  if (key === 'status') {
+    return si.status === 'списано' ? 'Списано' : si.status;
   }
   const value = si[key];
   return value === undefined || value === null ? '-' : String(value);
 }
 
-const siFormRef = ref();
-const verFormRef = ref();
-const exportDialogRef = ref();
-const confirmDialog = ref();
-
-const filters = ref({ search: '', status: '' });
-let searchTimer: ReturnType<typeof setTimeout> | null = null;
-const sortField = ref<ColumnKey>('tabNumber');
-const sortDir = ref<'asc' | 'desc'>('asc');
-
-const canEdit = computed(() => {
-  const user = localStorage.getItem('user');
-  if (!user) return false;
-  const role = JSON.parse(user).role;
-  return role === 'operator' || role === 'admin';
-});
-
 function getDaysLeft(si: any): number {
-  if (si.status === 'выведено') return Infinity;
+  if (si.status === 'списано') return Infinity;
   const nextDate = getNextVerificationDate(si.id);
   if (!nextDate) return Infinity;
   return getDaysUntilVerification(nextDate);
 }
 
 function getPriority(si: any): number {
-  if (si.status === 'выведено') return 3;
+  if (si.status === 'списано') return 999; // списанные - в конец
   const daysLeft = getDaysLeft(si);
   if (daysLeft < 0) return 0;
   if (daysLeft <= 30) return 1;
@@ -196,17 +203,13 @@ function getPriority(si: any): number {
 const sortedList = computed(() => {
   let list = [...store.instruments];
   
+  // Сначала сортируем по приоритету (цвету)
   list.sort((a, b) => {
     const priorityA = getPriority(a);
     const priorityB = getPriority(b);
     if (priorityA !== priorityB) return priorityA - priorityB;
     
-    if (priorityA === 0 || priorityA === 1) {
-      const daysA = getDaysLeft(a);
-      const daysB = getDaysLeft(b);
-      return daysA - daysB;
-    }
-    
+    // Если приоритет одинаковый, сортируем по выбранному полю
     const field = sortField.value;
     let valA: any = a[field];
     let valB: any = b[field];
@@ -252,7 +255,7 @@ function onSearchInput() {
 function resetFilters() { filters.value = { search: '', status: '' }; if (searchTimer) clearTimeout(searchTimer); applyFilters(); }
 
 function getRowClass(si: any): string {
-  if (si.status === 'выведено') return 'disabled-row';
+  if (si.status === 'списано') return 'disabled-row';
   const days = getDaysLeft(si);
   if (days < 0) return 'expired-row';
   if (days <= 30) return 'warning-row';
@@ -268,7 +271,7 @@ function getDaysWord(days: number): string {
 }
 
 function getTooltip(si: any): string {
-  if (si.status === 'выведено') return 'Прибор списан, не используется';
+  if (si.status === 'списано') return 'Прибор списан, не используется';
   const days = getDaysLeft(si);
   const nextDate = getNextVerificationDate(si.id);
   if (!nextDate) return 'Поверки ещё не проводились';
@@ -278,20 +281,63 @@ function getTooltip(si: any): string {
 }
 
 function viewCard(id: number) { router.push(`/si/${id}`); }
+
 function openAddForm() { siFormRef.value?.open(); }
+
 function editSI(si: any) { siFormRef.value?.open(si); }
+
 async function writeOffSI(id: number) {
-  const ok = await confirmDialog.value?.show('Списание', 'Списать СИ?');
-  if (ok) await store.writeOffInstrument(id);
+  const ok = await confirmDialog.value?.show('Списание', 'Вы уверены что хотите списать СИ?');
+  if (ok) {
+    await store.writeOffInstrument(id);
+    showToast('СИ успешно списано', 'success');
+  }
 }
+
 function refresh() { applyFilters(); }
-const exportDataList = computed(() => sortedList.value.map(si => ({ ...si, lastVerificationDate: getLastVerificationDate(si.id), nextVerificationDate: getNextVerificationDate(si.id) })));
-function openExportDialog() { exportDialogRef.value?.open(exportDataList.value); }
+
+function toggleExportDropdown() {
+  exportDropdownOpen.value = !exportDropdownOpen.value;
+}
+
+function closeExportDropdown() {
+  exportDropdownOpen.value = false;
+}
+
+function handleClickOutside(event: MouseEvent) {
+  const target = event.target as HTMLElement;
+  if (!target.closest('.dropdown')) {
+    exportDropdownOpen.value = false;
+  }
+}
+
+async function exportToExcel() {
+  const data = sortedList.value;
+  const columns = visibleOrderedColumns.value;
+  const columnLabels = columns.map(key => getColumnLabel(key));
+  await exportDialogRef.value?.exportDirect(data, columns, columnLabels, 'excel');
+  closeExportDropdown();
+}
+
+async function exportToWord() {
+  const data = sortedList.value;
+  const columns = visibleOrderedColumns.value;
+  const columnLabels = columns.map(key => getColumnLabel(key));
+  await exportDialogRef.value?.exportDirect(data, columns, columnLabels, 'word');
+  closeExportDropdown();
+}
 
 onMounted(() => {
   loadColumnSettings();
   store.fetchInstruments();
   window.addEventListener('column-settings-changed', onColumnSettingsChange);
+  document.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('column-settings-changed', onColumnSettingsChange);
+  document.removeEventListener('click', handleClickOutside);
+  if (searchTimer) clearTimeout(searchTimer);
 });
 </script>
 
@@ -301,20 +347,44 @@ onMounted(() => {
 .badge-disabled { display: inline-block; padding: 4px 8px; background-color: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 12px; }
 .actions-cell { white-space: nowrap; }
 .actions-cell .btn { margin-right: 4px; }
-.warning-row { background-color: #fff3e0; }
-.warning-row:hover { background-color: #ffe8c7; }
-.expired-row { background-color: #ffe0e0; }
-.expired-row:hover { background-color: #ffd0d0; }
-.disabled-row { background-color: #f0f0f0; color: #999; opacity: 0.7; }
-.disabled-row:hover { background-color: #e8e8e8; }
+.warning-row { background-color: #ffd699; }
+.warning-row:hover { background-color: #ffbb55; }
+.expired-row { background-color: #ffb3b3; }
+.expired-row:hover { background-color: #ff8080; }
+.disabled-row { background-color: #e0e0e0; color: #999; opacity: 0.7; }
+.disabled-row:hover { background-color: #d0d0d0; }
+.card { overflow-x: hidden; }
+.scrollable-table-container { width: 100%; }
 
-/* Убеждаемся, что карточка не создаёт лишнюю прокрутку */
-.card {
-  overflow-x: hidden;
+.dropdown {
+  position: relative;
 }
 
-/* Контейнер таблицы занимает всю ширину */
-.scrollable-table-container {
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #e0e4e8;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  z-index: 100;
+  min-width: 200px;
+}
+
+.dropdown-item {
+  display: block;
   width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.dropdown-item:hover {
+  background-color: #f0f2f5;
 }
 </style>

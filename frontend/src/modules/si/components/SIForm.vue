@@ -1,6 +1,6 @@
 <template>
   <div class="modal-overlay" v-if="visible">
-    <div class="modal-content" style="width: 650px">
+    <div class="modal-content" style="width: 700px">
       <div class="modal-header">{{ isEdit ? 'Редактирование СИ' : 'Добавление СИ' }}</div>
 
       <div class="form-row">
@@ -54,37 +54,56 @@
             <option value="в эксплуатации">В эксплуатации</option>
             <option value="на поверке">На поверке</option>
             <option value="в ремонте">В ремонте</option>
-            <option value="выведено">Выведено</option>
+            <option value="списано">Списано</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Размещение</label>
+          <label>Местоположение*</label>
           <input v-model="form.location" class="form-control" />
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label>Основные параметры (JSON)</label>
-          <textarea 
-            v-model="mainParamsStr" 
-            rows="4" 
-            class="form-control" 
-            placeholder='{"напряжение": "12В", "ток": "2А", "мощность": "24Вт"}'
-          />
-          <small class="text-muted">Введите данные в формате JSON</small>
-        </div>
-        <div class="form-group">
-          <label>Дата производства</label>
-          <input type="date" v-model="form.productionDate" class="form-control" />
+      <!-- Основные параметры - новая визуальная часть -->
+      <div class="form-group">
+        <label>Основные параметры</label>
+        <div class="params-container">
+          <div v-for="(param, index) in paramsList" :key="index" class="param-row">
+            <input 
+              v-model="param.name" 
+              placeholder="Название параметра"
+              class="param-name-input"
+            />
+            <input 
+              v-model="param.value" 
+              placeholder="Значение"
+              class="param-value-input"
+            />
+            <input 
+              v-model="param.unit" 
+              placeholder="Ед. измерения"
+              class="param-unit-input"
+            />
+            <button type="button" class="btn-remove" @click="removeParam(index)">×</button>
+          </div>
+          
+          <button type="button" class="btn-add-param" @click="addParam">
+            + Добавить параметр
+          </button>
         </div>
       </div>
 
       <div class="form-row">
         <div class="form-group">
+          <label>Дата производства</label>
+          <input type="date" v-model="form.productionDate" class="form-control" />
+        </div>
+        <div class="form-group">
           <label>Поверитель</label>
           <input v-model="form.verifier" class="form-control" />
         </div>
+      </div>
+
+      <div class="form-row">
         <div class="form-group">
           <label>Межповерочный интервал (лет)*</label>
           <input type="number" step="0.5" v-model="form.verificationInterval" class="form-control" />
@@ -96,7 +115,6 @@
         <textarea v-model="form.notes" rows="2" class="form-control"></textarea>
       </div>
 
-      <div v-if="jsonError" class="error-text">{{ jsonError }}</div>
       <div v-if="error" class="error-text">{{ error }}</div>
 
       <div class="modal-footer">
@@ -110,16 +128,83 @@
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue';
 import { useSIStore } from '../stores/siStore';
+import { showToast } from '@/utils/toast';
 
 const store = useSIStore();
 const visible = ref(false);
 const isEdit = ref(false);
 const editId = ref<string | null>(null);
 const error = ref('');
-const jsonError = ref('');
 
-// Строковое представление JSON для редактирования
-const mainParamsStr = ref('{}');
+// Список параметров для отображения
+interface ParamItem {
+  name: string;
+  value: string;
+  unit: string;
+}
+
+const paramsList = ref<ParamItem[]>([]);
+
+// Преобразование JSON параметров в список
+function paramsFromJson(json: Record<string, any>): ParamItem[] {
+  const list: ParamItem[] = [];
+  
+  for (const [key, rawValue] of Object.entries(json)) {
+    let value = String(rawValue);
+    let unit = '';
+    
+    // Пробуем отделить значение от единицы измерения
+    // Формат: "100 Вт" или "100"
+    const match = value.match(/^([\d.,]+)\s*(.+)$/);
+    if (match && match[1] && match[2]) {
+      value = match[1];
+      unit = match[2].trim();
+    }
+    
+    list.push({
+      name: key,
+      value: value,
+      unit: unit
+    });
+  }
+  
+  return list;
+}
+
+// Преобразование списка параметров в JSON
+function paramsToJson(): Record<string, any> {
+  const json: Record<string, any> = {};
+  
+  for (const param of paramsList.value) {
+    if (param.name && param.name.trim() && param.value && param.value.trim()) {
+      const name = param.name.trim();
+      const value = param.value.trim();
+      const unit = param.unit.trim();
+      
+      if (unit) {
+        json[name] = `${value} ${unit}`;
+      } else {
+        // Пробуем преобразовать в число
+        const numValue = parseFloat(value);
+        json[name] = isNaN(numValue) ? value : numValue;
+      }
+    }
+  }
+  
+  return json;
+}
+
+function addParam() {
+  paramsList.value.push({
+    name: '',
+    value: '',
+    unit: ''
+  });
+}
+
+function removeParam(index: number) {
+  paramsList.value.splice(index, 1);
+}
 
 function getCurrentDate(): string {
   const now = new Date();
@@ -138,7 +223,7 @@ const form = reactive({
   inventoryNumber: '',
   tabNumber: '',
   nodeId: undefined as string | undefined,
-  status: 'в эксплуатации' as 'в эксплуатации' | 'на поверке' | 'в ремонте' | 'выведено',
+  status: 'в эксплуатации' as 'в эксплуатации' | 'на поверке' | 'в ремонте' | 'списано',
   location: '',
   mainParams: {} as Record<string, any>,
   verificationInterval: 1,
@@ -147,26 +232,6 @@ const form = reactive({
   productionDate: '',
   verifier: '',
 });
-
-// Синхронизация mainParamsStr с form.mainParams
-watch(mainParamsStr, (newVal) => {
-  try {
-    const parsed = JSON.parse(newVal);
-    form.mainParams = parsed;
-    jsonError.value = '';
-  } catch (e) {
-    jsonError.value = 'Неверный формат JSON';
-  }
-});
-
-// При загрузке данных для редактирования
-function updateMainParamsStr() {
-  if (form.mainParams && Object.keys(form.mainParams).length > 0) {
-    mainParamsStr.value = JSON.stringify(form.mainParams, null, 2);
-  } else {
-    mainParamsStr.value = '{}';
-  }
-}
 
 function resetForm() {
   form.name = '';
@@ -185,8 +250,7 @@ function resetForm() {
   form.lastVerificationDate = '';
   form.productionDate = '';
   form.verifier = '';
-  mainParamsStr.value = '{}';
-  jsonError.value = '';
+  paramsList.value = [];
   error.value = '';
   isEdit.value = false;
   editId.value = null;
@@ -216,7 +280,7 @@ function open(editItem?: any) {
     form.lastVerificationDate = editItem.lastVerificationDate || now;
     form.productionDate = editItem.productionDate || '';
     form.verifier = editItem.verifier || '';
-    updateMainParamsStr();
+    paramsList.value = paramsFromJson(form.mainParams);
   }
   visible.value = true;
 }
@@ -242,13 +306,6 @@ function validate(): boolean {
     error.value = 'Укажите местоположение';
     return false;
   }
-  // Проверка JSON
-  try {
-    JSON.parse(mainParamsStr.value);
-  } catch {
-    error.value = 'Неверный формат JSON в основных параметрах';
-    return false;
-  }
   error.value = '';
   return true;
 }
@@ -256,15 +313,7 @@ function validate(): boolean {
 async function save() {
   if (!validate()) return;
 
-  // Парсим JSON перед сохранением
-  let mainParams = {};
-  try {
-    mainParams = JSON.parse(mainParamsStr.value);
-  } catch {
-    error.value = 'Неверный формат JSON';
-    return;
-  }
-
+  const mainParams = paramsToJson();
   const data = {
     name: form.name,
     manufacturer: form.manufacturer,
@@ -285,13 +334,20 @@ async function save() {
     isDeleted: false,
   };
 
-  if (isEdit.value && editId.value) {
-    await store.updateInstrument(editId.value, data);
-  } else {
-    await store.createInstrument(data);
+  try {
+    if (isEdit.value && editId.value) {
+      await store.updateInstrument(editId.value, data);
+      showToast('СИ успешно обновлено', 'success');
+    } else {
+      await store.createInstrument(data);
+      showToast('СИ успешно добавлено', 'success');
+    }
+    close();
+    window.dispatchEvent(new Event('si-saved'));
+  } catch (err: any) {
+    error.value = err.message || 'Ошибка сохранения';
+    showToast(error.value, 'error');
   }
-  close();
-  window.dispatchEvent(new Event('si-saved'));
 }
 
 defineExpose({ open });
@@ -306,10 +362,149 @@ defineExpose({ open });
 .form-row .form-group {
   flex: 1;
 }
-.text-muted {
-  font-size: 12px;
-  color: #6c757d;
-  display: block;
-  margin-top: 4px;
+
+/* Стили для параметров */
+.params-container {
+  border: 1px solid #e0e4e8;
+  border-radius: 6px;
+  padding: 12px;
+  background: #fafbfc;
+}
+
+.param-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.param-row:last-of-type {
+  margin-bottom: 0;
+}
+
+.param-name-input {
+  flex: 2;
+  padding: 8px 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.param-name-input:focus {
+  outline: none;
+  border-color: #2c5f8a;
+  box-shadow: 0 0 0 2px rgba(44, 95, 138, 0.1);
+}
+
+.param-value-input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.param-value-input:focus {
+  outline: none;
+  border-color: #2c5f8a;
+  box-shadow: 0 0 0 2px rgba(44, 95, 138, 0.1);
+}
+
+.param-unit-input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.param-unit-input:focus {
+  outline: none;
+  border-color: #2c5f8a;
+  box-shadow: 0 0 0 2px rgba(44, 95, 138, 0.1);
+}
+
+.btn-remove {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  color: #c0392b;
+  padding: 0 8px;
+  font-weight: bold;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.btn-remove:hover {
+  background-color: #ffebee;
+  color: #a93226;
+}
+
+.btn-add-param {
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: none;
+  border: 1px dashed #2c5f8a;
+  color: #2c5f8a;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.btn-add-param:hover {
+  background: #e8f0fe;
+  border-color: #2c5f8a;
+}
+
+.error-text {
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  color: #c0392b;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  font-size: 13px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #e0e4e8;
+}
+
+.btn-secondary {
+  background-color: #e9ecef;
+  color: #2c3e50;
+  border: 1px solid #ced4da;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background-color: #dee2e6;
+}
+
+.btn-primary {
+  background-color: #2c5f8a;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background-color: #1e4566;
 }
 </style>

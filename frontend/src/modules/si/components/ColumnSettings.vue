@@ -1,7 +1,11 @@
 <template>
   <div class="modal-overlay" v-if="visible">
     <div class="modal-content" style="width: 500px">
-      <div class="modal-header">Настройка отображаемых колонок</div>
+      <div class="modal-header">
+        <span>Настройка отображаемых колонок</span>
+        <button class="btn-close" @click="close" title="Закрыть">×</button>
+      </div>
+
       <div class="column-settings-list">
         <div
           v-for="(col, index) in editableOrder"
@@ -19,8 +23,14 @@
           <button class="drag-handle" title="Перетащить для изменения порядка">⋮⋮</button>
         </div>
       </div>
+
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="resetToDefault">Сбросить</button>
+        <div class="footer-left">
+          <button class="btn btn-secondary" @click="toggleSelectAll">
+            {{ allSelected ? 'Убрать всё' : 'Выбрать всё' }}
+          </button>
+          <button class="btn btn-secondary" @click="resetToDefault">Сбросить</button>
+        </div>
         <button class="btn btn-primary" @click="save">Сохранить</button>
       </div>
     </div>
@@ -28,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 
 const STORAGE_KEY = 'si_column_visibility'
 const STORAGE_ORDER_KEY = 'si_column_order'
@@ -45,12 +55,24 @@ const allColumns = [
   { key: 'nextVerificationDate', label: 'Следующая поверка' },
   { key: 'verificationInterval', label: 'Межповерочный интервал' },
   { key: 'location', label: 'Размещение' },
-  { key: 'note', label: 'Примечание' },           // было 'notes', исправлено
+  { key: 'note', label: 'Примечание' },
 ]
 
 const visible = ref(false)
 const localVisibility = reactive<Record<string, boolean>>({})
 const editableOrder = ref<typeof allColumns>([])
+
+// Проверка, выбраны ли все колонки
+const allSelected = computed(() => {
+  return editableOrder.value.every(col => localVisibility[col.key] === true)
+})
+
+function toggleSelectAll() {
+  const newValue = !allSelected.value
+  for (const col of editableOrder.value) {
+    localVisibility[col.key] = newValue
+  }
+}
 
 function loadSettings() {
   // Загружаем видимость
@@ -142,11 +164,58 @@ defineExpose({ open })
 </script>
 
 <style scoped>
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 500px;
+  max-width: 90%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e4e8;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.btn-close:hover {
+  background-color: #e9ecef;
+  color: #333;
+}
+
 .column-settings-list {
   max-height: 400px;
   overflow-y: auto;
-  margin-bottom: 15px;
+  padding: 16px 20px;
 }
+
 .column-item {
   display: flex;
   justify-content: space-between;
@@ -178,10 +247,45 @@ defineExpose({ open })
 .drag-handle:active {
   cursor: grabbing;
 }
+
 .modal-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-top: 1px solid #e0e4e8;
+}
+
+.footer-left {
+  display: flex;
   gap: 10px;
-  margin-top: 15px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background-color: #2c5f8a;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #1e4566;
+}
+
+.btn-secondary {
+  background-color: #e9ecef;
+  color: #2c3e50;
+  border: 1px solid #ced4da;
+}
+
+.btn-secondary:hover {
+  background-color: #dee2e6;
 }
 </style>

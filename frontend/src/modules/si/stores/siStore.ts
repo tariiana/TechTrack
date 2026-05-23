@@ -19,13 +19,28 @@ export const useSIStore = defineStore('si', () => {
     const params = filterParams.value;
     if (params.search) {
       const s = params.search.toLowerCase();
-      list = list.filter(si => si.name?.toLowerCase().includes(s) || si.tabNumber?.toLowerCase().includes(s));
+      list = list.filter(si => {
+        // Поиск по всем полям
+        return (
+          si.name?.toLowerCase().includes(s) ||
+          si.tabNumber?.toLowerCase().includes(s) ||
+          si.manufacturer?.toLowerCase().includes(s) ||
+          si.model?.toLowerCase().includes(s) ||
+          si.serialNumber?.toLowerCase().includes(s) ||
+          si.inventoryNumber?.toLowerCase().includes(s) ||
+          si.location?.toLowerCase().includes(s) ||
+          si.status?.toLowerCase().includes(s) ||
+          si.typeName?.toLowerCase().includes(s) ||
+          si.notes?.toLowerCase().includes(s)
+        );
+      });
     }
     if (params.status) {
       list = list.filter(si => si.status === params.status);
     }
     return list;
   });
+  
 
   async function fetchInstruments() {
     isLoading.value = true;
@@ -110,7 +125,10 @@ export const useSIStore = defineStore('si', () => {
   }
 
   async function writeOffInstrument(id: EntityId) {
-    await apiFetch(`/instruments/${id}/write-off`, { method: 'DELETE' });
+    await apiFetch(`/instruments/${id}`, { 
+      method: 'PUT', 
+      body: JSON.stringify({ status: 'списано' }) 
+    });
     await fetchInstruments();
   }
 
