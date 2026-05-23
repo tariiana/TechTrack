@@ -1,124 +1,122 @@
 <template>
-  <div style="margin-top: 20px">
-    <div class="resource-header">
-      <h3>Ресурсы</h3>
-      <div class="resource-actions">
-        <button class="btn btn-sm btn-secondary" @click="goToResources">📊 Полный учёт</button>
-        <button v-if="canEdit" class="btn btn-sm btn-primary" @click="$emit('add')">+ Добавить ресурс</button>
-      </div>
-    </div>
-
-    <div v-if="isLoading" class="loading">Загрузка...</div>
-    <div v-else-if="resources.length === 0" class="empty-message">Ресурсы не добавлены</div>
-    <div v-else class="table-wrapper">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Наименование</th>
-            <th>Значение</th>
-            <th>Ед. изм.</th>
-            <th>Обновлено</th>
-            <th v-if="canEdit">Действия</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="res in resources" :key="res.resource_id">
-            <td>{{ res.name }}</td>
-            <td>{{ res.value }}</td>
-            <td>{{ res.unit || '-' }}</td>
-            <td>{{ formatDate(res.updated_at || res.created_at) }}</td>
-            <td v-if="canEdit">
-              <button class="btn btn-sm btn-secondary" @click="$emit('edit', res)">✏️</button>
-              <button class="btn btn-sm btn-danger" @click="deleteResource(res.resource_id)">🗑️</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+  <div v-if="resources.length" class="resource-table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Наименование</th>
+          <th>Значение</th>
+          <th>Ед. изм.</th>
+          <th>Дата регистрации</th>
+          <th>Примечание</th>
+          <th v-if="canEdit">Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="res in resources" :key="res.id || res.registration_date">
+        <td>
+  <span class="clickable-link" @click="$emit('goToResource', res.id || res.resource_id)">
+    {{ res.resource_params?.name || res.name || 'Ресурс' }}
+  </span>
+</td>
+          <td>{{ res.resource_params?.value ?? res.value ?? '-' }}</td>
+          <td>{{ res.resource_params?.unit || res.unit || '-' }}</td>
+          <td>{{ formatDate(res.registration_date) }}</td>
+          <td>{{ res.note || '-' }}</td>
+          <td v-if="canEdit">
+            <button class="btn btn-sm btn-secondary" @click="$emit('edit', res)">✏️</button>
+            <button class="btn btn-sm btn-danger" @click="$emit('delete', res.node_id || res.id)">🗑️</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
+  <div v-else class="empty-message">Ресурсы не добавлены</div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
-import { useEquipmentStore } from '@/modules/equipment/stores/equipmentStore';
 import { formatDate } from '@/utils/dateUtils';
 
-const props = defineProps<{ nodeId: number }>();
-const emit = defineEmits(['add', 'edit']);
-const router = useRouter();
-const store = useEquipmentStore();
+defineProps<{
+  resources: any[];
+  canEdit: boolean;
+}>();
 
-const resources = ref<any[]>([]);
-const isLoading = ref(false);
-
-const canEdit = computed(() => {
-  const user = localStorage.getItem('user');
-  if (!user) return false;
-  const role = JSON.parse(user).role;
-  return role === 'operator' || role === 'admin';
-});
-
-async function loadResources() {
-  isLoading.value = true;
-  try {
-    resources.value = await store.getResourcesForNode(String(props.nodeId));
-  } catch (err) {
-    console.error('Ошибка загрузки ресурсов:', err);
-    resources.value = [];
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-function goToResources() {
-  router.push({ path: '/resources', query: { nodeId: String(props.nodeId) } });
-}
-
-async function deleteResource(id: string) {
-  if (confirm('Удалить ресурс?')) {
-    await store.deleteResource(id);
-    await loadResources();
-    window.dispatchEvent(new Event('resource-saved'));
-  }
-}
-function handleResourceSaved() {
-  loadResources();
-}
-
-onMounted(() => {
-  loadResources();
-  window.addEventListener('resource-saved', handleResourceSaved);
-});
-
-onUnmounted(() => {
-  window.removeEventListener('resource-saved', handleResourceSaved);
-});
-
-watch(() => props.nodeId, () => {
-  loadResources();
-}, { immediate: true });
+defineEmits(['edit', 'delete', 'goToResource']);
 </script>
 
+
 <style scoped>
-.resource-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
+.resource-table-wrapper { overflow-x: auto; margin-top: 8px; }
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th, .data-table td { border: 1px solid #e2e8f0; padding: 6px 10px; text-align: left; }
+.data-table th { background: #f1f5f9; font-weight: 600; }
+.btn-sm { padding: 4px 8px; font-size: 12px; margin-right: 4px; }
+.empty-message { color: #94a3b8; font-style: italic; padding: 12px; text-align: center; }
+.clickable-link { cursor: pointer; color: #1976d2; text-decoration: none; }
+.clickable-link:hover { text-decoration: underline; }
+
+.resource-table-wrapper {
+  overflow-x: auto;
+  margin-top: 8px;
 }
-.resource-actions {
-  display: flex;
-  gap: 8px;
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.data-table th,
+.data-table td {
+  border: 1px solid #e2e8f0;
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+.data-table th {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+.resource-name-cell {
+  white-space: nowrap;
+}
+.resource-params-cell {
+  max-width: 300px;
+  word-break: break-word;
+}
+.resource-note-cell {
+  max-width: 200px;
+  word-break: break-word;
+}
+.actions-cell {
+  white-space: nowrap;
+}
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+  margin-right: 4px;
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+}
+.btn-secondary {
+  background: #e0e4e8;
+  color: #2c3e50;
+  border: 1px solid #cbd5e1;
+}
+.btn-danger {
+  background: #d32f2f;
+  color: white;
 }
 .empty-message {
-  color: #999;
+  color: #94a3b8;
   font-style: italic;
-  padding: 10px;
-}
-.loading {
+  padding: 12px;
   text-align: center;
-  padding: 20px;
-  color: #666;
+}
+.clickable-link {
+  cursor: pointer;
+  color: #1976d2;
+  text-decoration: none;
+}
+.clickable-link:hover {
+  text-decoration: underline;
 }
 </style>
