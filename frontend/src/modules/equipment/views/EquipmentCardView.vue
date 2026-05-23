@@ -36,8 +36,10 @@
 
     <!-- Параметры -->
     <div class="info-block">
-      <h3>Параметры</h3>
-      <table class="data-table" v-if="parametersList.length">
+  <h3>Параметры</h3>
+  <template v-if="parametersList.length">
+    <ScrollableTable>
+      <table class="data-table">
         <thead>
           <tr>
             <th>Параметр</th>
@@ -55,10 +57,12 @@
           </tr>
         </tbody>
       </table>
-      <div v-else>Нет параметров</div>
-    </div>
+    </ScrollableTable>
+  </template>
+  <div v-else>Нет параметров</div>
+</div>
 
-    <!-- Остальные секции (без изменений) -->
+    <!-- Установленные узлы -->
     <div class="section">
       <h3>Установленные узлы и ресурсы</h3>
       <div v-if="node.type === 'aggregate'" class="subsection">
@@ -66,20 +70,21 @@
           <h4>Состав (дочерние узлы)</h4>
           <button v-if="canEdit" class="btn btn-sm btn-primary" @click="openAddChildModal">+ Добавить в состав</button>
         </div>
-        <div v-if="children.length" class="table-wrapper">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Наименование</th>
-                <th>Тип</th>
-                <th>Производитель</th>
-                <th>Марка</th>
-                <th>Основные параметры</th>
-                <th>Примечания</th>
-                <th v-if="canEdit">Действия</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div v-if="children.length">
+          <ScrollableTable>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Наименование</th>
+                  <th>Тип</th>
+                  <th>Производитель</th>
+                  <th>Марка</th>
+                  <th>Основные параметры</th>
+                  <th>Примечания</th>
+                  <th v-if="canEdit">Действия</th>
+                </tr>
+              </thead>
+              <tbody>
               <tr v-for="child in children" :key="child.node_id">
                 <td><span class="clickable-link" @click="viewChild(child.node_id)">{{ child.name }}</span></td>
                 <td>{{ child.type === 'aggregate' ? 'Агрегат' : 'Блок' }}</td>
@@ -90,12 +95,14 @@
                 <td v-if="canEdit"><button class="btn btn-sm btn-danger" @click="removeChild(child.node_id)">Удалить из состава</button></td>
               </tr>
             </tbody>
-          </table>
+            </table>
+          </ScrollableTable>
         </div>
         <div v-else>Нет дочерних узлов</div>
       </div>
 
-      <div class="subsection">
+       <!-- Ресурсы -->
+       <div class="subsection">
         <div class="subsection-header">
           <h4>Ресурсы</h4>
           <button v-if="canEdit" class="btn btn-sm btn-primary" @click="openAddResourceForm">+ Добавить ресурс</button>
@@ -110,9 +117,10 @@
       </div>
     </div>
 
+    <!-- История перемещений -->
     <div class="section" v-if="moveHistory.length">
       <h3>История перемещений</h3>
-      <div class="table-wrapper">
+      <ScrollableTable>
         <table class="data-table">
           <thead>
             <tr><th>Дата</th><th>Откуда</th><th>Куда</th><th>Пользователь</th></tr>
@@ -126,12 +134,13 @@
             </tr>
           </tbody>
         </table>
-      </div>
+      </ScrollableTable>
     </div>
 
+    <!-- История комплектаций -->
     <div class="section" v-if="compositionHistory.length">
       <h3>История комплектаций</h3>
-      <div class="table-wrapper">
+      <ScrollableTable>
         <table class="data-table">
           <thead><tr><th>Дата</th><th>Действие</th><th>Узел</th><th>Пользователь</th></tr></thead>
           <tbody>
@@ -143,7 +152,7 @@
             </tr>
           </tbody>
         </table>
-      </div>
+      </ScrollableTable>
     </div>
 
     <EquipmentForm :visible="showEditModal" :nodeId="editingNodeId" @update:visible="showEditModal = $event" @saved="refresh" />
@@ -174,6 +183,7 @@ import AddChildModal from '../components/AddChildModal.vue';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import ResourceForm from '../components/ResourceForm.vue';
 import ResourceList from '../components/ResourceList.vue';
+import ScrollableTable from '@/components/common/ScrollableTable.vue';
 import { formatDate } from '@/utils/dateUtils';
 
 const route = useRoute();
@@ -516,5 +526,21 @@ watch(() => route.params.id, (newId) => {
   padding: 6px 10px;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
+}
+
+:deep(.scrollable-table-container) {
+  height: 400px;
+  max-height: 400px;
+}
+
+:deep(.table-scroll) {
+  overflow-y: auto !important;
+}
+
+:deep(th) {
+  position: sticky;
+  top: 0;
+  background: #f8f9fa;
+  z-index: 10;
 }
 </style>

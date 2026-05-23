@@ -1,5 +1,5 @@
 <template>
-  <div v-if="resources.length" class="resource-table-wrapper">
+  <ScrollableTable v-if="resources.length">
     <table class="data-table">
       <thead>
         <tr>
@@ -13,11 +13,11 @@
       </thead>
       <tbody>
         <tr v-for="res in resources" :key="res.id || res.registration_date">
-        <td>
-  <span class="clickable-link" @click="$emit('goToResource', res.id || res.resource_id)">
-    {{ res.resource_params?.name || res.name || 'Ресурс' }}
-  </span>
-</td>
+          <td>
+            <span class="clickable-link" @click="$emit('goToResource', res.id || res.resource_id)">
+              {{ res.resource_params?.name || res.name || 'Ресурс' }}
+            </span>
+          </td>
           <td>{{ res.resource_params?.value ?? res.value ?? '-' }}</td>
           <td>{{ res.resource_params?.unit || res.unit || '-' }}</td>
           <td>{{ formatDate(res.registration_date) }}</td>
@@ -29,11 +29,12 @@
         </tr>
       </tbody>
     </table>
-  </div>
+  </ScrollableTable>
   <div v-else class="empty-message">Ресурсы не добавлены</div>
 </template>
 
 <script setup lang="ts">
+import ScrollableTable from '@/components/common/ScrollableTable.vue';
 import { formatDate } from '@/utils/dateUtils';
 
 defineProps<{
@@ -44,79 +45,20 @@ defineProps<{
 defineEmits(['edit', 'delete', 'goToResource']);
 </script>
 
-
 <style scoped>
-.resource-table-wrapper { overflow-x: auto; margin-top: 8px; }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { border: 1px solid #e2e8f0; padding: 6px 10px; text-align: left; }
-.data-table th { background: #f1f5f9; font-weight: 600; }
-.btn-sm { padding: 4px 8px; font-size: 12px; margin-right: 4px; }
-.empty-message { color: #94a3b8; font-style: italic; padding: 12px; text-align: center; }
-.clickable-link { cursor: pointer; color: #1976d2; text-decoration: none; }
-.clickable-link:hover { text-decoration: underline; }
+:deep(.scrollable-table-container) {
+  height: 300px;
+  max-height: 300px;
+}
 
-.resource-table-wrapper {
-  overflow-x: auto;
-  margin-top: 8px;
+:deep(.table-scroll) {
+  overflow-y: auto !important;
 }
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.data-table th,
-.data-table td {
-  border: 1px solid #e2e8f0;
-  padding: 8px 12px;
-  text-align: left;
-  vertical-align: top;
-}
-.data-table th {
-  background: #f1f5f9;
-  font-weight: 600;
-}
-.resource-name-cell {
-  white-space: nowrap;
-}
-.resource-params-cell {
-  max-width: 300px;
-  word-break: break-word;
-}
-.resource-note-cell {
-  max-width: 200px;
-  word-break: break-word;
-}
-.actions-cell {
-  white-space: nowrap;
-}
-.btn-sm {
-  padding: 4px 8px;
-  font-size: 12px;
-  margin-right: 4px;
-  cursor: pointer;
-  border: none;
-  border-radius: 4px;
-}
-.btn-secondary {
-  background: #e0e4e8;
-  color: #2c3e50;
-  border: 1px solid #cbd5e1;
-}
-.btn-danger {
-  background: #d32f2f;
-  color: white;
-}
-.empty-message {
-  color: #94a3b8;
-  font-style: italic;
-  padding: 12px;
-  text-align: center;
-}
-.clickable-link {
-  cursor: pointer;
-  color: #1976d2;
-  text-decoration: none;
-}
-.clickable-link:hover {
-  text-decoration: underline;
+
+:deep(th) {
+  position: sticky;
+  top: 0;
+  background: #f8f9fa;
+  z-index: 10;
 }
 </style>

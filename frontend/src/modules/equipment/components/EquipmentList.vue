@@ -54,9 +54,9 @@
 
     <div v-if="store.loading" class="loading">Загрузка...</div>
 
-    <!-- Таблица с горизонтальной прокруткой (только таблица, не страница) -->
-    <div class="table-wrapper">
-      <table class="data-table" id="equipment-table">
+    <!-- Таблица с прокруткой через ScrollableTable -->
+    <ScrollableTable>
+      <table class="data-table">
         <thead>
           <tr>
             <th v-for="col in visibleColumns" :key="col.key" @click="sortBy(col.key)">
@@ -67,36 +67,36 @@
           </tr>
         </thead>
         <tbody>
-  <tr
-    v-for="node in (sortedNodes as any[])"
-    :key="node.node_id"
-    :class="getRowClass(node)"
-    :title="getTooltip(node)"
-  >
-    <td v-for="col in visibleColumns" :key="col.key">
-      {{ formatCellValue(node, col.key) }}
-    </td>
-    <td class="actions-cell">
-      <button class="btn btn-sm btn-secondary" @click="viewCard(node.node_id)">Просмотр</button>
-      <button
-        v-if="canEdit && node.status !== 'списан'"
-        class="btn btn-sm btn-secondary"
-        @click="editNode(node.node_id)"
-      >✏️</button>
-      <button
-        v-if="canEdit && node.status !== 'списан'"
-        class="btn btn-sm btn-danger"
-        @click="deleteNode(node.node_id)"
-      >📝 Списать</button>
-      <span v-if="node.status === 'списан'" class="badge-disabled">Списан</span>
-    </td>
-  </tr>
-  <tr v-if="!store.loading && (sortedNodes as any[]).length === 0">
-    <td :colspan="visibleColumns.length + 1" class="empty">Нет данных</td>
-  </tr>
-</tbody>
-      </table> 
-    </div>
+          <tr
+            v-for="node in sortedNodes"
+            :key="node.node_id"
+            :class="getRowClass(node)"
+            :title="getTooltip(node)"
+          >
+            <td v-for="col in visibleColumns" :key="col.key">
+              {{ formatCellValue(node, col.key) }}
+            </td>
+            <td class="actions-cell">
+              <button class="btn btn-sm btn-secondary" @click="viewCard(node.node_id)">Просмотр</button>
+              <button
+                v-if="canEdit && node.status !== 'списан'"
+                class="btn btn-sm btn-secondary"
+                @click="editNode(node.node_id)"
+              >✏️</button>
+              <button
+                v-if="canEdit && node.status !== 'списан'"
+                class="btn btn-sm btn-danger"
+                @click="deleteNode(node.node_id)"
+              >📝 Списать</button>
+              <span v-if="node.status === 'списан'" class="badge-disabled">Списан</span>
+            </td>
+          </tr>
+          <tr v-if="!store.loading && sortedNodes.length === 0">
+            <td :colspan="visibleColumns.length + 1" class="empty">Нет данных</td>
+          </tr>
+        </tbody>
+      </table>
+    </ScrollableTable>
 
     <!-- Модальное окно настройки колонок (drag-and-drop) -->
     <div class="modal-overlay" v-if="showColumnSettings" @click.self="showColumnSettings = false">
@@ -145,6 +145,7 @@ import { useEquipmentStore } from '../stores/equipmentStore';
 import EquipmentForm from './EquipmentForm.vue';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import AdvancedFilter from './AdvancedFilter.vue';
+import ScrollableTable from '@/components/common/ScrollableTable.vue';
 import * as exportUtils from '@/utils/exportUtils';
 
 const router = useRouter();
@@ -281,7 +282,7 @@ const hasActiveFilters = computed(() =>
   !!(quickSearch.value || quickStatus.value || advancedConditions.value.length)
 );
 
-// Форматирование ячейки (параметры)
+// Форматирование ячейки
 function formatCellValue(node: any, key: string): string {
   if (key === 'is_si') return node.is_si ? 'Да' : 'Нет';
   if (key === 'parameters') {
@@ -416,7 +417,7 @@ function exportToWord() {
   exportUtils.exportToWord(data, headers, filename);
 }
 
-// Стилизация строк (заглушки)
+// Стилизация строк
 function getRowClass(node: any): string {
   if (node.status === 'списан') return 'disabled-row';
   return '';
@@ -426,14 +427,11 @@ function getTooltip(node: any): string {
   return '';
 }
 
-// ========== ХУКИ ЖИЗНЕННОГО ЦИКЛА ==========
+// Жизненный цикл
 onMounted(async () => {
   loadColumnSettings();
   await store.init();
   await nextTick();
-});
-onUnmounted(() => {
-  // ничего не делаем
 });
 </script>
 
@@ -523,23 +521,24 @@ onUnmounted(() => {
   background: #e2e8f0;
 }
 
-/* Контейнер таблицы — горизонтальная прокрутка только здесь, не на уровне страницы */
-.table-wrapper {
-  overflow-x: auto;
-  width: 100%;
-}
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  white-space: nowrap;
-}
-.data-table th, .data-table td {
-  padding: 10px;
-  border: 1px solid #e2e8f0;
-  text-align: left;
+/* Стили для ScrollableTable */
+:deep(.scrollable-table-container) {
+  height: 650px;
+  max-height: calc(100vh - 250px);
 }
 
-/* Стили для модального окна настройки колонок */
+:deep(.table-scroll) {
+  overflow-y: auto !important;
+}
+
+:deep(th) {
+  position: sticky;
+  top: 0;
+  background: #f8f9fa;
+  z-index: 10;
+}
+
+/* Модальное окно настройки колонок */
 .modal-overlay {
   position: fixed;
   top: 0;
