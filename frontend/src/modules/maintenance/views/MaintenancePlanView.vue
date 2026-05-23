@@ -15,7 +15,6 @@
     </div>
 
     <!-- Поиск и фильтры -->
-    <div class="filter-panel">
       <div class="filter-row">
         <input
           v-model="searchQuery"
@@ -43,9 +42,9 @@
         </select>
         <button class="btn btn-secondary" @click="resetFilters">Сбросить</button>
       </div>
-    </div>
+      <br>
 
-    <!-- Таблица задач с прокруткой -->
+    <!-- Таблица мероприятий с прокруткой -->
     <div class="table-scroll-container">
       <table class="data-table">
         <thead>
@@ -64,7 +63,7 @@
               <span class="sort-icon" v-if="sortField === 'expiry_date'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
             </th>
             <th @click="sortBy('completed_date')">
-              Фактическая дата проведения ТО
+              Дата проведения ТО
               <span class="sort-icon" v-if="sortField === 'completed_date'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
             </th>
             <th @click="sortBy('service_type')">
@@ -100,14 +99,34 @@
             <td>
               <template v-if="task.completed_date">
                 {{ formatDate(task.completed_date) }}
-                <span class="success-check">✅</span>
+                <!-- Если дата выполнения позже срока -->
+                <span v-if="getDaysDiff(task.expiry_date, task.completed_date) > 0" class="overdue-completed-badge">
+                  (просрочено на {{ getDaysDiff(task.expiry_date, task.completed_date) }} дн.)
+                </span>
+                <span v-else class="success-check">✅</span>
               </template>
               <template v-else>
                 <span class="not-completed">—</span>
+                <!-- Если не выполнено, но уже просрочено -->
+                <span v-if="getDaysDiff(task.expiry_date) < 0" class="overdue-badge">
+                  просрочено на {{ Math.abs(getDaysDiff(task.expiry_date)) }} дн.
+                </span>
               </template>
             </td>
             <td>{{ task.service_type }}</td>
-            <td>{{ getStatusText(task.status_name) }}</td>
+            <td>
+              {{ getStatusText(task.status_name) }}
+              
+              <!-- Просрочено, но не выполнено -->
+              <span v-if="task.status_name !== 'completed' && getDaysDiff(task.expiry_date) < 0" class="overdue-badge">
+                просрочено на {{ Math.abs(getDaysDiff(task.expiry_date)) }} дн.
+              </span>
+              
+              <!-- Выполнено с опозданием (сравниваем expiry_date с completed_date) -->
+              <span v-if="task.status_name === 'completed' && task.completed_date && getDaysDiff(task.expiry_date, task.completed_date) < 0" class="overdue-completed-badge">
+                опоздание на {{ Math.abs(getDaysDiff(task.expiry_date, task.completed_date)) }} дн.
+              </span>
+            </td>
             <td>{{ task.notes || '-' }}</td>
             <td>
               <button class="btn btn-sm btn-secondary" @click="openEditTaskForm(task)">✏️</button>
@@ -132,7 +151,7 @@
           </div>
         </div>
         <button class="btn btn-secondary" @click="openChartModal">📊 График нагрузки</button>
-        <button class="btn btn-primary" @click="openAddTaskForm">+ Добавить задачу</button>
+        <button class="btn btn-primary" @click="openAddTaskForm">+ Добавить мероприятие</button>
       </div>
     </div>
 
@@ -213,21 +232,49 @@ function getStatusText(status: string): string {
   return statuses[status] || status;
 }
 
-function getDaysDiff(expiryDate: string): number {
+function getDaysDiff(expiryDate: string, completedDate?: string): number {
   if (!expiryDate) return Infinity;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  
+  let targetDate = new Date();
+  targetDate.setHours(0, 0, 0, 0);
+  
+  // Если передана дата выполнения, используем её
+  if (completedDate) {
+    targetDate = new Date(completedDate);
+    targetDate.setHours(0, 0, 0, 0);
+  }
+  
   const expiry = new Date(expiryDate);
   expiry.setHours(0, 0, 0, 0);
-  const diff = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 3600 * 24));
+  
+  // Если срок истёк - возвращаем отрицательное число
+  // Например: expiry=2024-01-31, today=2026-05-23 → разница = -843
+  const diff = Math.ceil((expiry.getTime() - targetDate.getTime()) / (1000 * 3600 * 24));
   return diff;
 }
 
 function getRowClass(task: any): string {
-  if (task.status_name === 'completed') return '';
+  console.log('=== Task:', task.node_name);
+  console.log('expiry_date:', task.expiry_date);
+  console.log('status:', task.status_name);
+  
+  if (task.status_name === 'completed') {
+    console.log('→ completed, no color');
+    return '';
+  }
+  
   const daysDiff = getDaysDiff(task.expiry_date);
-  if (daysDiff < 0) return 'expired-row';
-  if (daysDiff <= 30) return 'warning-row';
+  console.log('daysDiff:', daysDiff);
+  
+  if (daysDiff < 0) {
+    console.log('→ expired-row (red)');
+    return 'expired-row';
+  }
+  if (daysDiff <= 30) {
+    console.log('→ warning-row (yellow)');
+    return 'warning-row';
+  }
+  console.log('→ no color');
   return '';
 }
 
@@ -330,7 +377,7 @@ function goToNode(nodeId: number) { router.push(`/equipment/${nodeId}`); }
 function openAddTaskForm() { taskFormRef.value?.open(plan.value.plan_id); }
 function openEditTaskForm(task: any) { taskFormRef.value?.open(plan.value.plan_id, task); }
 async function deleteTask(id: number) {
-  const ok = await confirmDialog.value?.show('Удаление', 'Удалить задачу?');
+  const ok = await confirmDialog.value?.show('Удаление', 'Вы точно хотите удалить мероприятие?');
   if (ok) {
     await maintenanceStore.deleteTask(id);
     refresh();
@@ -414,6 +461,7 @@ onUnmounted(() => {
   window.removeEventListener('plan-saved', refresh);
   window.removeEventListener('task-saved', refresh);
 });
+
 </script>
 
 <style scoped>
@@ -449,17 +497,17 @@ onUnmounted(() => {
 
 /* Цветовые классы для строк */
 .warning-row {
-  background-color: #fff3e0;
+  background-color: #ffd699;
 }
 .warning-row:hover {
-  background-color: #ffe8c7;
+  background-color: #ffbb55;
 }
 
 .expired-row {
-  background-color: #ffe0e0;
+  background-color: #ffb3b3;
 }
 .expired-row:hover {
-  background-color: #ffd0d0;
+  background-color: #ff8080;
 }
 
 .success-check {
@@ -511,5 +559,35 @@ onUnmounted(() => {
 /* Стили для таблицы внутри контейнера */
 .table-scroll-container .data-table {
   min-width: 800px;
+}
+
+/*для статуса*/
+.overdue-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background-color: #c0392b;
+  color: white;
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+.overdue-completed-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background-color: #e67e22;
+  color: white;
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+.success-check {
+  margin-left: 5px;
+  font-size: 14px;
+}
+
+.not-completed {
+  color: #999;
 }
 </style>

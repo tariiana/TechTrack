@@ -1,7 +1,7 @@
 <template>
   <div class="modal-overlay" v-if="visible">
     <div class="modal-content" style="width: 500px">
-      <div class="modal-header">{{ editId ? 'Редактирование задачи' : 'Добавление задачи' }}</div>
+      <div class="modal-header">{{ editId ? 'Редактирование мероприятия' : 'Добавление мероприятия' }}</div>
 
       <div class="form-group">
         <label>Оборудование*</label>
@@ -36,8 +36,8 @@
       </div>
 
       <div class="form-group">
-        <label>Рекомендуемая дата</label>
-        <input type="date" v-model="form.recommended_date" class="form-control">
+        <label>Фактическая дата проведения ТО</label>
+        <input type="date" v-model="form.completed_date" class="form-control" />
       </div>
 
       <div class="form-group">
@@ -68,20 +68,11 @@ const planId = ref<number | null>(null);
 const error = ref('');
 const equipmentNodes = ref<any[]>([]);
 
-function getCurrentDate(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function getDefaultRecommendedDate(): string {
-  const defaultDate = new Date();
-  defaultDate.setMonth(defaultDate.getMonth() + 1);
-  const year = defaultDate.getFullYear();
-  const month = String(defaultDate.getMonth() + 1).padStart(2, '0');
-  const day = String(defaultDate.getDate()).padStart(2, '0');
+// Форматирование даты в YYYY-MM-DD
+function formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
@@ -89,7 +80,7 @@ const form = reactive({
   node_id: null as number | null,
   service_type: 'плановое ТО',
   status_name: 'pending',
-  recommended_date: '',
+  completed_date: '',
   notes: '',
 });
 
@@ -106,10 +97,11 @@ function open(pId: number, task?: any) {
     form.node_id = task.node_id;
     form.service_type = task.service_type;
     form.status_name = task.status_name;
-    form.recommended_date = task.recommended_date || '';
+    form.completed_date = task.completed_date || '';
     form.notes = task.notes || '';
   } else {
-    form.recommended_date = getDefaultRecommendedDate();
+    // При создании нового мероприятия подставляем текущую дату
+    form.completed_date = formatDate(new Date());
   }
   visible.value = true;
 }
@@ -118,7 +110,7 @@ function reset() {
   form.node_id = null;
   form.service_type = 'плановое ТО';
   form.status_name = 'pending';
-  form.recommended_date = '';
+  form.completed_date = '';
   form.notes = '';
   error.value = '';
   editId.value = null;
@@ -134,17 +126,13 @@ async function save() {
     error.value = 'Выберите оборудование';
     return;
   }
-  if (!form.recommended_date) {
-    error.value = 'Укажите рекомендуемую дату';
-    return;
-  }
 
   try {
     const data = {
       node_id: form.node_id,
       service_type: form.service_type,
       status_name: form.status_name,
-      recommended_date: form.recommended_date,
+      completed_date: form.completed_date || null,
       notes: form.notes,
     };
 
@@ -157,9 +145,18 @@ async function save() {
     close();
     window.dispatchEvent(new Event('task-saved'));
   } catch (err: any) {
-    error.value = err.message || 'Ошибка сохранения задачи';
+    error.value = err.message || 'Ошибка сохранения мероприятия';
   }
 }
 
 defineExpose({ open });
 </script>
+
+<style scoped>
+.text-muted {
+  font-size: 12px;
+  color: #6c757d;
+  display: block;
+  margin-top: 4px;
+}
+</style>
