@@ -2,8 +2,10 @@ const router = require('express').Router();
 const subsystemController = require('../controllers/subsystemController');
 const { authMiddleware } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
+const { auditMiddleware } = require('../utils/auditLogger');
 
 router.use(authMiddleware);
+router.use(auditMiddleware('subsystem'));
 
 router.get('/', checkPermission(['subsystem:view']), subsystemController.getAll);
 router.get('/tree', checkPermission(['subsystem:view']), subsystemController.getTree);

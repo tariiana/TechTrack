@@ -7,8 +7,7 @@ function getRequestUserId(req) {
 
 async function getAll(req, res, next) {
   try {
-    const { search, status, subsystem_id, node_type_id } = req.query;
-    const nodes = await Node.getAll({ search, status, subsystem_id, node_type_id });
+    const nodes = await Node.getAll(req.query);
     res.json(nodes);
   } catch (err) {
     next(err);
@@ -49,6 +48,24 @@ async function getMovementHistory(req, res, next) {
   try {
     const history = await Node.getMovementHistory(req.params.id);
     res.json(history);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getCompositionHistory(req, res, next) {
+  try {
+    const history = await Node.getCompositionHistory(req.params.id);
+    res.json(history);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getInstallableChildren(req, res, next) {
+  try {
+    const nodes = await Node.getInstallableChildren(req.params.id, req.query);
+    res.json(nodes);
   } catch (err) {
     next(err);
   }
@@ -107,6 +124,8 @@ module.exports = {
   getById,
   getChildren,
   getMovementHistory,
+  getCompositionHistory,
+  getInstallableChildren,
   create,
   update,
   writeOff,
