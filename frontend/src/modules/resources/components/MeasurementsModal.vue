@@ -247,22 +247,22 @@ function editMeasurement(m: any) {
   addMeasurementModalRef.value?.open(m.resourceId, m);
 }
 
-async function confirmDeleteMeasurement(id: number) {
+async function confirmDeleteMeasurement(id: number | string) {
   const ok = await confirmDialog.value?.show('Удаление', 'Удалить измерение?');
   if (ok) {
     await deleteMeasurement(id);
   }
 }
 
-async function deleteMeasurement(measurementId: number) {
-  const measurement = measurements.value.find(m => m.id === measurementId);
+async function deleteMeasurement(measurementId: number | string) {
+  const measurement = measurements.value.find(m => String(m.id) === String(measurementId));
   if (!measurement) return;
 
   try {
     const resource = await store.fetchResourceById(measurement.resourceId);
     const params = resource.resource_params || {};
     let measurementsList = params.measurements || [];
-    measurementsList = measurementsList.filter((m: any) => m.id !== measurementId);
+    measurementsList = measurementsList.filter((m: any) => String(m.id) !== String(measurementId));
     const updatedParams = { ...params, measurements: measurementsList };
     
     const payload = {

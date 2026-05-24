@@ -191,7 +191,7 @@ const alerts = computed(() => {
   
   const timeToService = toNumber(resource.value.time_to_service);
   if (timeToService !== null && timeToService < 1) {
-    result.push({ type: 'warning', message: `⚠️ Срок до ТО менее года (${resource.value.time_to_service} лет)` });
+    result.push({ type: 'warning', message: `⚠️ Срок до ТО менее года (${timeToService} лет)` });
   }
   
   return result;
@@ -243,9 +243,9 @@ async function loadParameters() {
       const v = value as any;
       paramsArray.push({
         name: key,
-        value: v.value !== undefined ? v.value : v,
-        unit: v.unit || '',
-        is_main: v.is_main || false,
+        value: v && typeof v === 'object' && 'value' in v ? v.value : v,
+        unit: v && typeof v === 'object' ? v.unit || '' : '',
+        is_main: v && typeof v === 'object' ? v.is_main || v.isMain || false : false,
       });
     }
   }

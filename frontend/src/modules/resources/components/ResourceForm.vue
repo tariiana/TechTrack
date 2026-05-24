@@ -1,115 +1,117 @@
 <template>
   <div class="modal-overlay" v-if="visible" @click.self="close">
-    <div class="modal-content" style="width: 750px; max-width: 90vw;">
-      <div class="modal-header">{{ isEdit ? 'Редактирование оборудования' : 'Добавление оборудования' }}</div>
+    <div class="modal-content">
+      <div class="modal-header">{{ isEdit ? 'Редактирование ресурса' : 'Добавление ресурса' }}</div>
 
       <div class="form-scroll">
         <div class="form-grid">
-          <!-- Левая колонка -->
           <div class="form-col">
             <div class="form-group">
+              <label>Узел *</label>
+              <select v-model="form.node_id" class="form-control" :class="{ invalid: errors.node_id }" :disabled="isEdit">
+                <option :value="null">-- Выберите узел --</option>
+                <option v-for="node in nodes" :key="node.node_id" :value="node.node_id">
+                  {{ node.name || node.model || node.node_id }}
+                </option>
+              </select>
+              <span v-if="errors.node_id" class="error-text">{{ errors.node_id }}</span>
+            </div>
+
+            <div class="form-group">
               <label>Наименование *</label>
-              <input v-model="form.name" class="form-control" :class="{ 'invalid': errors.name }" />
+              <input v-model="form.name" class="form-control" :class="{ invalid: errors.name }" />
               <span v-if="errors.name" class="error-text">{{ errors.name }}</span>
             </div>
+
             <div class="form-group">
               <label>Марка</label>
               <input v-model="form.mark" class="form-control" />
             </div>
+
             <div class="form-group">
               <label>Тип</label>
               <input v-model="form.type" class="form-control" />
             </div>
+
             <div class="form-group">
               <label>Дата производства</label>
               <input type="date" v-model="form.production_date" class="form-control" />
             </div>
+
             <div class="form-group">
-              <label>Учётный номер</label>
-              <input type="number" v-model="form.registration_number" class="form-control" />
-            </div>
-            <div class="form-group">
-              <label>Статус</label>
-              <select v-model="form.status" class="form-control">
-                <option value="Получен">Получен</option>
-                <option value="Исправен">Исправен</option>
-                <option value="Неисправен">Неисправен</option>
-                <option value="В ремонте">В ремонте</option>
-                <option value="На поверке">На поверке</option>
-                <option value="Законсервирован">Законсервирован</option>
-                <option value="Списан">Списан</option>
-              </select>
+              <label>Учетный номер</label>
+              <input v-model="form.registration_number" class="form-control" />
             </div>
           </div>
 
-          <!-- Правая колонка -->
           <div class="form-col">
-            <div class="form-group">
-              <label>Вид узла</label>
-              <select v-model="form.node_type_id" class="form-control">
-                <option :value="null">-- Не выбран --</option>
-                <option value="Агрегат">Агрегат</option>
-                <option value="Аккумулятор">Аккумулятор</option>
-                <option value="Блок детектирования">Блок детектирования</option>
-                <option value="Блок питания">Блок питания</option>
-                <option value="Дозиметр">Дозиметр</option>
-                <option value="Измерительный блок">Измерительный блок</option>
-                <option value="Коммутатор">Коммутатор</option>
-                <option value="Осциллограф">Осциллограф</option>
-                <option value="Пост контроля">Пост контроля</option>
-                <option value="Сервер">Сервер</option>
-              </select>
-            </div>
             <div class="form-group">
               <label>Установлен в</label>
               <input v-model="form.installed_in" class="form-control" />
             </div>
+
             <div class="form-group">
               <label>Размещение</label>
               <input v-model="form.location" class="form-control" />
             </div>
+
+            <div class="form-group">
+              <label>Дата регистрации</label>
+              <input type="date" v-model="form.registration_date" class="form-control" />
+            </div>
+
+            <div class="form-group">
+              <label>Дата последнего ТО</label>
+              <input type="date" v-model="form.last_service_date" class="form-control" />
+            </div>
+
             <div class="form-group">
               <label>Срок службы (лет)</label>
               <input type="number" step="0.5" v-model="form.service_life" class="form-control" />
             </div>
+
             <div class="form-group">
               <label>Срок до ТО (лет)</label>
               <input type="number" step="0.5" v-model="form.time_to_service" class="form-control" />
             </div>
+
             <div class="form-group">
               <label>Исходный ресурс</label>
               <input v-model="form.initial_resource" class="form-control" />
             </div>
+
             <div class="form-group">
               <label>Остаточный ресурс</label>
               <input v-model="form.remaining_resource" class="form-control" />
             </div>
-            <div class="form-group">
-              <label>Режим работы (часов/год)</label>
-              <div class="calc-row">
-                <input type="number" v-model="workHours" class="form-control" />
-                <button type="button" class="btn btn-sm btn-secondary" @click="calculateResource">Рассчитать ресурс</button>
-              </div>
-            </div>
           </div>
         </div>
 
-        <div class="form-group full-width">
-          <label>Примечания</label>
+        <div class="form-group">
+          <label>Режим работы (часов/год)</label>
+          <div class="calc-row">
+            <input type="number" v-model="workHours" class="form-control" />
+            <button type="button" class="btn btn-sm btn-secondary" @click="calculateResource">Рассчитать ресурс</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Примечание</label>
           <textarea v-model="form.note" rows="2" class="form-control"></textarea>
         </div>
       </div>
 
-      <div v-if="calcResult" class="calc-result">
-        <h4>Результат расчёта:</h4>
-        <p>📊 Рассчитанный остаточный ресурс: <strong>{{ calcResult }}%</strong></p>
+      <div v-if="calcResult !== null" class="calc-result">
+        Рассчитанный остаточный ресурс: <strong>{{ calcResult }}%</strong>
       </div>
 
-      <div v-if="error" class="error-text">{{ error }}</div>
+      <div v-if="error" class="error-text form-error">{{ error }}</div>
 
       <div class="modal-footer">
         <button class="btn btn-secondary" @click="close">Отмена</button>
-        <button class="btn btn-primary" :disabled="saving" @click="save">{{ saving ? 'Сохранение...' : 'Сохранить' }}</button>
+        <button class="btn btn-primary" :disabled="saving" @click="save">
+          {{ saving ? 'Сохранение...' : 'Сохранить' }}
+        </button>
       </div>
     </div>
   </div>
@@ -118,80 +120,109 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
 import { useResourcesStore } from '../stores/resourcesStore';
+import { useEquipmentStore } from '@/modules/equipment/stores/equipmentStore';
 
 const store = useResourcesStore();
+const equipmentStore = useEquipmentStore();
+
 const visible = ref(false);
 const isEdit = ref(false);
-const editId = ref<string | null>(null);
 const error = ref('');
 const saving = ref(false);
 const workHours = ref(8760);
-const calcResult = ref<string | null>(null);
+const calcResult = ref<number | null>(null);
+const nodes = ref<any[]>([]);
 
 const errors = reactive({
   name: '',
+  node_id: '',
 });
 
 const form = reactive({
+  node_id: null as string | null,
   name: '',
   mark: '',
   type: '',
   production_date: '',
   registration_date: '',
-  registration_number: null as number | null,
+  registration_number: '',
   last_service_date: '',
-  node_type_id: null as string | null,
   service_life: null as number | null,
   time_to_service: null as number | null,
   initial_resource: '',
   remaining_resource: '',
   installed_in: '',
   location: '',
-  status: 'Получен',
   note: '',
 });
 
 function getCurrentDate(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return new Date().toISOString().slice(0, 10);
+}
+
+function reset() {
+  isEdit.value = false;
+  form.node_id = null;
+  form.name = '';
+  form.mark = '';
+  form.type = '';
+  form.production_date = '';
+  form.registration_date = getCurrentDate();
+  form.registration_number = '';
+  form.last_service_date = '';
+  form.service_life = null;
+  form.time_to_service = null;
+  form.initial_resource = '';
+  form.remaining_resource = '';
+  form.installed_in = '';
+  form.location = '';
+  form.note = '';
+  workHours.value = 8760;
+  calcResult.value = null;
+  error.value = '';
+  errors.name = '';
+  errors.node_id = '';
+}
+
+async function loadNodes() {
+  await equipmentStore.fetchNodes();
+  nodes.value = equipmentStore.rawNodes || equipmentStore.nodes || [];
 }
 
 function validate(): boolean {
-  let isValid = true;
   errors.name = '';
-  if (!form.name.trim()) {
-    errors.name = 'Введите наименование';
-    isValid = false;
-  }
-  return isValid;
+  errors.node_id = '';
+
+  if (!form.node_id) errors.node_id = 'Выберите узел';
+  if (!form.name.trim()) errors.name = 'Введите наименование';
+
+  return !errors.name && !errors.node_id;
 }
 
 async function calculateResource() {
   error.value = '';
-  if (!form.node_type_id) {
-    error.value = 'Выберите вид узла';
+  if (!form.node_id) {
+    error.value = 'Сначала выберите узел';
     return;
   }
-  if (!form.service_life) {
-    error.value = 'Укажите срок службы';
-    return;
-  }
+
   try {
-    const result = await store.calculateResource(form.node_type_id, workHours.value);
-    if (result && result.remaining_resource !== undefined) {
-      calcResult.value = result.remaining_resource;
-      form.remaining_resource = `${result.remaining_resource}%`;
+    const result = await store.calculateResource(form.node_id, workHours.value);
+    const remaining = result?.remaining_resource ?? result?.calculated_resource_percent;
+    if (remaining !== undefined && remaining !== null) {
+      calcResult.value = Number(remaining);
+      form.remaining_resource = String(remaining);
+    }
+    if (result?.time_to_service !== undefined && result.time_to_service !== null) {
+      form.time_to_service = result.time_to_service;
     }
   } catch (err: any) {
-    error.value = err.message || 'Ошибка расчёта';
+    error.value = err.message || 'Ошибка расчета ресурса';
   }
 }
 
 async function save() {
-  if (!validate()) return;
+  if (!validate() || !form.node_id) return;
   saving.value = true;
   error.value = '';
 
@@ -209,13 +240,11 @@ async function save() {
     remaining_resource: form.remaining_resource,
     installed_in: form.installed_in,
     location: form.location,
-    status: form.status,
     note: form.note,
   };
 
   try {
-    const nodeId = form.node_type_id || 'temp';
-    await store.upsertResource(nodeId, payload);
+    await store.upsertResource(form.node_id, payload);
     close();
     window.dispatchEvent(new Event('resource-saved'));
   } catch (err: any) {
@@ -225,53 +254,30 @@ async function save() {
   }
 }
 
-function open(resource?: any) {
+async function open(resource?: any) {
   reset();
+  await loadNodes();
+
   if (resource) {
     isEdit.value = true;
-    editId.value = resource.resource_id;
+    form.node_id = resource.node_id || resource.resource_id || null;
     form.name = resource.name || '';
     form.mark = resource.mark || '';
     form.type = resource.type || '';
     form.production_date = resource.production_date || '';
     form.registration_date = resource.registration_date || getCurrentDate();
-    form.registration_number = resource.registration_number || null;
+    form.registration_number = resource.registration_number || '';
     form.last_service_date = resource.last_service_date || '';
-    form.node_type_id = resource.node_type_id || null;
     form.service_life = resource.service_life || null;
     form.time_to_service = resource.time_to_service || null;
-    form.initial_resource = resource.initial_resource || '';
-    form.remaining_resource = resource.remaining_resource || '';
+    form.initial_resource = resource.initial_resource ?? '';
+    form.remaining_resource = resource.remaining_resource ?? '';
     form.installed_in = resource.installed_in || '';
     form.location = resource.location || '';
-    form.status = resource.status || 'Получен';
     form.note = resource.note || '';
   }
-  visible.value = true;
-}
 
-function reset() {
-  isEdit.value = false;
-  editId.value = null;
-  form.name = '';
-  form.mark = '';
-  form.type = '';
-  form.production_date = '';
-  form.registration_date = getCurrentDate();
-  form.registration_number = null;
-  form.last_service_date = '';
-  form.node_type_id = null;
-  form.service_life = null;
-  form.time_to_service = null;
-  form.initial_resource = '';
-  form.remaining_resource = '';
-  form.installed_in = '';
-  form.location = '';
-  form.status = 'Получен';
-  form.note = '';
-  workHours.value = 8760;
-  calcResult.value = null;
-  error.value = '';
+  visible.value = true;
 }
 
 function close() {
@@ -284,10 +290,7 @@ defineExpose({ open });
 <style scoped>
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
@@ -295,10 +298,11 @@ defineExpose({ open });
   z-index: 1000;
 }
 .modal-content {
-  background: white;
-  border-radius: 8px;
+  width: 750px;
   max-width: 90vw;
   max-height: 90vh;
+  background: white;
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
 }
@@ -322,13 +326,11 @@ defineExpose({ open });
   flex-direction: column;
   gap: 12px;
 }
-.full-width {
-  grid-column: span 2;
-}
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  margin-bottom: 12px;
 }
 .form-group label {
   font-weight: 500;
@@ -340,6 +342,13 @@ defineExpose({ open });
   border-radius: 6px;
   font-size: 14px;
 }
+.calc-row {
+  display: flex;
+  gap: 8px;
+}
+.calc-row .form-control {
+  flex: 1;
+}
 .invalid {
   border-color: #c0392b !important;
   background-color: #ffe0e0;
@@ -347,27 +356,15 @@ defineExpose({ open });
 .error-text {
   color: #c0392b;
   font-size: 12px;
-  margin-top: 4px;
-  display: block;
 }
-.calc-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.calc-row .form-control {
-  flex: 1;
+.form-error {
+  padding: 0 16px;
 }
 .calc-result {
   background: #e8f5e9;
   padding: 12px 16px;
-  border-radius: 8px;
-  margin: 0 16px 16px 16px;
+  margin: 0 16px 16px;
   border-left: 4px solid #27ae60;
-}
-.calc-result h4 {
-  margin: 0 0 8px 0;
-  font-size: 14px;
 }
 .modal-footer {
   padding: 16px;
@@ -381,23 +378,28 @@ defineExpose({ open });
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.2s;
   border: none;
 }
 .btn-primary {
   background: #2c5f8a;
   color: white;
 }
-.btn-primary:hover:not(:disabled) { background: #1e4566; }
-.btn-primary:disabled { background: #9cb3c9; cursor: not-allowed; }
+.btn-primary:disabled {
+  background: #9cb3c9;
+  cursor: not-allowed;
+}
 .btn-secondary {
   background: #e9ecef;
   border: 1px solid #ced4da;
   color: #1a2a3a;
 }
-.btn-secondary:hover { background: #dee2e6; }
 .btn-sm {
   padding: 4px 10px;
   font-size: 12px;
+}
+@media (max-width: 720px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

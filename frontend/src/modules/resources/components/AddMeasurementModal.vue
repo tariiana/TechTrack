@@ -86,7 +86,7 @@ import { useResourcesStore } from '../stores/resourcesStore';
 const store = useResourcesStore();
 const visible = ref(false);
 const editMode = ref(false);
-const editId = ref<number | null>(null);
+const editId = ref<number | string | null>(null);
 const selectedResourceId = ref<string | null>(null);
 const error = ref('');
 const resources = ref<any[]>([]);
@@ -107,6 +107,19 @@ const measurementParams = reactive({
 });
 
 const customParams = ref<{ name: string; value: string; unit: string; is_main: boolean }[]>([]);
+
+function getParamValue(params: Record<string, any>, key: string): any {
+  const value = params?.[key];
+  if (value && typeof value === 'object' && !Array.isArray(value) && 'value' in value) {
+    return value.value;
+  }
+  return value;
+}
+
+function getParamFlag(params: Record<string, any>, key: string): boolean {
+  const value = params?.[key];
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value) && (value.is_main || value.isMain));
+}
 
 function getCurrentDate(): string {
   const now = new Date();
@@ -130,9 +143,12 @@ async function onResourceSelect() {
     try {
       currentResource.value = await store.fetchResourceById(selectedResourceId.value);
       const params = currentResource.value.resource_params || {};
-      if (params.voltage) measurementParams.voltage = params.voltage.value;
-      if (params.resistance) measurementParams.resistance = params.resistance.value;
-      if (params.capacity) measurementParams.capacity = params.capacity.value;
+      measurementParams.voltage = getParamValue(params, 'voltage') ?? getParamValue(params, 'U') ?? null;
+      measurementParams.voltage_main = getParamFlag(params, 'voltage') || getParamFlag(params, 'U');
+      measurementParams.resistance = getParamValue(params, 'resistance') ?? getParamValue(params, 'R') ?? null;
+      measurementParams.resistance_main = getParamFlag(params, 'resistance') || getParamFlag(params, 'R');
+      measurementParams.capacity = getParamValue(params, 'capacity') ?? getParamValue(params, 'C') ?? getParamValue(params, 'E') ?? null;
+      measurementParams.capacity_main = getParamFlag(params, 'capacity') || getParamFlag(params, 'C') || getParamFlag(params, 'E');
     } catch (err) {
       console.error(err);
     }
@@ -182,11 +198,11 @@ async function open(resourceId?: string, measurement?: any) {
     await onResourceSelect();
     form.measurementDate = measurement.measurementDate;
     if (measurement.parameters) {
-      measurementParams.voltage = measurement.parameters.voltage || null;
+      measurementParams.voltage = measurement.parameters.voltage ?? measurement.parameters.U ?? null;
       measurementParams.voltage_main = measurement.parameters.voltage_main || false;
-      measurementParams.resistance = measurement.parameters.resistance || null;
+      measurementParams.resistance = measurement.parameters.resistance ?? measurement.parameters.R ?? null;
       measurementParams.resistance_main = measurement.parameters.resistance_main || false;
-      measurementParams.capacity = measurement.parameters.capacity || null;
+      measurementParams.capacity = measurement.parameters.capacity ?? measurement.parameters.C ?? measurement.parameters.E ?? null;
       measurementParams.capacity_main = measurement.parameters.capacity_main || false;
       if (measurement.parameters.custom) {
         customParams.value = [...measurement.parameters.custom];
@@ -238,7 +254,7 @@ async function save() {
     let measurements = params.measurements || [];
 
     if (editMode.value && editId.value) {
-      const index = measurements.findIndex((m: any) => m.id === editId.value);
+      const index = measurements.findIndex((m: any) => String(m.id) === String(editId.value));
       if (index !== -1) {
         measurements[index] = { ...measurements[index], ...newMeasurement };
       }

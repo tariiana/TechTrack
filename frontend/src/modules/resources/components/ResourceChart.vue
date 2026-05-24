@@ -38,6 +38,28 @@ function formatDate(dateStr: string): string {
   return `${parts[2]}.${parts[1]}.${parts[0]}`;
 }
 
+function getChartValue(parameters: Record<string, any>, key: string): number | null {
+  const aliases: Record<string, string[]> = {
+    U: ['U', 'voltage'],
+    R: ['R', 'resistance'],
+    E: ['E', 'capacity'],
+    C: ['C', 'capacity'],
+  };
+
+  for (const alias of aliases[key] || [key]) {
+    const value = parameters?.[alias];
+    const raw = value && typeof value === 'object' && !Array.isArray(value) && 'value' in value
+      ? value.value
+      : value;
+    if (raw !== null && raw !== undefined && raw !== '') {
+      const number = Number(raw);
+      if (Number.isFinite(number)) return number;
+    }
+  }
+
+  return null;
+}
+
 async function loadMeasurements() {
   measurements.value = store.getMeasurementsForResource(props.resourceId);
   await renderChart();
@@ -50,8 +72,14 @@ async function renderChart() {
     new Date(a.measurementDate).getTime() - new Date(b.measurementDate).getTime()
   );
   
-  const labels = sorted.map(m => formatDate(m.measurementDate));
-  const data = sorted.map(m => m.parameters?.[selectedParam.value] || 0);
+  const points = sorted
+    .map(m => ({
+      label: formatDate(m.measurementDate),
+      value: getChartValue(m.parameters || {}, selectedParam.value),
+    }))
+    .filter(point => point.value !== null);
+  const labels = points.map(point => point.label);
+  const data = points.map(point => point.value);
   
   if (labels.length === 0) {
     hasData.value = false;

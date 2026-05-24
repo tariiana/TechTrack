@@ -115,9 +115,9 @@
             <td v-for="col in visibleColumns" :key="col.key">{{ formatCell(res, col.key) }}</td>
             <td class="actions-cell">
               <button class="btn btn-sm btn-secondary" @click="viewCard(res.resource_id)">Просмотр</button>
-              <button v-if="canEdit && res.status !== 'Списан'" class="btn btn-sm btn-secondary" @click="editResource(res)">✏️</button>
-              <button v-if="canEdit && res.status !== 'Списан'" class="btn btn-sm btn-danger" @click="writeOffResource(res.resource_id)">📝 Списать</button>
-              <span v-if="res.status === 'Списан'" class="badge-disabled">Списан</span>
+              <button v-if="canEdit && !isWrittenOff(res)" class="btn btn-sm btn-secondary" @click="editResource(res)">✏️</button>
+              <button v-if="canEdit && !isWrittenOff(res)" class="btn btn-sm btn-danger" @click="writeOffResource(res.resource_id)">📝 Списать</button>
+              <span v-if="isWrittenOff(res)" class="badge-disabled">Списан</span>
             </td>
           </tr>
           <tr v-if="sortedAndFilteredResources.length === 0">
@@ -196,14 +196,33 @@ const canEdit = computed(() => {
   } catch { return false; }
 });
 
+function normalizeStatus(status: any): string {
+  const value = String(status || '').trim();
+  const map: Record<string, string> = {
+    'списан': 'Списан',
+    'РЎРїРёСЃР°РЅ': 'Списан',
+    'РџРѕР»СѓС‡РµРЅ': 'Получен',
+    'РСЃРїСЂР°РІРµРЅ': 'Исправен',
+    'РќРµРёСЃРїСЂР°РІРµРЅ': 'Неисправен',
+    'Р’ СЂРµРјРѕРЅС‚Рµ': 'В ремонте',
+    'РќР° РїРѕРІРµСЂРєРµ': 'На поверке',
+    'Р—Р°РєРѕРЅСЃРµСЂРІРёСЂРѕРІР°РЅ': 'Законсервирован',
+  };
+  return map[value] || value || 'Получен';
+}
+
 function getResourceStatus(res: any): string {
-  return res.status || 'Получен';
+  return normalizeStatus(res.status);
+}
+
+function isWrittenOff(res: any): boolean {
+  return getResourceStatus(res).toLowerCase() === 'списан';
 }
 
 const alerts = computed(() => {
   const result: { type: string; message: string }[] = [];
   for (const res of store.resources) {
-    if (res.status === 'Списан') continue;
+    if (isWrittenOff(res)) continue;
     const remaining = toNumber(res.remaining_resource);
     if (remaining !== null && remaining <= 20) {
       result.push({ type: 'danger', message: `🔴 ${res.name}: остаточный ресурс критический (${remaining}%)` });
@@ -217,7 +236,7 @@ const alerts = computed(() => {
 function toggleAlerts() { alertsCollapsed.value = !alertsCollapsed.value; }
 
 function getRowClass(res: any): string {
-  if (res.status === 'Списан') return 'row-disabled';
+  if (isWrittenOff(res)) return 'row-disabled';
   const remaining = toNumber(res.remaining_resource);
   if (remaining !== null && remaining <= 20) return 'row-critical';
   if (remaining !== null && remaining <= 50) return 'row-warning';
@@ -261,7 +280,7 @@ const sortedAndFilteredResources = computed(() => {
   const list = [...filteredResources.value];
   list.sort((a, b) => {
     const getPriority = (res: any) => {
-      if (res.status === 'Списан') return 3;
+      if (isWrittenOff(res)) return 3;
       const r = toNumber(res.remaining_resource);
       if (r !== null && r <= 20) return 0;
       if (r !== null && r <= 50) return 1;
@@ -283,7 +302,7 @@ const sortedAndFilteredResources = computed(() => {
 function formatCell(res: any, key: string): string {
   if (key === 'status') return getResourceStatus(res);
   const val = res[key];
-  if (val === undefined || val === null) return '-';
+  if (val === undefined || val === null || val === '') return '-';
   if (key === 'initial_resource' || key === 'remaining_resource') return `${val}%`;
   return String(val);
 }
