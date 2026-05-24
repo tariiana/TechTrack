@@ -89,6 +89,7 @@
 </template>
 
 <script setup lang="ts">
+import { showToast } from '@/utils/toast';
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMaintenanceStore } from '../stores/maintenanceStore'
@@ -180,8 +181,11 @@ function editPlan(plan: any) {
 }
 
 async function deletePlan(id: string) {
-  const ok = await confirmDialog.value?.show('Удаление', 'Удалить план-график?')
-  if (ok) store.deletePlan(id)
+  const ok = await confirmDialog.value?.show('Удаление', 'Удалить план-график?');
+  if (ok) {
+    await store.deletePlan(id);
+    showToast('План успешно удалён', 'success');
+  }
 }
 
 function refresh() {
@@ -200,18 +204,19 @@ function getExportData() {
 function exportToExcel() {
   const data = getExportData()
   if (data.length === 0) {
-    alert('Нет данных для экспорта')
+    showToast('Нет данных для экспорта', 'error');
     return
   }
   const filename = `Планы_ТО_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}`
   exportUtils.exportToExcel(data, filename)
   dropdownOpen.value = false
+  showToast('Экспорт в Excel выполнен успешно', 'success');
 }
 
 function exportToWord() {
   const data = getExportData()
   if (data.length === 0) {
-    alert('Нет данных для экспорта')
+    showToast('Нет данных для экспорта', 'error');
     return
   }
   const firstItem = data[0]
@@ -220,6 +225,7 @@ function exportToWord() {
   const filename = `Планы_ТО_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}`
   exportUtils.exportToWord(data, headers, filename)
   dropdownOpen.value = false
+  showToast('Экспорт в Word выполнен успешно', 'success');
 }
 
 function toggleDropdown() {

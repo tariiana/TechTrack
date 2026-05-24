@@ -1,30 +1,48 @@
 <template>
   <div class="modal-overlay" v-if="visible">
-    <div class="modal-content" style="width: 900px; max-height: 100vh; overflow-y: auto;">
+    <div class="modal-content">
       <div class="modal-header">График нагрузки ТО по месяцам</div>
       
-      <!-- Контейнер для графика и экспорта     -->
-      <div ref="chartContainer" class="chart-container">
-        <div class="chart-header-info">
-          <h3>{{ planName }}</h3>
-          <p>Период: {{ planPeriod }}</p>
-        </div>
-        <canvas ref="chartCanvas" class="chart-canvas"></canvas>
-        <div class="chart-summary" v-if="summaryData.length">
+      <!-- Прокручиваемая область (всё кроме кнопок) -->
+      <div class="modal-scrollable">
+        <div ref="chartContainer" class="chart-container">
+          <div class="chart-header-info">
+            <h3>{{ planName }}</h3>
+            <p>Период: {{ planPeriod }}</p>
+          </div>
+          
+          <canvas ref="chartCanvas" class="chart-canvas"></canvas>
+          
+          <!-- Легенда статуса выполнения -->
+          <div class="status-legend" style="background-color: white;">
+            <div class="status-legend-item">
+              <div class="status-color solid"></div>
+              <span>— не выполнено</span>
+            </div>
+            <div class="status-legend-item">
+              <div class="status-color hatched"></div>
+              <span>— выполнено</span>
+            </div>
+          </div>
+          
+          <!-- Сводка без прокрутки -->
+          <div class="chart-summary" v-if="summaryData.length">
             <h4>Сводка по месяцам:</h4>
             <ul>
-                <li v-for="item in summaryData" :key="item.month">
+              <li v-for="item in summaryData" :key="item.month">
                 <strong>{{ item.month }}:</strong>
                 <template v-for="(count, type) in item.types" :key="type">
-                    <span v-if="count > 0" :style="{ color: getColorForType(String(type)), marginLeft: '8px' }">
+                  <span v-if="count > 0" :style="{ color: getColorForType(String(type)), marginLeft: '8px' }">
                     {{ type }}: {{ count }}
-                    </span>
+                  </span>
                 </template>
-                </li>
+              </li>
             </ul>
+          </div>
         </div>
       </div>
       
+      <!-- Закрепленные кнопки внизу -->
       <div class="modal-footer">
         <div class="export-buttons">
           <button class="btn btn-secondary" @click="exportAsPNG">📸 Сохранить как PNG</button>
@@ -37,6 +55,7 @@
 </template>
 
 <script setup lang="ts">
+import { showToast } from '@/utils/toast';
 import { ref, nextTick } from 'vue';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -76,51 +95,129 @@ function getColorForType(type: string): string {
   return typeColors[type] || '#999';
 }
 
-function prepareChartData(tasks: any[]) {
-  const monthlyData: Record<number, Record<string, number>> = {};
+function createHatchPattern(ctx: CanvasRenderingContext2D, baseColor: string): CanvasPattern {
+  const patternSize = 10;
+  const patternCanvas = document.createElement('canvas');
+  patternCanvas.width = patternSize;
+  patternCanvas.height = patternSize;
+  const patternCtx = patternCanvas.getContext('2d')!;
   
+  patternCtx.fillStyle = baseColor;
+  patternCtx.fillRect(0, 0, patternSize, patternSize);
+  
+  patternCtx.beginPath();
+  patternCtx.moveTo(0, 0);
+  patternCtx.lineTo(patternSize, patternSize);
+  patternCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+  patternCtx.lineWidth = 1.5;
+  patternCtx.stroke();
+  
+  return patternCtx.createPattern(patternCanvas, 'repeat')!;
+}
+
+function prepareChartData(tasks: any[]) {
+  const pendingMonthlyData: Record<number, Record<string, number>> = {};
+  const completedMonthlyData: Record<number, Record<string, number>> = {};
+  
+  // Инициализация
   for (let i = 1; i <= 12; i++) {
-    monthlyData[i] = {};
+    pendingMonthlyData[i] = {};
+    completedMonthlyData[i] = {};
     for (const type of serviceTypes) {
-      const monthRecord = monthlyData[i];
-      if (monthRecord) {
-        monthRecord[type] = 0;
+      const pendingMonth = pendingMonthlyData[i];
+      const completedMonth = completedMonthlyData[i];
+      if (pendingMonth && completedMonth) {
+        pendingMonth[type] = 0;
+        completedMonth[type] = 0;
       }
     }
   }
   
   for (const task of tasks) {
-    if (task.completed_date) {
-    const month = new Date(task.completed_date).getMonth() + 1;
-      const type = task.serviceType;
-      const monthRecord = monthlyData[month];
-      if (monthRecord && monthRecord[type] !== undefined) {
-        monthRecord[type]++;
+    const dateStr = task.completed_date;
+    if (dateStr) {
+      const date = new Date(dateStr);
+      if (!isNaN(date.getTime())) {
+        const month = date.getMonth() + 1;
+        const type = task.service_type;
+        
+        if (task.status_name === 'completed') {
+          if (completedMonthlyData[month] && completedMonthlyData[month][type] !== undefined) {
+            completedMonthlyData[month][type]++;
+          }
+        } else {
+          if (pendingMonthlyData[month] && pendingMonthlyData[month][type] !== undefined) {
+            pendingMonthlyData[month][type]++;
+          }
+        }
       }
     }
   }
   
-  const datasets = serviceTypes.map(type => ({
-    label: type,
-    data: monthNames.map((_, idx) => {
-      const monthData = monthlyData[idx + 1];
-      return monthData ? (monthData[type] || 0) : 0;
-    }),
-    backgroundColor: getColorForType(type),
-    borderColor: getColorForType(type),
-    borderWidth: 1,
-    stack: 'stack0'
-  }));
+  const datasets: any[] = [];
   
+  for (const type of serviceTypes) {
+    // Невыполненные (сплошной цвет)
+    datasets.push({
+      label: type,
+      data: monthNames.map((_, idx) => {
+        const monthData = pendingMonthlyData[idx + 1];
+        return monthData ? (monthData[type] || 0) : 0;
+      }),
+      backgroundColor: getColorForType(type),
+      borderColor: getColorForType(type),
+      borderWidth: 1,
+      stack: type,
+      isCompleted: false,
+      barPercentage: 0.7,
+      categoryPercentage: 0.9
+    });
+    
+    // Выполненные (штриховка) – добавляем только если есть данные
+    const hasCompleted = monthNames.some((_, idx) => {
+      const monthData = completedMonthlyData[idx + 1];
+      return monthData ? (monthData[type] || 0) > 0 : false;
+    });
+    if (hasCompleted) {
+      datasets.push({
+        label: type,
+        data: monthNames.map((_, idx) => {
+          const monthData = completedMonthlyData[idx + 1];
+          return monthData ? (monthData[type] || 0) : 0;
+        }),
+        backgroundColor: (context: any) => {
+          if (context && context.chart && context.chart.ctx) {
+            return createHatchPattern(context.chart.ctx, getColorForType(type));
+          }
+          return getColorForType(type);
+        },
+        borderColor: getColorForType(type),
+        borderWidth: 1,
+        stack: type,
+        isCompleted: true,
+        barPercentage: 0.7,
+        categoryPercentage: 0.9
+      });
+    }
+  }
+  
+  // Сводка
   summaryData.value = [];
   for (let i = 0; i < monthNames.length; i++) {
     const month = monthNames[i];
-    const monthData = monthlyData[i + 1];
-    if (monthData) {
-      const hasData = Object.values(monthData).some(v => v > 0);
-      if (hasData) {
-        summaryData.value.push({ month, types: monthData });
-      }
+    const monthPending = pendingMonthlyData[i + 1];
+    const monthCompleted = completedMonthlyData[i + 1];
+    const totalTypes: Record<string, number> = {};
+    
+    for (const type of serviceTypes) {
+      const pending = monthPending ? (monthPending[type] || 0) : 0;
+      const completed = monthCompleted ? (monthCompleted[type] || 0) : 0;
+      totalTypes[type] = pending + completed;
+    }
+    
+    const hasData = Object.values(totalTypes).some(v => v > 0);
+    if (hasData) {
+      summaryData.value.push({ month, types: totalTypes });
     }
   }
   
@@ -147,39 +244,64 @@ async function renderChart() {
       responsive: true,
       maintainAspectRatio: true,
       plugins: {
-        legend: { 
+        legend: {
           position: 'top',
           labels: {
-            font: { size: 12 }
+            font: { size: 12 },
+            filter: (legendItem, data) => {
+              const idx = legendItem.datasetIndex;
+              if (idx === undefined) return false;
+              const dataset = data.datasets[idx];
+              return (dataset as any)?.isCompleted === false;
+            }
           }
         },
-        tooltip: { 
+        tooltip: {
           callbacks: {
-            label: (context: any) => `${context.dataset.label}: ${context.raw} ТО`
+            label: (context: any) => {
+              const datasetLabel = context.dataset.label || '';
+              const value = context.raw || 0;
+              const isCompleted = context.dataset.isCompleted;
+              const status = isCompleted ? '(выполнено)' : '(не выполнено)';
+              return `${datasetLabel} ${status}: ${value} ТО`;
+            }
           },
           bodyFont: { size: 12 },
           titleFont: { size: 13 }
         }
       },
       scales: {
-        x: { 
+        x: {
           stacked: true,
-          title: { 
-            display: true, 
-            text: 'Месяцы',
-            font: { size: 13, weight: 'bold' }
+          offset: true,
+          grid: {
+            offset: true,
           },
-          ticks: { font: { size: 11 } }
-        },
-        y: { 
-          stacked: true,
-          beginAtZero: true, 
           title: { 
             display: true, 
+            text: 'Месяцы', 
+            font: { size: 13, weight: 'bold' } 
+          },
+          ticks: { 
+            font: { size: 11 },
+            autoSkip: false,
+            maxRotation: 45,
+            minRotation: 45
+          }
+        },
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          title: {
+            display: true,
             text: 'Количество ТО',
             font: { size: 13, weight: 'bold' }
           },
-          ticks: { stepSize: 1, precision: 0, font: { size: 11 } }
+          ticks: { 
+            stepSize: 1, 
+            precision: 0, 
+            font: { size: 11 } 
+          }
         }
       }
     }
@@ -199,9 +321,10 @@ async function exportAsPNG() {
     link.download = `${props.planName.replace(/\s/g, '_')}_график_ТО.png`;
     link.href = canvas.toDataURL();
     link.click();
+    showToast('График сохранён как PNG', 'success');
   } catch (error) {
     console.error('Ошибка экспорта PNG:', error);
-    alert('Ошибка при создании изображения');
+    showToast('Ошибка при создании изображения', 'error');
   }
 }
 
@@ -209,13 +332,11 @@ async function exportAsPDF() {
   if (!chartContainer.value) return;
   
   try {
-    // Временно убираем ограничения по высоте для полного захвата
     const originalHeight = chartCanvas.value?.style.height;
     if (chartCanvas.value) {
       chartCanvas.value.style.height = 'auto';
     }
     
-    // Создаём canvas с полным захватом
     const canvas = await html2canvas(chartContainer.value, {
       scale: 2,
       backgroundColor: '#ffffff',
@@ -224,7 +345,6 @@ async function exportAsPDF() {
       windowWidth: document.documentElement.scrollWidth,
       windowHeight: document.documentElement.scrollHeight,
       onclone: (clonedDoc, element) => {
-        // В клоне тоже убираем ограничения
         const clonedCanvas = clonedDoc.querySelector('.chart-canvas');
         if (clonedCanvas) {
           (clonedCanvas as HTMLElement).style.height = 'auto';
@@ -232,7 +352,6 @@ async function exportAsPDF() {
       }
     });
     
-    // Возвращаем оригинальную высоту
     if (chartCanvas.value && originalHeight) {
       chartCanvas.value.style.height = originalHeight;
     }
@@ -248,25 +367,23 @@ async function exportAsPDF() {
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = pdf.internal.pageSize.getHeight();
     
-    // Рассчитываем размеры с сохранением пропорций
     let imgWidth = pdfWidth - 10;
     let imgHeight = (canvas.height * imgWidth) / canvas.width;
     
-    // Если высота больше страницы, уменьшаем
     if (imgHeight > pdfHeight - 10) {
       imgHeight = pdfHeight - 10;
       imgWidth = (canvas.width * imgHeight) / canvas.height;
     }
     
-    // Центрируем
     const x = (pdfWidth - imgWidth) / 2;
     const y = (pdfHeight - imgHeight) / 2;
     
     pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
     pdf.save(`${props.planName.replace(/\s/g, '_')}_график_ТО.pdf`);
+    showToast('График сохранён как PDF', 'success');
   } catch (error) {
     console.error('Ошибка экспорта PDF:', error);
-    alert('Ошибка при создании PDF');
+    showToast('Ошибка при создании PDF', 'error');
   }
 }
 
@@ -285,8 +402,71 @@ defineExpose({ open });
 </script>
 
 <style scoped>
-.chart-container {
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 900px;
+  max-width: 95%;
+  max-height: 95vh;
+  display: flex;
+  flex-direction: column;
   padding: 20px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e0e4e8;
+  flex-shrink: 0;
+}
+
+/* Прокручиваемая область */
+.modal-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  padding-right: 4px;
+}
+
+/* Стилизация скроллбара для прокручиваемой области */
+.modal-scrollable::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-scrollable::-webkit-scrollbar-track {
+  background: #e0e4e8;
+  border-radius: 4px;
+}
+
+.modal-scrollable::-webkit-scrollbar-thumb {
+  background: #2c5f8a;
+  border-radius: 4px;
+}
+
+.modal-scrollable::-webkit-scrollbar-thumb:hover {
+  background: #1e4566;
+}
+
+.chart-container {
+  padding: 12px;
   background: white;
   border-radius: 8px;
   overflow: visible !important;
@@ -300,11 +480,11 @@ defineExpose({ open });
 
 .chart-header-info {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
 .chart-header-info h3 {
-  margin: 0 0 5px 0;
+  margin: 0 0 3px 0;
   color: #2c5f8a;
   font-size: 18px;
 }
@@ -312,68 +492,117 @@ defineExpose({ open });
 .chart-header-info p {
   margin: 0;
   color: #666;
-  font-size: 14px;
+  font-size: 13px;
 }
 
+.status-legend {
+  display: flex;
+  justify-content: flex-start;
+  gap: 20px;
+  margin: 8px 0;
+  padding: 5px 10px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.status-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #2c3e50;
+}
+
+.status-color {
+  width: 24px;
+  height: 16px;
+  border-radius: 2px;
+}
+
+.status-color.solid {
+  background-color: #2c5f8a;
+}
+
+.status-color.hatched {
+  background: repeating-linear-gradient(
+    45deg,
+    #2c5f8a,
+    #2c5f8a 2px,
+    rgba(255, 255, 255, 0.5) 2px,
+    rgba(255, 255, 255, 0.5) 5px
+  );
+}
+
+/* Сводка без прокрутки */
 .chart-summary {
-  margin-top: 20px;
-  padding: 15px;
+  margin-top: 15px;
   background: #f8f9fa;
   border-radius: 8px;
 }
 
 .chart-summary h4 {
-  margin: 0 0 10px 0;
+  margin: 0;
+  padding: 12px;
   color: #2c5f8a;
-  font-size: 16px;
+  font-size: 14px;
+  border-bottom: 1px solid #e0e4e8;
 }
 
 .chart-summary ul {
   display: flex;
   flex-wrap: wrap;
-  gap: 15px;
+  gap: 10px;
   margin: 0;
-  padding: 0;
+  padding: 12px;
   list-style: none;
 }
 
 .chart-summary li {
   background: white;
-  padding: 5px 10px;
+  padding: 4px 8px;
   border-radius: 4px;
   border: 1px solid #e0e4e8;
-  font-size: 14px;
-}
-
-.legend {
-  display: flex;
-  gap: 15px;
-  margin-right: 20px;
-  flex-wrap: wrap;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 14px;
-}
-
-.legend-color {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
+  font-size: 12px;
 }
 
 .modal-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 15px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e4e8;
+  flex-shrink: 0;
 }
 
 .export-buttons {
   display: flex;
   gap: 10px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-primary {
+  background-color: #2c5f8a;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #1e4566;
+}
+
+.btn-secondary {
+  background-color: #e9ecef;
+  color: #2c3e50;
+  border: 1px solid #ced4da;
+}
+
+.btn-secondary:hover {
+  background-color: #dee2e6;
 }
 </style>

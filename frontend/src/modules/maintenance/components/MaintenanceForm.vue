@@ -44,6 +44,7 @@
 </template>
 
 <script setup lang="ts">
+import { showToast } from '@/utils/toast';
 import { ref, reactive, watch } from 'vue';
 import { useMaintenanceStore } from '../stores/maintenanceStore';
 
@@ -114,12 +115,14 @@ function close() {
 async function save() {
   if (!form.startDate || !form.endDate) {
     error.value = 'Укажите дату начала и окончания плана';
+    showToast(error.value, 'error');  // можно добавить
     return;
   }
   const start = new Date(form.startDate);
   const end = new Date(form.endDate);
   if (end < start) {
     dateError.value = 'Дата окончания не может быть раньше даты начала!';
+    showToast(dateError.value, 'error'); // можно добавить
     return;
   }
   
@@ -135,6 +138,7 @@ async function save() {
         end_date: form.endDate,
       });
       autoMessage.value = 'План обновлён';
+      showToast('План успешно обновлён', 'success');
     } else {
       const planData = {
         name: form.name || `План ТО на ${new Date(form.startDate).getFullYear()} год`,
@@ -145,14 +149,17 @@ async function save() {
       if (newPlan && newPlan.plan_id) {
         await store.generatePlan(form.startDate, form.endDate);
         autoMessage.value = `План создан! Задачи сгенерированы автоматически.`;
+        showToast('План создан с автоматической генерацией задач', 'success');
       } else {
         autoMessage.value = 'План создан.';
+        showToast('План успешно создан', 'success');
       }
     }
     setTimeout(() => close(), 1500);
   } catch (err: any) {
     console.error('Ошибка сохранения плана:', err);
     error.value = err.message || 'Ошибка при сохранении плана';
+    showToast(error.value, 'error');
   } finally {
     generating.value = false;
   }

@@ -100,10 +100,11 @@
               <template v-if="task.completed_date">
                 {{ formatDate(task.completed_date) }}
                 <!-- Если дата выполнения позже срока -->
-                <span v-if="getDaysDiff(task.expiry_date, task.completed_date) > 0" class="overdue-completed-badge">
+               <span v-if="getDaysDiff(task.expiry_date, task.completed_date) > 0" class="overdue-completed-badge">
                   (просрочено на {{ getDaysDiff(task.expiry_date, task.completed_date) }} дн.)
                 </span>
-                <span v-else class="success-check">✅</span>
+                <!-- Галочка только для выполненных мероприятий -->
+                <span v-if="task.status_name === 'completed'" class="success-check">✅</span>
               </template>
               <template v-else>
                 <span class="not-completed">—</span>
@@ -151,6 +152,7 @@
           </div>
         </div>
         <button class="btn btn-secondary" @click="openChartModal">📊 График нагрузки</button>
+        <button class="btn btn-secondary" @click="openCalendarModal">📅 Календарь</button>
         <button class="btn btn-primary" @click="openAddTaskForm">+ Добавить мероприятие</button>
       </div>
     </div>
@@ -165,11 +167,17 @@
       :plan-period="`${formatDate(plan?.start_date)} — ${plan?.end_date ? formatDate(plan?.end_date) : '∞'}`"
       :tasks="tasks"
     />
+    <CalendarModal
+      ref="calendarModalRef"
+      :tasks="tasks"
+    />
   </div>
   <div v-else class="card">Загрузка...</div>
 </template>
 
 <script setup lang="ts">
+import CalendarModal from '../components/CalendarModal.vue';
+import { showToast } from '@/utils/toast';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMaintenanceStore } from '../stores/maintenanceStore';
@@ -189,6 +197,7 @@ const taskFormRef = ref();
 const planFormRef = ref();
 const confirmDialog = ref();
 const chartModalRef = ref();
+const calendarModalRef = ref();
 
 const plan = ref<any>(null);
 const tasks = ref<any[]>([]);
@@ -364,25 +373,35 @@ function resetFilters() {
   serviceTypeFilter.value = '';
 }
 
+function openCalendarModal() {
+  calendarModalRef.value?.open();
+}
+
 function goBack() { router.back(); }
 function editPlan() { planFormRef.value?.open(plan.value); }
+
 async function deletePlan() {
   const ok = await confirmDialog.value?.show('Удаление', 'Удалить план?');
   if (ok) {
     await maintenanceStore.deletePlan(plan.value.plan_id);
+    showToast('План успешно удалён', 'success');
     router.back();
   }
 }
+
 function goToNode(nodeId: number) { router.push(`/equipment/${nodeId}`); }
 function openAddTaskForm() { taskFormRef.value?.open(plan.value.plan_id); }
 function openEditTaskForm(task: any) { taskFormRef.value?.open(plan.value.plan_id, task); }
+
 async function deleteTask(id: number) {
   const ok = await confirmDialog.value?.show('Удаление', 'Вы точно хотите удалить мероприятие?');
   if (ok) {
     await maintenanceStore.deleteTask(id);
+    showToast('Мероприятие успешно удалено', 'success');
     refresh();
   }
 }
+
 function refresh() { loadData(); }
 
 function getTasksExportData() {
@@ -399,10 +418,10 @@ function getTasksExportData() {
 }
 
 function exportTasksToExcel() {
-  const data = getTasksExportData();
+  const data = getTasksExportData()
   if (data.length === 0) {
-    alert('Нет данных для экспорта');
-    return;
+    showToast('Нет данных для экспорта', 'error');
+    return
   }
 
   const excelRows = [];
@@ -429,18 +448,21 @@ function exportTasksToExcel() {
   const filename = `${plan.value.name.replace(/\s/g, '_')}.xlsx`;
   XLSX.writeFile(wb, filename);
   exportDropdownOpen.value = false;
+  showToast('Экспорт плана в Excel выполнен успешно', 'success');
 }
 
+
 function exportTasksToWord() {
-  const data = getTasksExportData();
+  const data = getTasksExportData()
   if (data.length === 0) {
-    alert('Нет данных для экспорта');
-    return;
+    showToast('Нет данных для экспорта', 'error');
+    return
   }
   const headers = ['№ п/п', 'Наименование агрегата', 'Местоположение', 'Дата истечения срока ТО', 'Фактическая дата проведения ТО', 'Тип обслуживания', 'Статус', 'Примечание'];
   const filename = `${plan.value.name.replace(/\s/g, '_')}`;
   exportUtils.exportToWord(data, headers, filename);
   exportDropdownOpen.value = false;
+  showToast('Экспорт плана в Word выполнен успешно', 'success');
 }
 
 function toggleExportDropdown() { exportDropdownOpen.value = !exportDropdownOpen.value; }
