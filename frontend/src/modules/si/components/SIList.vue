@@ -342,19 +342,34 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.action-buttons { display: flex; gap: 10px; }
-.btn-fixed { min-width: 140px; text-align: center; }
-.badge-disabled { display: inline-block; padding: 4px 8px; background-color: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 12px; }
-.actions-cell { white-space: nowrap; }
-.actions-cell .btn { margin-right: 4px; }
-.warning-row { background-color: #ffd699; }
-.warning-row:hover { background-color: #ffbb55; }
-.expired-row { background-color: #ffb3b3; }
-.expired-row:hover { background-color: #ff8080; }
-.disabled-row { background-color: #e0e0e0; color: #999; opacity: 0.7; }
-.disabled-row:hover { background-color: #d0d0d0; }
-.card { overflow-x: hidden; }
-.scrollable-table-container { width: 100%; }
+.action-buttons {
+  display: flex;
+  gap: 10px;
+}
+.btn-fixed {
+  min-width: 140px;
+  text-align: center;
+}
+.badge-disabled {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #e9ecef;
+  color: #6c757d;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.actions-cell {
+  white-space: nowrap;
+}
+.actions-cell .btn {
+  margin-right: 4px;
+}
+.card {
+  overflow-x: hidden;
+}
+.scrollable-table-container {
+  width: 100%;
+}
 :deep(.scrollable-table-container) {
   height: 650px;
   max-height: calc(100vh - 250px);
@@ -362,7 +377,6 @@ onUnmounted(() => {
 .dropdown {
   position: relative;
 }
-
 .dropdown-menu {
   position: absolute;
   top: 100%;
@@ -375,7 +389,6 @@ onUnmounted(() => {
   z-index: 100;
   min-width: 200px;
 }
-
 .dropdown-item {
   display: block;
   width: 100%;
@@ -386,7 +399,6 @@ onUnmounted(() => {
   cursor: pointer;
   font-size: 14px;
 }
-
 .dropdown-item:hover {
   background-color: #f0f2f5;
 }

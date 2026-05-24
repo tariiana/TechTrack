@@ -31,6 +31,19 @@ async function getTree(req, res) {
   }
 }
 
+async function searchContent(req, res) {
+  try {
+    const items = await Subsystem.searchContent({
+      query: req.query.query || req.query.q || '',
+      type: req.query.type || 'all',
+      limit: req.query.limit || 20,
+    });
+    res.json(items);
+  } catch (error) {
+    sendError(res, error);
+  }
+}
+
 async function getById(req, res) {
   try {
     const subsystem = await Subsystem.getById(req.params.id);
@@ -53,6 +66,52 @@ async function getNodes(req, res) {
 
     const nodes = await Subsystem.getNodes(req.params.id);
     res.json(nodes);
+  } catch (error) {
+    sendError(res, error);
+  }
+}
+
+async function getContent(req, res) {
+  try {
+    const content = await Subsystem.getContent(req.params.id);
+    res.json(content);
+  } catch (error) {
+    sendError(res, error);
+  }
+}
+
+async function addContent(req, res) {
+  try {
+    const result = await Subsystem.attachContent(
+      req.params.id,
+      req.body.type,
+      req.body.id,
+      getRequestUserId(req)
+    );
+    res.status(201).json(result);
+  } catch (error) {
+    sendError(res, error);
+  }
+}
+
+async function moveContent(req, res) {
+  try {
+    const result = await Subsystem.moveContent(
+      req.params.type,
+      req.params.objectId,
+      req.body.target_subsystem_id,
+      getRequestUserId(req)
+    );
+    res.json(result);
+  } catch (error) {
+    sendError(res, error);
+  }
+}
+
+async function removeContent(req, res) {
+  try {
+    const result = await Subsystem.detachContent(req.params.type, req.params.objectId);
+    res.json(result);
   } catch (error) {
     sendError(res, error);
   }
@@ -88,8 +147,13 @@ async function deleteSubsystem(req, res) {
 module.exports = {
   getAll,
   getTree,
+  searchContent,
   getById,
   getNodes,
+  getContent,
+  addContent,
+  moveContent,
+  removeContent,
   create,
   update,
   delete: deleteSubsystem,
