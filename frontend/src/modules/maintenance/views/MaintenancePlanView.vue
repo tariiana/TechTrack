@@ -1,8 +1,8 @@
 <template>
   <div class="card" v-if="plan">
-    <div style="display: flex; justify-content: space-between; margin-bottom: 20px">
-      <h2>{{ plan.name }}</h2>
-      <div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+      <h2 style="margin: 0;">{{ plan.name }}</h2>
+      <div style="display: flex; gap: 10px;">
         <button class="btn btn-secondary" @click="goBack">← Назад</button>
         <button v-if="canEdit" class="btn btn-primary" @click="editPlan">Редактировать</button>
         <button v-if="canEdit" class="btn btn-danger" @click="deletePlan">Удалить</button>
@@ -507,83 +507,23 @@ onUnmounted(() => {
   background: none; border: none; cursor: pointer; font-size: 14px;
 }
 .dropdown-item:hover { background-color: #f0f2f5; }
-.filter-panel {
-  background: #f8f9fa; border: 1px solid #e0e4e8;
-  border-radius: 8px; padding: 15px; margin-bottom: 20px;
-}
 .filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .link-btn {
   background: none; border: none; color: #2c5f8a; cursor: pointer; font-size: 15px; text-align: left;
 }
 .link-btn:hover { color: #1e4566; }
-
-/* Цветовые классы для строк */
-.warning-row {
-  background-color: #ffd699;
-}
-.warning-row:hover {
-  background-color: #ffbb55;
-}
-
-.expired-row {
-  background-color: #ffb3b3;
-}
-.expired-row:hover {
-  background-color: #ff8080;
-}
-
 .success-check {
   margin-left: 5px;
   font-size: 14px;
 }
-
 .not-completed {
   color: #999;
 }
-
 .sort-icon {
   margin-left: 5px;
   font-size: 12px;
   color: #2c5f8a;
 }
-
-/* Контейнер для таблицы с прокруткой */
-.table-scroll-container {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: 500px;
-  border: 1px solid #e0e4e8;
-  border-radius: 8px;
-  background: white;
-}
-
-.table-scroll-container::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
-
-.table-scroll-container::-webkit-scrollbar-track {
-  background: #e0e4e8;
-  border-radius: 6px;
-}
-
-.table-scroll-container::-webkit-scrollbar-thumb {
-  background: #2c5f8a;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.table-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: #1e4566;
-}
-
-/* Стили для таблицы внутри контейнера */
-.table-scroll-container .data-table {
-  min-width: 800px;
-}
-
-/*для статуса*/
 .overdue-badge {
   display: inline-block;
   margin-left: 8px;
@@ -593,7 +533,6 @@ onUnmounted(() => {
   border-radius: 4px;
   font-size: 10px;
 }
-
 .overdue-completed-badge {
   display: inline-block;
   margin-left: 8px;
@@ -603,13 +542,17 @@ onUnmounted(() => {
   border-radius: 4px;
   font-size: 10px;
 }
-
-.success-check {
-  margin-left: 5px;
-  font-size: 14px;
+/* Цветовые классы для строк */
+.warning-row {
+  background-color: #ffd699;
 }
-
-.not-completed {
-  color: #999;
+.warning-row:hover {
+  background-color: #ffbb55;
+}
+.expired-row {
+  background-color: #ffb3b3;
+}
+.expired-row:hover {
+  background-color: #ff8080;
 }
 </style>

@@ -372,100 +372,260 @@ defineExpose({ open });
 .modal-content {
   background: white;
   border-radius: 12px;
-  width: 1200px;
-  max-width: 95%;
-  max-height: 95vh;
+  width: 1100px;
+  max-width: 95vw;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  padding: 16px;
+  overflow: hidden;
 }
 
-/* Прокручиваемая область с календарями */
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e4e8;
+  flex-shrink: 0;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.btn-close:hover {
+  background-color: #e9ecef;
+}
+
+.calendar-year-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.calendar-year-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #2c3e50;
+}
+
+.btn-year {
+  background: #e9ecef;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.btn-year:hover:not(:disabled) {
+  background: #dee2e6;
+}
+
+.btn-year:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .calendar-scrollable {
   flex: 1;
   overflow-y: auto;
-  max-height: calc(90vh - 300px);
-  margin-bottom: 16px;
+  overflow-x: hidden;
+  margin-bottom: 12px;
+  padding-right: 4px;
 }
 
-/* Закрепленная сводка внизу */
+.calendar-scrollable::-webkit-scrollbar {
+  width: 8px;
+}
+
+.calendar-scrollable::-webkit-scrollbar-track {
+  background: #e0e4e8;
+  border-radius: 4px;
+}
+
+.calendar-scrollable::-webkit-scrollbar-thumb {
+  background: #2c5f8a;
+  border-radius: 4px;
+}
+
+.calendar-scrollable::-webkit-scrollbar-thumb:hover {
+  background: #1e4566;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.month-card {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 8px;
+  border: 1px solid #e0e4e8;
+}
+
+.month-title {
+  text-align: center;
+  font-weight: 600;
+  padding: 4px;
+  color: #2c5f8a;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 10px;
+  color: #6c757d;
+  margin-bottom: 4px;
+}
+
+.days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.day-cell {
+  aspect-ratio: 1;
+  padding: 2px;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+  position: relative;
+  font-size: 11px;
+}
+
+.day-cell:hover {
+  background-color: #e8f0fe;
+}
+
+.day-cell.other-month {
+  color: #ccc;
+}
+
+.day-cell.has-events {
+  background-color: #e8f0fe;
+}
+
+.day-cell.selected-day {
+  background-color: #2c5f8a;
+  color: white;
+}
+
+.day-number {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.day-events {
+  display: flex;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.event-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.event-multi {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
 .summary-fixed {
   flex-shrink: 0;
   border-top: 1px solid #e0e4e8;
   background: white;
   margin-top: 8px;
+  max-height: 30%;
+  display: flex;
+  flex-direction: column;
 }
 
 .summary-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  padding: 12px 0 8px 0;
+  padding: 8px 0 4px 0;
   cursor: pointer;
   user-select: none;
-}
-
-.summary-header h4 {
-  margin: 0;
-  font-size: 14px;
-  color: #2c3e50;
 }
 
 .btn-toggle {
   background: none;
   border: none;
-  font-size: 16px;
+  font-size: 14px;
   cursor: pointer;
   color: #2c5f8a;
-  padding: 4px 8px;
-}
-
-.summary-date {
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: #2c3e50;
-  border-left: 3px solid #2c5f8a;
-  padding-left: 10px;
-  font-size: 14px;
-}
-
-.summary-list-scrollable {
-  max-height: 100px;
-  overflow-y: auto;
-}
-
-.summary-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  padding: 2px 6px;
 }
 
 .summary-panel {
-  padding: 12px;
+  padding: 10px;
   background: #f8f9fa;
   border-radius: 8px;
   border: 1px solid #e0e4e8;
   margin-top: 4px;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .summary-panel.empty {
   text-align: center;
   color: #6c757d;
-  padding: 20px;
+  padding: 16px;
+}
+
+.summary-date {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #2c3e50;
+  border-left: 3px solid #2c5f8a;
+  padding-left: 8px;
+  font-size: 13px;
+}
+
+.summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .summary-item {
   display: flex;
-  gap: 12px;
-  padding: 8px;
+  gap: 8px;
+  padding: 6px;
   background: white;
   border-radius: 6px;
   border: 1px solid #e0e4e8;
 }
 
 .summary-color {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   border-radius: 4px;
   flex-shrink: 0;
 }
@@ -479,13 +639,13 @@ defineExpose({ open });
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: 6px;
+  margin-bottom: 4px;
 }
 
 .summary-status {
-  font-size: 11px;
-  padding: 2px 8px;
+  font-size: 10px;
+  padding: 2px 6px;
   border-radius: 12px;
 }
 
@@ -511,169 +671,32 @@ defineExpose({ open });
 
 .summary-details {
   display: flex;
-  gap: 16px;
-  font-size: 12px;
+  gap: 12px;
+  font-size: 11px;
   color: #6c757d;
   flex-wrap: wrap;
 }
 
 .summary-notes {
-  margin-top: 6px;
-  font-size: 12px;
+  margin-top: 4px;
+  font-size: 11px;
   color: #2c3e50;
   font-style: italic;
 }
 
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 20px;
-  font-weight: 600;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e0e4e8;
-}
-
-.btn-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #6c757d;
-}
-
-.calendar-year-header {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-.calendar-year-header h2 {
-  margin: 0;
-  font-size: 24px;
-  color: #2c3e50;
-}
-
-.btn-year {
-  background: #e9ecef;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-}
-
-.btn-year:hover:not(:disabled) {
-  background: #dee2e6;
-}
-
-.btn-year:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
-
-.month-card {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 10px;
-  border: 1px solid #e0e4e8;
-}
-
-.month-title {
-  text-align: center;
-  font-weight: 600;
-  padding: 8px;
-  color: #2c5f8a;
-  margin-bottom: 8px;
-}
-
-.weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  text-align: center;
-  font-size: 11px;
-  color: #6c757d;
-  margin-bottom: 4px;
-}
-
-.days-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
-}
-
-.day-cell {
-  aspect-ratio: 1;
-  padding: 4px;
-  text-align: center;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: all 0.2s;
-  position: relative;
-}
-
-.day-cell:hover {
-  background-color: #e8f0fe;
-}
-
-.day-cell.other-month {
-  color: #ccc;
-}
-
-.day-cell.has-events {
-  background-color: #e8f0fe;
-}
-
-.day-cell.selected-day {
-  background-color: #2c5f8a;
-  color: white;
-}
-
-.day-number {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.day-events {
-  display: flex;
-  justify-content: center;
-  margin-top: 2px;
-}
-
-.event-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.event-multi {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
 .modal-footer {
-  margin-top: 16px;
+  margin-top: 12px;
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .btn {
-  padding: 8px 16px;
+  padding: 6px 12px;
   border-radius: 4px;
   border: none;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .btn-secondary {

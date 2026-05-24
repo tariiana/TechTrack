@@ -310,47 +310,7 @@ onUnmounted(() => {
   background: none; border: none; cursor: pointer; font-size: 14px;
 }
 .dropdown-item:hover { background-color: #f0f2f5; }
-.filter-panel {
-  background: #f8f9fa; border: 1px solid #e0e4e8;
-  border-radius: 8px; padding: 15px; margin-bottom: 20px;
-}
 .filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .filter-label { font-size: 14px; color: #6c757d; }
 .sort-icon { margin-left: 5px; font-size: 12px; color: #2c5f8a; }
-
-/* Контейнер для таблицы с прокруткой */
-.table-scroll-container {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: 500px;
-  border: 1px solid #e0e4e8;
-  border-radius: 8px;
-  background: white;
-}
-
-.table-scroll-container::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
-
-.table-scroll-container::-webkit-scrollbar-track {
-  background: #e0e4e8;
-  border-radius: 6px;
-}
-
-.table-scroll-container::-webkit-scrollbar-thumb {
-  background: #2c5f8a;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.table-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: #1e4566;
-}
-
-/* Стили для таблицы внутри контейнера */
-.table-scroll-container .data-table {
-  min-width: 600px;
-}
 </style>

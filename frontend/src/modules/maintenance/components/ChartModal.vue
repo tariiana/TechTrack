@@ -402,19 +402,6 @@ defineExpose({ open });
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
 .modal-content {
   background: white;
   border-radius: 12px;
@@ -438,7 +425,6 @@ defineExpose({ open });
   flex-shrink: 0;
 }
 
-/* Прокручиваемая область */
 .modal-scrollable {
   flex: 1;
   overflow-y: auto;
@@ -446,7 +432,6 @@ defineExpose({ open });
   padding-right: 4px;
 }
 
-/* Стилизация скроллбара для прокручиваемой области */
 .modal-scrollable::-webkit-scrollbar {
   width: 8px;
 }
@@ -533,7 +518,6 @@ defineExpose({ open });
   );
 }
 
-/* Сводка без прокрутки */
 .chart-summary {
   margin-top: 15px;
   background: #f8f9fa;
@@ -577,32 +561,5 @@ defineExpose({ open });
 .export-buttons {
   display: flex;
   gap: 10px;
-}
-
-.btn {
-  padding: 8px 16px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.btn-primary {
-  background-color: #2c5f8a;
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: #1e4566;
-}
-
-.btn-secondary {
-  background-color: #e9ecef;
-  color: #2c3e50;
-  border: 1px solid #ced4da;
-}
-
-.btn-secondary:hover {
-  background-color: #dee2e6;
 }
 </style>

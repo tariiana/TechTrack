@@ -301,12 +301,10 @@ defineExpose({ open });
   display: block;
   margin-top: 4px;
 }
-
 .warning-date {
   border-color: #e67e22 !important;
   background-color: #fff3e0;
 }
-
 .warning-text {
   color: #e67e22;
   font-size: 12px;
@@ -315,75 +313,9 @@ defineExpose({ open });
   align-items: center;
   gap: 4px;
 }
-
-.error-text {
-  color: #c0392b;
-  font-size: 12px;
-  margin-top: 4px;
-}
-
-.form-group {
-  margin-bottom: 15px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: 500;
-  color: #2c3e50;
-}
-
-.form-control {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.form-control.invalid {
-  border-color: #c0392b;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 15px;
-}
-
-.btn {
-  padding: 8px 16px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.btn-primary {
-  background-color: #2c5f8a;
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: #1e4566;
-}
-
-.btn-secondary {
-  background-color: #e9ecef;
-  color: #2c3e50;
-  border: 1px solid #ced4da;
-}
-
-.btn-secondary:hover {
-  background-color: #dee2e6;
-}
-
-/* Стили для поиска оборудования */
 .equipment-search {
   position: relative;
 }
-
 .equipment-dropdown {
   position: absolute;
   top: 100%;
@@ -397,13 +329,11 @@ defineExpose({ open });
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   z-index: 100;
 }
-
 .equipment-option {
   padding: 8px 12px;
   cursor: pointer;
   transition: background-color 0.2s;
 }
-
 .equipment-option:hover {
   background-color: #e8f0fe;
 }

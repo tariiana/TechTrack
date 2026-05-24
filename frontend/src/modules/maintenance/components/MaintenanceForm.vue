@@ -115,14 +115,14 @@ function close() {
 async function save() {
   if (!form.startDate || !form.endDate) {
     error.value = 'Укажите дату начала и окончания плана';
-    showToast(error.value, 'error');  // можно добавить
+    showToast(error.value, 'error');
     return;
   }
   const start = new Date(form.startDate);
   const end = new Date(form.endDate);
   if (end < start) {
     dateError.value = 'Дата окончания не может быть раньше даты начала!';
-    showToast(dateError.value, 'error'); // можно добавить
+    showToast(dateError.value, 'error');
     return;
   }
   
@@ -146,13 +146,35 @@ async function save() {
         end_date: form.endDate,
       };
       const newPlan = await store.createPlan(planData);
+      
       if (newPlan && newPlan.plan_id) {
-        await store.generatePlan(form.startDate, form.endDate);
-        autoMessage.value = `План создан! Задачи сгенерированы автоматически.`;
-        showToast('План создан с автоматической генерацией задач', 'success');
+        const generateResult = await store.generatePlan(form.startDate, form.endDate);
+        
+        let tasksCount = 0;
+        
+        // Проверяем разные возможные форматы ответа
+        if (generateResult && generateResult.tasks && Array.isArray(generateResult.tasks)) {
+          tasksCount = generateResult.tasks.length;
+        } else if (generateResult && Array.isArray(generateResult)) {
+          tasksCount = generateResult.length;
+        } else if (generateResult && generateResult.data && Array.isArray(generateResult.data)) {
+          tasksCount = generateResult.data.length;
+        }
+        
+        // Если не получили количество из ответа, загружаем план и считаем задачи
+        if (tasksCount === 0) {
+          const loadedPlan = await store.fetchPlanById(newPlan.plan_id);
+          if (loadedPlan && loadedPlan.tasks) {
+            tasksCount = loadedPlan.tasks.length;
+          }
+        }
+        
+        // Сообщение в нужном формате
+        autoMessage.value = `План создан, количество мероприятий ${tasksCount}`;
+        showToast(autoMessage.value, 'success');
       } else {
-        autoMessage.value = 'План создан.';
-        showToast('План успешно создан', 'success');
+        autoMessage.value = 'План создан, количество мероприятий 0';
+        showToast(autoMessage.value, 'success');
       }
     }
     setTimeout(() => close(), 1500);
@@ -194,10 +216,5 @@ defineExpose({ open });
 .invalid-date {
   border-color: #c0392b !important;
   background-color: #ffe0e0;
-}
-.error-text {
-  color: #c0392b;
-  font-size: 12px;
-  margin-top: 4px;
 }
 </style>
