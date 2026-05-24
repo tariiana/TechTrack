@@ -1,4 +1,8 @@
 const { pool } = require('../config/db');
+const {
+  calculateMaintenanceExpiryDate,
+  daysBetween,
+} = require('../utils/businessCalendar');
 
 const STATUS_TO_DB = {
   pending: 'ожидает',
@@ -32,10 +36,18 @@ const TYPE_FROM_DB = {
   диагностика: 'диагностика',
 };
 
+const AUTO_GENERATED_NOTE = 'Автоматическая генерация';
+const LEGACY_AUTO_GENERATED_NOTE = 'Automatically generated from maintenance plan';
+
 function normalizeDate(value) {
   if (!value) return null;
   if (typeof value === 'string') return value.slice(0, 10);
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
   return value;
 }
 
@@ -66,16 +78,50 @@ function mapPlan(row) {
 }
 
 function mapTask(row) {
-  const recommendedDate = normalizeDate(row.recommended_date || row.expiry_date || row.created_at);
+  const expiryDate = normalizeDate(row.expiry_date);
 
   return {
     ...row,
     completed_date: normalizeDate(row.completed_date),
-    recommended_date: recommendedDate,
-    expiry_date: recommendedDate,
+    commission_date: normalizeDate(row.commission_date),
+    last_completed_date: normalizeDate(row.last_completed_date),
+    expiry_date: expiryDate,
+    recommended_date: expiryDate,
+    notes: row.notes === LEGACY_AUTO_GENERATED_NOTE ? AUTO_GENERATED_NOTE : row.notes,
     service_type: getApiType(row.service_type),
     status_name: getApiStatus(row.status_name),
+    is_overdue: row.is_overdue === true,
+    overdue_days: Number(row.overdue_days || 0),
   };
+}
+
+const aggregateCondition = `
+  (
+    LOWER(nt.name) LIKE '%агрегат%'
+    OR
+    COALESCE(array_length(nt.allowed_child_types, 1), 0) > 0
+    OR EXISTS (
+      SELECT 1 FROM equipment.nodes child
+      WHERE child.installed_in_node = n.node_id
+    )
+  )
+`;
+
+function applyTaskDates(row) {
+  const expiryDate = calculateMaintenanceExpiryDate(row.expiry_base_date);
+  const storedCompletedDate = normalizeDate(row.completed_date);
+  const completedDate = storedCompletedDate || expiryDate;
+  const compareDate = completedDate || normalizeDate(new Date());
+  const overdueDays = expiryDate ? Math.max(daysBetween(expiryDate, compareDate), 0) : 0;
+
+  return mapTask({
+    ...row,
+    completed_date: completedDate,
+    completed_date_auto_filled: !storedCompletedDate && !!completedDate,
+    expiry_date: expiryDate,
+    is_overdue: overdueDays > 0,
+    overdue_days: overdueDays,
+  });
 }
 
 class Maintenance {
@@ -128,7 +174,7 @@ class Maintenance {
 
   static async getAllPlans() {
     const result = await pool.query(`
-      SELECT 
+      SELECT
         mp.plan_id,
         mp.name,
         mp.start_date,
@@ -147,7 +193,7 @@ class Maintenance {
 
   static async getPlanById(id) {
     const result = await pool.query(`
-      SELECT 
+      SELECT
         plan_id,
         name,
         start_date,
@@ -161,13 +207,18 @@ class Maintenance {
     if (result.rows.length === 0) return null;
 
     const plan = mapPlan(result.rows[0]);
+    const baseDateSql = `COALESCE(GREATEST(prev.last_completed_date, n.commission_date), prev.last_completed_date, n.commission_date)`;
+
     const tasksResult = await pool.query(`
-      SELECT 
+      SELECT
         t.maintenance_id,
         t.node_id,
         n.name AS node_name,
         n.location,
         n.location AS node_location,
+        n.commission_date,
+        prev.last_completed_date,
+        ${baseDateSql} AS expiry_base_date,
         t.completed_date,
         t.type_id,
         mt.name AS service_type,
@@ -175,18 +226,31 @@ class Maintenance {
         ms.name AS status_name,
         t.notes,
         t.created_at,
-        t.updated_at,
-        p.start_date AS recommended_date
+        t.updated_at
       FROM equipment.maintenance_tasks t
       JOIN equipment.nodes n ON t.node_id = n.node_id
-      LEFT JOIN equipment.maintenance_plans p ON t.plan_id = p.plan_id
       JOIN equipment.maintenance_types mt ON t.type_id = mt.type_id
       JOIN equipment.maintenance_statuses ms ON t.status_id = ms.status_id
+      LEFT JOIN LATERAL (
+        SELECT MAX(prev_task.completed_date) AS last_completed_date
+        FROM equipment.maintenance_tasks prev_task
+        WHERE prev_task.node_id = t.node_id
+          AND prev_task.maintenance_id <> t.maintenance_id
+          AND prev_task.completed_date IS NOT NULL
+          AND (t.completed_date IS NULL OR prev_task.completed_date < t.completed_date)
+      ) prev ON true
       WHERE t.plan_id = $1
-      ORDER BY p.start_date, n.name, t.created_at
+      ORDER BY n.name, t.created_at
     `, [id]);
 
-    plan.tasks = tasksResult.rows.map(mapTask);
+    plan.tasks = tasksResult.rows
+      .map(applyTaskDates)
+      .sort((a, b) => {
+        if (!a.expiry_date && !b.expiry_date) return (a.node_name || '').localeCompare(b.node_name || '');
+        if (!a.expiry_date) return 1;
+        if (!b.expiry_date) return -1;
+        return a.expiry_date.localeCompare(b.expiry_date) || (a.node_name || '').localeCompare(b.node_name || '');
+      });
     return plan;
   }
 
@@ -220,21 +284,21 @@ class Maintenance {
   }
 
   static async createTask(data) {
-    const { node_id, plan_id, service_type, status_name, notes } = data;
+    const { node_id, plan_id, service_type, status_name, completed_date, notes } = data;
     const typeId = await Maintenance.getTypeId(service_type);
-    const statusId = await Maintenance.getStatusId(status_name);
+    const statusId = await Maintenance.getStatusId(completed_date && !status_name ? 'completed' : status_name);
 
     const result = await pool.query(`
-      INSERT INTO equipment.maintenance_tasks (maintenance_id, node_id, plan_id, type_id, status_id, notes)
-      VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5)
+      INSERT INTO equipment.maintenance_tasks (maintenance_id, node_id, plan_id, completed_date, type_id, status_id, notes)
+      VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6)
       RETURNING maintenance_id, node_id, plan_id, completed_date, type_id, status_id, notes, created_at, updated_at
-    `, [node_id, plan_id || null, typeId, statusId, notes || null]);
+    `, [node_id, plan_id || null, completed_date || null, typeId, statusId, notes || null]);
 
     return result.rows[0];
   }
 
   static async updateTask(id, data) {
-    const { node_id, plan_id, service_type, status_name, notes } = data;
+    const { node_id, plan_id, service_type, status_name, completed_date, notes } = data;
     const updates = [];
     const values = [];
     let idx = 1;
@@ -249,6 +313,11 @@ class Maintenance {
       values.push(plan_id || null);
     }
 
+    if (completed_date !== undefined) {
+      updates.push(`completed_date = $${idx++}`);
+      values.push(completed_date || null);
+    }
+
     if (service_type) {
       updates.push(`type_id = $${idx++}`);
       values.push(await Maintenance.getTypeId(service_type));
@@ -257,6 +326,9 @@ class Maintenance {
     if (status_name) {
       updates.push(`status_id = $${idx++}`);
       values.push(await Maintenance.getStatusId(status_name));
+    } else if (completed_date) {
+      updates.push(`status_id = $${idx++}`);
+      values.push(await Maintenance.getStatusId('completed'));
     }
 
     if (notes !== undefined) {
@@ -297,9 +369,22 @@ class Maintenance {
 
   static async getEquipmentNodes() {
     const result = await pool.query(`
-      SELECT node_id, name, location, status
-      FROM equipment.nodes
-      ORDER BY name NULLS LAST, model NULLS LAST
+      SELECT
+        n.node_id,
+        n.name,
+        n.location,
+        n.status,
+        n.commission_date,
+        nt.name AS node_type_name,
+        ${aggregateCondition} AS is_aggregate,
+        EXISTS (
+          SELECT 1 FROM equipment.nodes child
+          WHERE child.installed_in_node = n.node_id
+        ) AS has_children
+      FROM equipment.nodes n
+      LEFT JOIN equipment.node_types nt ON nt.node_type_id = n.node_type_id
+      WHERE ${aggregateCondition}
+      ORDER BY n.name NULLS LAST, n.model NULLS LAST
     `);
 
     return result.rows;
@@ -313,25 +398,69 @@ class Maintenance {
 
     const typeId = await Maintenance.getTypeId('плановое ТО');
     const statusId = await Maintenance.getStatusId('pending');
-    const nodesResult = nodeIds && nodeIds.length
-      ? await pool.query(`SELECT node_id FROM equipment.nodes WHERE node_id = ANY($1::uuid[])`, [nodeIds])
-      : await pool.query(`SELECT node_id FROM equipment.nodes`);
+    const baseDateSql = `COALESCE(GREATEST(last_done.last_completed_date, n.commission_date), last_done.last_completed_date, n.commission_date)`;
+
+    const nodesResult = await pool.query(`
+      SELECT
+        n.node_id,
+        n.name,
+        ${baseDateSql} AS expiry_base_date
+      FROM equipment.nodes n
+      LEFT JOIN equipment.node_types nt ON nt.node_type_id = n.node_type_id
+      LEFT JOIN LATERAL (
+        SELECT MAX(t.completed_date) AS last_completed_date
+        FROM equipment.maintenance_tasks t
+        WHERE t.node_id = n.node_id
+          AND t.completed_date IS NOT NULL
+      ) last_done ON true
+      WHERE ${aggregateCondition}
+        AND ($1::uuid[] IS NULL OR n.node_id = ANY($1::uuid[]))
+      ORDER BY n.name
+    `, [nodeIds && nodeIds.length ? nodeIds : null]);
+
+    const candidateNodes = nodesResult.rows
+      .map((node) => ({
+        ...node,
+        expiry_date: calculateMaintenanceExpiryDate(node.expiry_base_date),
+      }))
+      .filter((node) => node.expiry_date && node.expiry_date >= startDate && node.expiry_date <= endDate)
+      .sort((a, b) => a.expiry_date.localeCompare(b.expiry_date) || (a.name || '').localeCompare(b.name || ''));
+
+    await pool.query(`
+      DELETE FROM equipment.maintenance_tasks
+      WHERE plan_id = $1
+        AND type_id = $2
+        AND status_id = $3
+        AND notes IN ($4, $5)
+        AND (completed_date IS NULL OR updated_at = created_at)
+    `, [
+      targetPlanId,
+      typeId,
+      statusId,
+      LEGACY_AUTO_GENERATED_NOTE,
+      AUTO_GENERATED_NOTE,
+    ]);
 
     let createdCount = 0;
-    for (const node of nodesResult.rows) {
+    for (const node of candidateNodes) {
       const insertResult = await pool.query(`
-        INSERT INTO equipment.maintenance_tasks (maintenance_id, node_id, plan_id, type_id, status_id, notes)
-        SELECT uuid_generate_v4(), $1, $2, $3, $4, $5
+        INSERT INTO equipment.maintenance_tasks (maintenance_id, node_id, plan_id, completed_date, type_id, status_id, notes)
+        SELECT uuid_generate_v4(), $1, $2, $3, $4, $5, $6
         WHERE NOT EXISTS (
           SELECT 1
           FROM equipment.maintenance_tasks
-          WHERE node_id = $1 AND plan_id = $2 AND type_id = $3
+          WHERE node_id = $1 AND plan_id = $2 AND type_id = $4
         )
-      `, [node.node_id, targetPlanId, typeId, statusId, 'Automatically generated from maintenance plan']);
+      `, [node.node_id, targetPlanId, node.expiry_date, typeId, statusId, AUTO_GENERATED_NOTE]);
       createdCount += insertResult.rowCount;
     }
 
-    return { success: true, plan_id: targetPlanId, tasks_created: createdCount };
+    return {
+      success: true,
+      plan_id: targetPlanId,
+      tasks_created: createdCount,
+      candidates_count: candidateNodes.length,
+    };
   }
 }
 
