@@ -234,9 +234,11 @@ class Maintenance {
       LEFT JOIN LATERAL (
         SELECT MAX(prev_task.completed_date) AS last_completed_date
         FROM equipment.maintenance_tasks prev_task
+        JOIN equipment.maintenance_statuses prev_status ON prev_status.status_id = prev_task.status_id
         WHERE prev_task.node_id = t.node_id
           AND prev_task.maintenance_id <> t.maintenance_id
           AND prev_task.completed_date IS NOT NULL
+          AND prev_status.name = 'выполнено'
           AND (t.completed_date IS NULL OR prev_task.completed_date < t.completed_date)
       ) prev ON true
       WHERE t.plan_id = $1
@@ -410,8 +412,10 @@ class Maintenance {
       LEFT JOIN LATERAL (
         SELECT MAX(t.completed_date) AS last_completed_date
         FROM equipment.maintenance_tasks t
+        JOIN equipment.maintenance_statuses done_status ON done_status.status_id = t.status_id
         WHERE t.node_id = n.node_id
           AND t.completed_date IS NOT NULL
+          AND done_status.name = 'выполнено'
       ) last_done ON true
       WHERE ${aggregateCondition}
         AND ($1::uuid[] IS NULL OR n.node_id = ANY($1::uuid[]))
