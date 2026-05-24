@@ -51,6 +51,18 @@
             </div>
 
             <div class="form-group">
+  <label>Статус</label>
+  <select v-model="form.status" class="form-control">
+    <option value="активный">Получен</option>
+    <option value="на обслуживании">Исправен</option>
+     <option value="на обслуживании">Неисправен</option>
+    <option value="ремонт">В ремонте</option>
+    <option value="ремонт">На поверке</option>
+    <option value="ремонт">Законсервирован</option>
+    <option value="списан">Списан</option>
+  </select>
+</div>
+            <div class="form-group">
               <label>Размещение</label>
               <input v-model="form.location" class="form-control" />
             </div>
@@ -154,6 +166,7 @@ const form = reactive({
   installed_in: '',
   location: '',
   note: '',
+  status: 'Исправен', 
 });
 
 function getCurrentDate(): string {
@@ -177,6 +190,7 @@ function reset() {
   form.installed_in = '';
   form.location = '';
   form.note = '';
+  form.status = 'активный';  
   workHours.value = 8760;
   calcResult.value = null;
   error.value = '';
@@ -241,6 +255,8 @@ async function save() {
     installed_in: form.installed_in,
     location: form.location,
     note: form.note,
+      status: form.status, // 👈 ДОБАВИТЬ
+   isDeleted: false,
   };
 
   try {
@@ -275,6 +291,7 @@ async function open(resource?: any) {
     form.installed_in = resource.installed_in || '';
     form.location = resource.location || '';
     form.note = resource.note || '';
+    form.status = resource.status || 'Исправен';  
   }
 
   visible.value = true;

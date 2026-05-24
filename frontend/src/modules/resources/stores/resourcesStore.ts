@@ -86,7 +86,7 @@ function normalizeResource(resource: any): any {
     remaining_resource: remainingNumber,
     installed_in: resource?.installed_in || '',
     location: resource?.location || '',
-    status: resource?.status || (resource?.valid_to ? 'Списан' : 'Получен'),
+    status: resource?.status || (resource?.valid_to ? 'Списан' : 'Исправен'),  // 👈 ИСПРАВЛЕНО: по умолчанию 'активный'
     note: resource?.note || '',
     is_deleted: resource?.is_deleted || false,
     resource_params: {
@@ -161,7 +161,15 @@ export const useResourcesStore = defineStore('resources', () => {
   }
 
   async function upsertResource(nodeId: string, data: any) {
-    const payload = { ...data, node_id: nodeId };
+    // 👈 ДОБАВЛЕНО: сохраняем статус в resource_params
+    const payload = { 
+      ...data, 
+      node_id: nodeId,
+      resource_params: {
+        ...(data.resource_params || {}),
+        status: data.status,  // сохраняем статус в параметры
+      }
+    };
     const response = await apiFetch(`/resources/${nodeId}`, {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -170,10 +178,21 @@ export const useResourcesStore = defineStore('resources', () => {
     return response.data || response;
   }
 
-  async function writeOffResource(nodeId: string) {
-    await apiFetch(`/resources/${nodeId}`, { method: 'DELETE' });
-    await fetchResources();
-  }
+async function writeOffResource(nodeId: string) {
+  // Находим ресурс по node_id
+  const resource = resources.value.find((r: any) => String(r.node_id) === String(nodeId));
+  if (!resource) return;
+  
+  // Обновляем статус и флаг удаления
+  await upsertResource(nodeId, { 
+    ...resource, 
+    status: 'списан',
+    is_deleted: true 
+  });
+  
+  // Перезагружаем список
+  await fetchResources();
+}
 
   async function deleteResource(nodeId: string) {
     await writeOffResource(nodeId);
@@ -192,29 +211,63 @@ export const useResourcesStore = defineStore('resources', () => {
       .filter((m: ResourceMeasurement) => String(m.resourceId) === String(resourceId))
       .sort((a, b) => new Date(b.measurementDate).getTime() - new Date(a.measurementDate).getTime());
   }
-
-  function getParametersForResource(resourceId: number | string): any[] {
-    const resource = resources.value.find((r: any) => String(r.resource_id) === String(resourceId));
-    if (!resource || !resource.resource_params) return [];
-    const result: any[] = [];
-    for (const [key, value] of Object.entries(resource.resource_params)) {
-      if (key === 'measurements') continue;
-      const v = value as any;
-      result.push({
-        id: key,
-        name: key,
-        value: v && typeof v === 'object' && 'value' in v ? v.value : v,
-        unit: v && typeof v === 'object' ? v.unit || '' : '',
-        isMain: v && typeof v === 'object' ? v.is_main || v.isMain || false : false,
-      });
-    }
-    return result;
+function getParametersForResource(resourceId: number | string): any[] {
+  const resource = resources.value.find((r: any) => String(r.resource_id) === String(resourceId));
+  if (!resource || !resource.resource_params) return [];
+  
+  const result: any[] = [];
+  const seenParams = new Set(); // Для дедупликации
+  
+  for (const [key, value] of Object.entries(resource.resource_params)) {
+    if (key === 'measurements') continue;
+    if (key === 'status') continue;
+    
+    const v = value as any;
+    const valueText = v && typeof v === 'object' && 'value' in v ? v.value : v;
+    const unit = v && typeof v === 'object' ? v.unit || '' : '';
+    const isMain = v && typeof v === 'object' ? v.is_main || v.isMain || false : false;
+    
+    // Определяем отображаемое имя
+    let displayName = '';
+    if (key === 'U' || key === 'voltage') displayName = 'Напряжение';
+    else if (key === 'R' || key === 'resistance') displayName = 'Сопротивление';
+    else if (key === 'C') displayName = 'Ёмкость (C)';
+    else if (key === 'E') displayName = 'Ёмкость (E)';
+    else if (key === 'capacity') displayName = 'Ёмкость';
+    else continue;
+    
+    // Дедупликация: показываем только один параметр каждого типа
+    if (seenParams.has(displayName)) continue;
+    seenParams.add(displayName);
+    
+    result.push({
+      id: key,
+      name: displayName,
+      key: key,
+      value: valueText,
+      unit: unit === 'B' ? 'В' : unit,
+      isMain: isMain,
+    });
   }
-
+  
+  // Сортируем в нужном порядке
+  const order = ['Напряжение', 'Сопротивление', 'Ёмкость (E)', 'Ёмкость (C)', 'Ёмкость'];
+  result.sort((a, b) => {
+    const indexA = order.findIndex(o => a.name.includes(o));
+    const indexB = order.findIndex(o => b.name.includes(o));
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
+    return a.name.localeCompare(b.name);
+  });
+  
+  return result;
+}
   async function updateResource(id: number | string, data: any) {
     const resource = resources.value.find((r: any) => String(r.resource_id) === String(id));
     if (!resource) return;
-    await upsertResource(String(resource.node_id), data);
+    // 👈 ДОБАВЛЕНО: передаём статус при обновлении
+    await upsertResource(String(resource.node_id), { ...data, status: data.status });
   }
 
   return {

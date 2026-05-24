@@ -236,13 +236,17 @@ const alerts = computed(() => {
 function toggleAlerts() { alertsCollapsed.value = !alertsCollapsed.value; }
 
 function getRowClass(res: any): string {
-  if (isWrittenOff(res)) return 'row-disabled';
+  if (res.status === 'списан' || res.isDeleted) {
+    return 'row-disabled';
+  }
+  
+if (isWrittenOff(res)) return 'row-disabled';
   const remaining = toNumber(res.remaining_resource);
   if (remaining !== null && remaining <= 20) return 'row-critical';
   if (remaining !== null && remaining <= 50) return 'row-warning';
   return '';
-}
-
+  }
+    
 const filteredResources = computed(() => {
   let list = [...store.resources];
   const f = filters.value;
@@ -280,6 +284,7 @@ const sortedAndFilteredResources = computed(() => {
   const list = [...filteredResources.value];
   list.sort((a, b) => {
     const getPriority = (res: any) => {
+      if (res.status === 'списан' || res.isDeleted) return 4;
       if (isWrittenOff(res)) return 3;
       const r = toNumber(res.remaining_resource);
       if (r !== null && r <= 20) return 0;
@@ -328,22 +333,18 @@ function resetFilters() {
 function openForm() { formRef.value?.open(); }
 function openAddMeasurementModal() { addMeasurementModalRef.value?.open(); }
 function openMeasurementsModal() { measurementsModalRef.value?.open(); }
+
 function editResource(res: any) { formRef.value?.open(res); }
 async function writeOffResource(id: string) {
   const resource = store.resources.find(r => r.resource_id === id);
   if (!resource) return;
   
   const ok = await confirmDialog.value?.show(
-    'Списание оборудования',
+    'Списание ресурса',
     `Списать ресурс "${resource.name}"?`
   );
   if (ok) {
-    try {
-      await store.writeOffResource(id);
-      await refresh();
-    } catch (err: any) {
-      alert('Ошибка при списании');
-    }
+    await store.writeOffResource(id);
   }
 }
 

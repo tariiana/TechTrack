@@ -117,7 +117,7 @@ const allColumns = [
   { key: 'mark', label: 'Марка' },
   { key: 'registrationNumber', label: 'Учётный №' },
   { key: 'measurementDate', label: 'Дата измерения' },
-  { key: 'parametersSummary', label: 'Параметры (основные)' },
+  { key: 'parametersSummary', label: 'Параметры' },  // 👈 ИЗМЕНЕНО
 ];
 const selectedColumns = ref(allColumns.map(c => c.key));
 const visibleColumns = computed(() => allColumns.filter(c => selectedColumns.value.includes(c.key)));
@@ -125,6 +125,10 @@ const visibleColumns = computed(() => allColumns.filter(c => selectedColumns.val
 function getParametersSummary(m: any): string {
   const params = m.parameters || {};
   const parts: string[] = [];
+  if (params.U !== undefined && params.U !== null) parts.push(`U = ${params.U}`);
+  if (params.R !== undefined && params.R !== null) parts.push(`R = ${params.R}`);
+  if (params.E !== undefined && params.E !== null) parts.push(`E = ${params.E}`);
+  if (params.C !== undefined && params.C !== null) parts.push(`C = ${params.C}`);
   if (params.voltage !== undefined && params.voltage !== null) parts.push(`U = ${params.voltage}`);
   if (params.resistance !== undefined && params.resistance !== null) parts.push(`R = ${params.resistance}`);
   if (params.capacity !== undefined && params.capacity !== null) parts.push(`C = ${params.capacity}%`);
@@ -298,7 +302,7 @@ function getExportData() {
     'Марка': m.mark || '-',
     'Учётный №': m.registrationNumber || '-',
     'Дата измерения': formatDate(m.measurementDate),
-    'Параметры (основные)': getParametersSummary(m),
+    'Параметры': getParametersSummary(m),  // 👈 ИЗМЕНЕНО
   }));
 }
 
