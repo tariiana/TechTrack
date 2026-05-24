@@ -3,7 +3,9 @@ import { computed, ref } from 'vue';
 import { apiFetch } from '@/api/client';
 import type {
   Subsystem,
-  SubsystemNode,
+  SubsystemContent,
+  SubsystemContentItem,
+  SubsystemContentType,
   SubsystemPayload,
   SubsystemTreeItem,
   SubsystemTreeNode,
@@ -82,9 +84,48 @@ export const useSubsystemStore = defineStore('subsystem', () => {
     return await apiFetch(`/subsystems/${id}`);
   }
 
-  async function fetchNodes(id: string): Promise<SubsystemNode[]> {
+  async function fetchContent(id: string): Promise<SubsystemContent> {
+    return await apiFetch(`/subsystems/${id}/content`);
+  }
+
+  async function fetchNodes(id: string): Promise<SubsystemContentItem[]> {
     const data = await apiFetch(`/subsystems/${id}/nodes`);
     return Array.isArray(data) ? data : [];
+  }
+
+  async function searchContent(
+    query: string,
+    type: SubsystemContentType | 'all' = 'all',
+  ): Promise<SubsystemContentItem[]> {
+    const params = new URLSearchParams({
+      query,
+      type,
+      limit: '30',
+    });
+    const data = await apiFetch(`/subsystems/content/search?${params.toString()}`);
+    return Array.isArray(data) ? data : [];
+  }
+
+  async function attachContent(
+    subsystemId: string,
+    type: SubsystemContentType,
+    id: string,
+  ) {
+    return await apiFetch(`/subsystems/${subsystemId}/content`, {
+      method: 'POST',
+      body: JSON.stringify({ type, id }),
+    });
+  }
+
+  async function moveContent(
+    type: SubsystemContentType,
+    id: string,
+    targetSubsystemId: string,
+  ) {
+    return await apiFetch(`/subsystems/content/${type}/${id}/move`, {
+      method: 'PATCH',
+      body: JSON.stringify({ target_subsystem_id: targetSubsystemId }),
+    });
   }
 
   async function create(data: SubsystemPayload) {
@@ -113,7 +154,11 @@ export const useSubsystemStore = defineStore('subsystem', () => {
     fetchTree,
     fetchAll,
     getSubsystem,
+    fetchContent,
     fetchNodes,
+    searchContent,
+    attachContent,
+    moveContent,
     create,
     update,
     remove,
