@@ -317,7 +317,7 @@ class MeasuringInstrument {
     const explicit = data.node_type_id || data.nodeTypeId || data.typeId;
     if (explicit) return explicit;
 
-    const typeName = String(data.node_type_name || data.nodeTypeName || data.typeName || '').trim();
+    const typeName = data.node_type_name || data.nodeTypeName || data.typeName;
     if (typeName) {
       const byName = await client.query(`
         SELECT node_type_id
@@ -326,12 +326,9 @@ class MeasuringInstrument {
         LIMIT 1
       `, [typeName]);
       if (byName.rows[0]) return byName.rows[0].node_type_id;
-      throw makeHttpError('Указанный тип средства измерения не найден');
     }
 
     if (currentNode?.node_type_id) return currentNode.node_type_id;
-
-    throw makeHttpError('Укажите тип средства измерения');
 
     const fallback = await client.query(`
       SELECT node_type_id

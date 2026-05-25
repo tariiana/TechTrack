@@ -316,118 +316,70 @@ defineExpose({ open });
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.modal-content {
-  width: 750px;
-  max-width: 90vw;
-  max-height: 90vh;
-  background: white;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-}
-.modal-header {
-  padding: 16px;
-  border-bottom: 1px solid #e0e4e8;
-  font-weight: 600;
-  font-size: 18px;
-}
 .form-scroll {
   overflow-y: auto;
   padding: 16px;
 }
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
 }
+
 .form-col {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-.form-group label {
-  font-weight: 500;
-  font-size: 14px;
-}
-.form-control {
-  padding: 8px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  font-size: 14px;
-}
+
+/* Строка расчёта ресурса */
 .calc-row {
   display: flex;
   gap: 8px;
 }
+
 .calc-row .form-control {
   flex: 1;
 }
-.invalid {
-  border-color: #c0392b !important;
-  background-color: #ffe0e0;
-}
-.error-text {
-  color: #c0392b;
-  font-size: 12px;
-}
-.form-error {
-  padding: 0 16px;
-}
+
+/* Результат расчёта */
 .calc-result {
   background: #e8f5e9;
   padding: 12px 16px;
   margin: 0 16px 16px;
   border-left: 4px solid #27ae60;
 }
-.modal-footer {
-  padding: 16px;
-  border-top: 1px solid #e0e4e8;
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-.btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  border: none;
-}
-.btn-primary {
-  background: #2c5f8a;
-  color: white;
-}
-.btn-primary:disabled {
-  background: #9cb3c9;
-  cursor: not-allowed;
-}
-.btn-secondary {
-  background: #e9ecef;
-  border: 1px solid #ced4da;
-  color: #1a2a3a;
-}
-.btn-sm {
-  padding: 4px 10px;
-  font-size: 12px;
-}
+
+/* Адаптивность */
 @media (max-width: 720px) {
   .form-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Переопределение размеров модального окна */
+.modal-content {
+  width: 750px;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 16px;
+  border-bottom: 1px solid #e0e4e8;
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.modal-footer {
+  padding: 16px;
+  border-top: 1px solid #e0e4e8;
+}
+
+.form-error {
+  padding: 0 16px;
 }
 </style>

@@ -1,12 +1,6 @@
 const { pool } = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 
-function makeHttpError(message, status = 400) {
-  const error = new Error(message);
-  error.status = status;
-  return error;
-}
-
 class NodeType {
   static async getAll() {
     const result = await pool.query(`
@@ -38,7 +32,7 @@ class NodeType {
 
   static async update(id, data, userId) {
     const old = await this.getById(id);
-    if (!old) throw makeHttpError('Вид узла не найден', 404);
+    if (!old) throw new Error('Вид узла не найден');
     await pool.query(`UPDATE equipment.node_types_history SET valid_to = CURRENT_TIMESTAMP WHERE node_type_id = $1 AND valid_to IS NULL`, [id]);
     const { name, parameters, allowed_child_types, note, parent_node_type_id } = data;
     await pool.query(`
@@ -51,7 +45,7 @@ class NodeType {
   static async delete(id) {
     // проверяем, используются ли типы в узлах
     const nodes = await pool.query(`SELECT COUNT(*) FROM equipment.nodes WHERE node_type_id = $1`, [id]);
-    if (parseInt(nodes.rows[0].count) > 0) throw makeHttpError('Нельзя удалить вид узла, так как он используется в оборудовании');
+    if (parseInt(nodes.rows[0].count) > 0) throw new Error('Нельзя удалить вид узла, так как он используется в оборудовании');
     await pool.query(`UPDATE equipment.node_types_history SET valid_to = CURRENT_TIMESTAMP WHERE node_type_id = $1 AND valid_to IS NULL`, [id]);
     return { success: true };
   }

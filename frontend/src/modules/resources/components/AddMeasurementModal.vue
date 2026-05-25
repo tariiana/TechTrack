@@ -347,21 +347,25 @@ defineExpose({ open });
 </script>
 
 <style scoped>
+/* Уникальные стили модального окна измерения (нет в глобальных) */
 .params-section {
   margin-top: 15px;
   padding-top: 15px;
   border-top: 1px solid #e0e4e8;
 }
+
 .params-section h4 {
   margin-bottom: 15px;
   font-size: 14px;
   color: #2c3e50;
 }
+
 .params-list {
   max-height: 400px;
   overflow-y: auto;
   margin-bottom: 15px;
 }
+
 .param-row {
   display: flex;
   align-items: center;
@@ -371,43 +375,43 @@ defineExpose({ open });
   background: #f8f9fa;
   border-radius: 6px;
 }
+
 .param-info {
   flex: 1;
   display: flex;
   align-items: center;
   gap: 5px;
 }
+
 .param-name {
   font-weight: 500;
 }
+
 .param-unit {
   font-size: 12px;
   color: #6c757d;
 }
+
 .param-input {
   width: 120px;
 }
+
 .checkbox-label {
   display: flex;
   align-items: center;
   gap: 5px;
   white-space: nowrap;
 }
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-}
-.error-text {
-  color: #c0392b;
-  font-size: 12px;
-  margin-top: 8px;
-}
+
 .empty-params {
   text-align: center;
   padding: 20px;
   color: #999;
   font-style: italic;
+}
+
+/* Переопределение ширины модального окна */
+.modal-content {
+  width: 650px;
 }
 </style>

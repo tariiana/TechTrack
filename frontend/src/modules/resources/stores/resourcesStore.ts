@@ -179,21 +179,27 @@ export const useResourcesStore = defineStore('resources', () => {
   }
 
 async function writeOffResource(nodeId: string) {
-  // Находим ресурс по node_id
   const resource = resources.value.find((r: any) => String(r.node_id) === String(nodeId));
   if (!resource) return;
   
-  // Обновляем статус и флаг удаления
-  await upsertResource(nodeId, { 
-    ...resource, 
+  // Формируем payload для списания
+  const payload = {
+    name: resource.name,
+    mark: resource.mark,
+    type: resource.type,
+    registration_number: resource.registration_number,
     status: 'списан',
-    is_deleted: true 
-  });
+    is_deleted: true,
+    remaining_resource: '0',
+    resource_params: {
+      ...resource.resource_params,
+      status: 'списан',
+      is_deleted: true
+    }
+  };
   
-  // Перезагружаем список
-  await fetchResources();
+  await upsertResource(nodeId, payload);
 }
-
   async function deleteResource(nodeId: string) {
     await writeOffResource(nodeId);
   }

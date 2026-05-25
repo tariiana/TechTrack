@@ -3,11 +3,11 @@
     <!-- Заголовок и кнопки -->
     <div style="display: flex; justify-content: space-between; margin-bottom: 20px">
       <h2>Ресурсы оборудования</h2>
-      <div class="action-buttons">
-        <button class="btn btn-secondary" @click="openMeasurementsModal">📊 Журнал измерений</button>
-        <button class="btn btn-secondary" @click="openAddMeasurementModal">+ Добавить измерение параметра</button>
-        <button class="btn btn-primary" @click="openForm">+ Добавить оборудование</button>
-      </div>
+     <div class="action-buttons">
+  <button class="btn btn-secondary" @click="openMeasurementsModal">📊 Журнал измерений</button>
+  <button v-if="canEdit" class="btn btn-secondary" @click="openAddMeasurementModal">+ Добавить измерение параметра</button>
+  <button v-if="canEdit" class="btn btn-primary" @click="openForm">+ Добавить оборудование</button>
+</div>
     </div>
 
     <!-- Блок предупреждений (сворачиваемый) -->
@@ -77,10 +77,12 @@
     <div class="table-toolbar">
       <button class="btn btn-secondary" @click="showColumnSettings = true">⚙️ Колонки</button>
       <div class="dropdown">
-        <button class="btn btn-secondary" @click="toggleExportDropdown">📎 Экспорт</button>
-        <div v-if="exportDropdownOpen" class="dropdown-menu">
-          <button class="dropdown-item" @click="exportToExcel">Microsoft Excel (.xlsx)</button>
-          <button class="dropdown-item" @click="exportToWord">Microsoft Word (.docx)</button>
+       <button class="btn btn-secondary btn-fixed" @click="toggleExportDropdown">
+    📎 Экспорт {{ exportDropdownOpen ? '▲' : '▼' }}
+  </button>
+  <div v-if="exportDropdownOpen" class="dropdown-menu">
+    <button class="dropdown-item" @click="exportToExcel">Microsoft Excel (.xlsx)</button>
+    <button class="dropdown-item" @click="exportToWord">Microsoft Word (.docx)</button>
         </div>
       </div>
     </div>
@@ -116,7 +118,7 @@
             <td class="actions-cell">
               <button class="btn btn-sm btn-secondary" @click="viewCard(res.resource_id)">Просмотр</button>
               <button v-if="canEdit && !isWrittenOff(res)" class="btn btn-sm btn-secondary" @click="editResource(res)">✏️</button>
-              <button v-if="canEdit && !isWrittenOff(res)" class="btn btn-sm btn-danger" @click="writeOffResource(res.resource_id)">📝 Списать</button>
+      
               <span v-if="isWrittenOff(res)" class="badge-disabled">Списан</span>
             </td>
           </tr>
@@ -237,13 +239,13 @@ function toggleAlerts() { alertsCollapsed.value = !alertsCollapsed.value; }
 
 function getRowClass(res: any): string {
   if (res.status === 'списан' || res.isDeleted) {
-    return 'row-disabled';
+    return 'disabled-row';
   }
   
-if (isWrittenOff(res)) return 'row-disabled';
+if (isWrittenOff(res)) return 'disabled-row';
   const remaining = toNumber(res.remaining_resource);
-  if (remaining !== null && remaining <= 20) return 'row-critical';
-  if (remaining !== null && remaining <= 50) return 'row-warning';
+  if (remaining !== null && remaining <= 20) return 'expired-row';
+  if (remaining !== null && remaining <= 50) return 'warning-row';
   return '';
   }
     
@@ -393,36 +395,133 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.action-buttons { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
-.filter-panel { background: #f8f9fa; border: 1px solid #e0e4e8; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
-.filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
-.btn-link { background: none; border: none; color: #2c5f8a; cursor: pointer; font-size: 14px; padding: 0; margin-top: 8px; }
-.btn-link:hover { text-decoration: underline; }
-.advanced-filter-panel { background: #fff; border: 1px solid #e0e4e8; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
-.filter-conditions { margin-bottom: 15px; }
-.filter-condition { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-.filter-condition .form-control { width: auto; min-width: 150px; }
-.filter-actions { display: flex; gap: 10px; justify-content: flex-end; }
-.table-toolbar { display: flex; gap: 10px; margin-bottom: 15px; justify-content: flex-end; }
+.filter-panel {
+  background: #f8f9fa;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.filter-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: #2c5f8a;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  margin-top: 8px;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+}
+
+/* Расширенный фильтр */
+.advanced-filter-panel {
+  background: #fff;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.filter-conditions {
+  margin-bottom: 15px;
+}
+.action-buttons .btn {
+  margin-right: 12px;
+}
+
+.action-buttons .btn:last-child {
+  margin-right: 0;
+}
+.filter-condition {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.filter-condition .form-control {
+  width: auto;
+  min-width: 150px;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* Панель инструментов таблицы */
+.table-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  justify-content: flex-end;
+}
+
+/* Блок предупреждений */
+.alert-panel {
+  background: #fff3e0;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.alert-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  background: #fff3e0;
+}
+
+.alert-header h4 {
+  margin: 0;
+}
+
+.alert-list {
+  padding: 0 16px 16px 16px;
+}
+
+.alert-item {
+  padding: 6px 0;
+  border-bottom: 1px solid #ffe0b3;
+}
+
+.alert-item:last-child {
+  border-bottom: none;
+}
+
+.alert-item.danger {
+  color: #c0392b;
+  font-weight: 500;
+}
+.actions-cell {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.alert-item.warning {
+  color: #e67e22;
+}
 .dropdown { position: relative; }
 .dropdown-menu { position: absolute; top: 100%; right: 0; margin-top: 4px; background: white; border: 1px solid #e0e4e8; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 100; min-width: 150px; }
 .dropdown-item { display: block; width: 100%; padding: 8px 12px; text-align: left; background: none; border: none; cursor: pointer; font-size: 14px; }
 .dropdown-item:hover { background-color: #f0f2f5; }
 .alert-panel { background: #fff3e0; border: 1px solid #e0e4e8; border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
-.alert-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; cursor: pointer; background: #fff3e0; }
-.alert-header h4 { margin: 0; }
-.alert-list { padding: 0 16px 16px 16px; }
-.alert-item { padding: 6px 0; border-bottom: 1px solid #ffe0b3; }
-.alert-item:last-child { border-bottom: none; }
-.alert-item.danger { color: #c0392b; font-weight: 500; }
-.alert-item.warning { color: #e67e22; }
-.table-scroll-container { width: 100%; overflow-x: auto; max-height: 500px; border: 1px solid #e0e4e8; border-radius: 8px; background: white; }
-.table-scroll-container .data-table { min-width: 1000px; }
-.actions-cell { white-space: nowrap; }
-.actions-cell .btn { margin-right: 4px; }
-.empty-data { text-align: center; padding: 20px; color: #999; }
-.row-critical { background-color: #ffcccc !important; }
-.row-warning { background-color: #ffe6b3 !important; }
-.row-disabled { background-color: #e0e0e0 !important; color: #999; opacity: 0.7; }
-.badge-disabled { display: inline-block; padding: 4px 8px; background-color: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 12px; }
 </style>

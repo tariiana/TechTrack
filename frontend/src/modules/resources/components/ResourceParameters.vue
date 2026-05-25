@@ -274,70 +274,49 @@ defineExpose({ loadParameters, openAddParamForm });
   align-items: center;
   margin-bottom: 15px;
 }
-.table-scroll-container {
-  width: 100%;
-  overflow-x: auto;
-  max-height: 400px;
-  border: 1px solid #e0e4e8;
-  border-radius: 8px;
-  background: white;
-  margin: 10px 0;
-}
+
+/* Кастомный скроллбар (уникальный для этого компонента) */
 .table-scroll-container::-webkit-scrollbar {
   width: 12px;
   height: 12px;
 }
+
 .table-scroll-container::-webkit-scrollbar-track {
   background: #e0e4e8;
   border-radius: 6px;
 }
+
 .table-scroll-container::-webkit-scrollbar-thumb {
   background: #2c5f8a;
   border-radius: 6px;
   cursor: pointer;
 }
+
 .table-scroll-container::-webkit-scrollbar-thumb:hover {
   background: #1e4566;
 }
-.empty-message {
-  color: #999;
-  font-style: italic;
-  padding: 10px;
-}
+
+/* Строка формы для двух полей в ряд */
 .form-row {
   display: flex;
   gap: 15px;
   margin-bottom: 15px;
 }
+
 .form-row .form-group {
   flex: 1;
 }
+
+/* Чекбокс с меткой */
 .checkbox-label {
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
 }
-.invalid {
-  border-color: #c0392b !important;
-  background-color: #ffe0e0;
-}
-.error-text {
-  color: #c0392b;
-  font-size: 12px;
-  margin-top: 4px;
-  display: block;
-}
-.actions-cell {
-  white-space: nowrap;
-}
-.actions-cell .btn {
-  margin-right: 4px;
-}
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
+
+/* Переопределение размеров модального окна */
+.modal-content {
+  width: 500px;
 }
 </style>

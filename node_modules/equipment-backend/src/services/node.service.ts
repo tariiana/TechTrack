@@ -1,6 +1,23 @@
 import { query, getClient } from '../config/db.js';
 import { auditLog } from '../middleware/audit.js';
 
+const AGGREGATE_RU_PATTERN = '%\u0430\u0433\u0440\u0435\u0433\u0430\u0442%';
+const AGGREGATE_EN_PATTERN = '%aggregate%';
+
+function aggregateCondition(alias = 'n', nodeTypeAlias = 'nt') {
+  return `
+    (
+      LOWER(COALESCE(${nodeTypeAlias}.name, '')) LIKE '${AGGREGATE_RU_PATTERN}'
+      OR LOWER(COALESCE(${nodeTypeAlias}.name, '')) LIKE '${AGGREGATE_EN_PATTERN}'
+      OR COALESCE(array_length(${nodeTypeAlias}.allowed_child_types, 1), 0) > 0
+      OR EXISTS (
+        SELECT 1 FROM equipment.nodes child
+        WHERE child.installed_in_node = ${alias}.node_id
+      )
+    )
+  `;
+}
+
 export async function getAllNodes(filters?: { subsystem_id?: string; node_type_id?: string; status?: string; search?: string }) {
   let sql = `
     SELECT n.node_id, n.node_type_id, n.name, n.manufacturer, n.model, 
@@ -8,7 +25,8 @@ export async function getAllNodes(filters?: { subsystem_id?: string; node_type_i
            n.status, n.location, n.parameters, n.note, n.installed_in_node, n.subsystem_id,
            n.commission_date, n.operation_mode, n.decommission_date, n.write_off_date,
            n.manufactured_date,
-           (SELECT COUNT(*) FROM equipment.nodes WHERE installed_in_node = n.node_id) > 0 as is_aggregate,
+           ${aggregateCondition()} as is_aggregate,
+           CASE WHEN ${aggregateCondition()} THEN 'aggregate' ELSE 'block' END as type,
            EXISTS(SELECT 1 FROM equipment.measuring_instruments mi WHERE mi.instrument_id::text = n.node_id::text) as is_si,
            nt.name as node_type_name,
            s.name as subsystem_name,
@@ -37,9 +55,9 @@ export async function getAllNodes(filters?: { subsystem_id?: string; node_type_i
     values.push(filters.status);
   }
   if (filters?.search) {
-    conditions.push(`(n.name ILIKE $${paramIndex++} OR n.manufacturer ILIKE $${paramIndex} OR n.model ILIKE $${paramIndex})`);
+    conditions.push(`(n.name ILIKE $${paramIndex} OR n.manufacturer ILIKE $${paramIndex} OR n.model ILIKE $${paramIndex})`);
     const searchPattern = `%${filters.search}%`;
-    values.push(searchPattern, searchPattern);
+    values.push(searchPattern);
     paramIndex++;
   }
   
@@ -47,7 +65,7 @@ export async function getAllNodes(filters?: { subsystem_id?: string; node_type_i
     sql += ' AND ' + conditions.join(' AND ');
   }
   
-  sql += ` ORDER BY n.created_at DESC`;
+  sql += ` ORDER BY n.name NULLS LAST, n.model NULLS LAST`;
   
   const result = await query(sql, values);
   return result.rows;
@@ -63,6 +81,8 @@ export async function getNodeById(nodeId: string) {
             nt.name as node_type_name,
             s.name as subsystem_name,
             parent.name as parent_node_name,
+            ${aggregateCondition()} as is_aggregate,
+            CASE WHEN ${aggregateCondition()} THEN 'aggregate' ELSE 'block' END as type,
             (SELECT json_agg(json_build_object('node_id', child.node_id, 'name', child.name, 'node_type_name', nt2.name))
              FROM equipment.nodes child
              JOIN equipment.node_types nt2 ON child.node_type_id = nt2.node_type_id
@@ -119,7 +139,9 @@ export async function getNodeTree() {
 export async function getNodeChildren(nodeId: string) {
   const result = await query(
     `SELECT n.node_id, n.name, n.manufacturer, n.model, n.status, n.location,
-            nt.name as node_type_name
+            nt.name as node_type_name,
+            ${aggregateCondition()} as is_aggregate,
+            CASE WHEN ${aggregateCondition()} THEN 'aggregate' ELSE 'block' END as type
      FROM equipment.nodes n
      JOIN equipment.node_types nt ON n.node_type_id = nt.node_type_id
      WHERE n.installed_in_node = $1 AND n.write_off_date IS NULL

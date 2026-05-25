@@ -1,3 +1,4 @@
+
 <template>
   <div class="card" v-if="resource">
     <div style="display: flex; justify-content: space-between; margin-bottom: 20px">
@@ -6,7 +7,7 @@
         <button class="btn btn-secondary" @click="goBack">← Назад</button>
         <button v-if="canEdit" class="btn btn-primary" @click="editResource">Редактировать</button>
         <button v-if="canEdit && resource.status !== 'списан'" class="btn btn-danger" @click="writeOffResource">📝 Списать</button>
-        <div class="dropdown">
+        <div class="dropdown"> 
           <button class="btn btn-secondary" @click="toggleExportDropdown">📎 Экспорт</button>
           <div v-if="exportDropdownOpen" class="dropdown-menu">
             <button class="dropdown-item" @click="exportToExcel">Microsoft Excel (.xlsx)</button>
@@ -74,58 +75,52 @@
     </div>
 
     <!-- Параметры (общая таблица) -->
-    <h3>Параметры</h3>
-    <div class="table-scroll-container" v-if="allParameters.length">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Параметр</th>
-            <th>Значение</th>
-            <th>Ед. изм.</th>
-            <th>Основной</th>
-            <th v-if="canEdit">Действия</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(param, idx) in allParameters" :key="param.key + idx">
-            <td>{{ param.name }}</td>
-            <td>{{ param.value }}</td>
-            <td>{{ param.unit || '-' }}</td>
-            <td class="is-main-cell" @click="toggleParamMain(param, idx)">
-              {{ param.is_main ? '✅' : '◻️' }}
-            </td>
-            <td v-if="canEdit">
-              <template v-if="param.is_custom">
-                <button class="btn btn-sm btn-secondary" @click="editCustomParam(getCustomIndex(idx))">✏️</button>
-                <button class="btn btn-sm btn-danger" @click="deleteCustomParam(getCustomIndex(idx))">🗑️</button>
-              </template>
-              <span v-else class="text-muted">—</span>
-            </td>
-          </tr>
-          <tr v-if="allParameters.length === 0">
-            <td colspan="5">Нет параметров</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+<h3>Параметры</h3>
+<div class="table-scroll-container" v-if="allParameters.length">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Параметр</th>
+        <th>Значение</th>
+        <th>Ед. изм.</th>
+        <th>Основной</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-for="(param, idx) in allParameters" :key="param.key + idx">
+        <td>{{ param.name }}</td>
+        <td>{{ param.value }}</td>
+        <td>{{ param.unit || '-' }}</td>
+        <td class="is-main-cell" @click="toggleParamMain(param, idx)">
+          {{ param.is_main ? '✅' : '◻️' }}
+        </td>
+      </tr>
+      <tr v-if="allParameters.length === 0">
+        <td colspan="4">Нет параметров</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
     <!-- Кнопка добавления параметра -->
     <div v-if="canEdit" class="add-param-button" style="margin-top: 15px;">
       <button class="btn btn-sm btn-primary" @click="openAddCustomParam">+ Добавить параметр</button>
     </div>
 
-    <!-- График -->
-    <div class="chart-section" v-if="hasChartData">
-      <h3>Динамика изменения ресурса</h3>
+    <!-- График (динамический) -->
+    <div class="chart-section" v-if="hasChartData && availableParams.length">
+      <h3>Динамика изменения параметров</h3>
       <canvas ref="chartCanvas" class="chart-canvas"></canvas>
       <div class="chart-controls">
-        <select v-model="selectedParam" class="form-control">
-          <option value="U">Напряжение (U), В</option>
-          <option value="R">Сопротивление (R), Ом</option>
-          <option value="E">Ёмкость (E), Втч</option>
-          <option value="C">Ёмкость (C), мАч</option>
+        <select v-model="selectedParam" class="form-control" @change="renderChart">
+          <option v-for="param in availableParams" :key="param.key" :value="param.key">
+            {{ param.name }} {{ param.unit ? `(${param.unit})` : '' }}
+          </option>
         </select>
       </div>
+    </div>
+    <div v-else-if="hasChartData && availableParams.length === 0" class="empty-message">
+      Нет числовых параметров для построения графика
     </div>
     <div v-else class="empty-message">Нет данных для построения графика</div>
 
@@ -236,7 +231,8 @@ const chartKey = ref(0);
 // Переменные для графика
 const chartCanvas = ref<HTMLCanvasElement | null>(null);
 let chartInstance: any = null;
-const selectedParam = ref('U');
+const selectedParam = ref('');
+const availableParams = ref<{ key: string; name: string; unit: string }[]>([]);
 const targetResourceId = computed(() => {
   const id = props.embedded ? props.embeddedId : route.params.id;
   return id ? String(id) : '';
@@ -319,6 +315,9 @@ async function toggleParamMain(param: any, idx: number) {
   }
   
   await saveAllParameters();
+  
+  // 👇 ДОБАВИТЬ ЭТО — обновляем список параметров для графика
+  extractAvailableParams();
 }
 
 // Функции для дополнительных параметров
@@ -352,6 +351,9 @@ async function deleteCustomParam(customIndex: number) {
     if (ok) {
       customParams.value.splice(customIndex, 1);
       await saveAllParameters();
+      
+      // 👇 ДОБАВИТЬ ЭТО — обновляем список параметров для графика
+      extractAvailableParams();
     }
   }
 }
@@ -383,6 +385,9 @@ async function saveCustomParam() {
   
   showCustomParamModal.value = false;
   await saveAllParameters();
+  
+  // 👇 ДОБАВИТЬ ЭТО — обновляем список параметров для графика
+  extractAvailableParams();
 }
 
 // Сохраняем все параметры (основные + дополнительные)
@@ -436,20 +441,87 @@ async function writeOffResource() {
   }
 }
 
-// Функция отрисовки графика
-async function renderChart() {
-  console.log('🟢 renderChart вызван');
+function extractAvailableParams() {
+  const params = resource.value?.resource_params || {};
   
-  if (!chartCanvas.value) {
-    console.error('❌ canvas элемент не найден');
-    return;
+  // Список ключей, которые НЕ должны появляться в графике (служебные)
+  const excludeKeys = [
+    'measurements', 'status', 'mark', 'name', 'type', 'manufacturer', 
+    'model', 'serial_number', 'inventory_number', 'registration_number', 
+    'location', 'note', 'production_date', 'registration_date', 
+    'last_service_date', 'service_life', 'time_to_service', 
+    'initial_resource', 'remaining_resource', 'installed_in', 
+    'node_name', 'node_id', 'created_at', 'updated_at', 'is_deleted',
+    'resource_id', 'id', 'write_off_date'
+  ];
+  
+  const paramsSet = new Map<string, { name: string; unit: string }>();
+  
+  // Проходим по всем параметрам из resource_params (как в таблице)
+  for (const [key, value] of Object.entries(params)) {
+    // Пропускаем служебные ключи
+    if (excludeKeys.includes(key)) continue;
+    if (key.endsWith('_main')) continue;
+    
+    // Получаем числовое значение
+    let numValue: number | null = null;
+    if (value && typeof value === 'object' && 'value' in value) {
+      numValue = Number((value as any).value);
+    } else {
+      numValue = Number(value);
+    }
+    
+    // Добавляем только числовые параметры
+    if (!isNaN(numValue)) {
+      let displayName = key;
+      let unit = '';
+      
+      // Маппинг стандартных параметров для красивого отображения
+      if (key === 'U' || key === 'voltage') { displayName = 'Напряжение'; unit = 'В'; }
+      else if (key === 'R' || key === 'resistance') { displayName = 'Сопротивление'; unit = 'Ом'; }
+      else if (key === 'E') { displayName = 'Ёмкость (E)'; unit = 'Втч'; }
+      else if (key === 'C' || key === 'capacity') { displayName = 'Ёмкость (C)'; unit = '%'; }
+      else if (key === 'health') { displayName = 'Здоровье'; unit = '%'; }
+      else if (key === 'battery_level') { displayName = 'Уровень заряда'; unit = '%'; }
+      else if (key === 'operating_hours') { displayName = 'Наработка'; unit = 'ч'; }
+      else if (key === 'uptime') { displayName = 'Время работы'; unit = 'ч'; }
+      else if (key === 'packet_loss') { displayName = 'Потери пакетов'; unit = '%'; }
+      else {
+        displayName = key;
+        if (value && typeof value === 'object' && (value as any).unit) {
+          unit = (value as any).unit;
+        }
+      }
+      
+      if (!paramsSet.has(key)) {
+        paramsSet.set(key, { name: displayName, unit });
+      }
+    }
   }
   
-  const measurements = resource.value?.resource_params?.measurements || [];
-  console.log('📊 Количество измерений:', measurements.length);
+  availableParams.value = Array.from(paramsSet.entries()).map(([key, info]) => ({
+    key,
+    name: info.name,
+    unit: info.unit
+  }));
   
-  if (measurements.length === 0) {
-    console.warn('❌ Нет данных для графика');
+  // Сортируем параметры для удобства
+  availableParams.value.sort((a, b) => a.name.localeCompare(b.name));
+  
+  // Устанавливаем выбранный параметр
+  if (availableParams.value.length > 0) {
+    const first = availableParams.value[0];
+    if (first && (!selectedParam.value || !availableParams.value.some(p => p.key === selectedParam.value))) {
+      selectedParam.value = first.key;
+    }
+  }
+}
+// Функция отрисовки графика (динамическая)
+async function renderChart() {
+  if (!chartCanvas.value) return;
+  
+  const measurements = resource.value?.resource_params?.measurements || [];
+  if (measurements.length === 0 || !selectedParam.value) {
     if (chartInstance) {
       chartInstance.destroy();
       chartInstance = null;
@@ -463,27 +535,27 @@ async function renderChart() {
   
   const labels = sorted.map(m => formatDate(m.measurement_date));
   const data = sorted.map(m => {
-    const val = m.parameters?.[selectedParam.value];
-    return val !== undefined && val !== null ? val : 0;
+    let val = m.parameters?.[selectedParam.value];
+    if (val && typeof val === 'object' && 'value' in val) {
+      val = val.value;
+    }
+    const num = Number(val);
+    return isNaN(num) ? 0 : num;
   });
   
-  console.log('📊 labels:', labels);
-  console.log('📊 data:', data);
+  const paramInfo = availableParams.value.find(p => p.key === selectedParam.value);
+  const paramName = paramInfo?.name || selectedParam.value;
+  const paramUnit = paramInfo?.unit || '';
+  const label = paramUnit ? `${paramName} (${paramUnit})` : paramName;
 
   try {
     if (chartInstance) {
-      console.log('🟡 Уничтожаем старый график');
       chartInstance.destroy();
       chartInstance = null;
     }
     
     const ctx = chartCanvas.value.getContext('2d');
-    if (!ctx) {
-      console.error('❌ Не удалось получить 2d контекст');
-      return;
-    }
-    
-    ctx.clearRect(0, 0, chartCanvas.value.width, chartCanvas.value.height);
+    if (!ctx) return;
     
     const canvas = chartCanvas.value;
     const container = canvas.parentElement;
@@ -497,12 +569,10 @@ async function renderChart() {
     chartInstance = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: labels,
+        labels,
         datasets: [{
-          label: selectedParam.value === 'U' ? 'Напряжение (В)' : 
-                  selectedParam.value === 'R' ? 'Сопротивление (Ом)' : 
-                  selectedParam.value === 'E' ? 'Ёмкость (Втч)' : 'Ёмкость (мАч)',
-          data: data,
+          label,
+          data,
           borderColor: '#2c5f8a',
           backgroundColor: 'rgba(44,95,138,0.1)',
           borderWidth: 2,
@@ -525,18 +595,14 @@ async function renderChart() {
           y: {
             title: {
               display: true,
-              text: selectedParam.value === 'U' ? 'Вольты (В)' : 
-                    selectedParam.value === 'R' ? 'Омы (Ω)' : 
-                    selectedParam.value === 'E' ? 'Втч' : 'мАч'
+              text: paramUnit || 'Значение'
             }
           }
         }
       }
     });
-    
-    console.log('✅ График создан успешно');
   } catch (error) {
-    console.error('❌ Ошибка при создании графика:', error);
+    console.error('Chart error:', error);
   }
 }
 
@@ -546,6 +612,7 @@ async function loadData() {
   try {
     resource.value = await store.fetchResourceById(id);
     await loadParameters();
+    extractAvailableParams();
     chartKey.value++;
     await nextTick();
     await renderChart();
@@ -559,94 +626,59 @@ async function loadParameters() {
   
   const params = resource.value.resource_params || {};
   
-  // Основные параметры
+  // Служебные ключи, которые НЕ должны отображаться в таблице параметров
+  const excludeKeys = [
+    'measurements', 'status', 'mark', 'name', 'type', 'manufacturer', 
+    'model', 'serial_number', 'inventory_number', 'registration_number', 
+    'location', 'note', 'production_date', 'registration_date', 
+    'last_service_date', 'service_life', 'time_to_service', 
+    'initial_resource', 'remaining_resource', 'installed_in', 
+    'node_name', 'node_id', 'created_at', 'updated_at', 'is_deleted',
+    'resource_id', 'id', 'write_off_date'
+  ];
+  
   const mainResult: any[] = [];
+  const customResult: any[] = [];
   
-  // Напряжение - берём из U
-  if (params.U !== undefined) {
-    const v = params.U;
+  for (const [key, value] of Object.entries(params)) {
+    // Пропускаем служебные ключи
+    if (excludeKeys.includes(key)) continue;
+    if (key === 'measurements') continue;
+    if (key.endsWith('_main')) continue;
+    
+    let displayName = key;
+    let val = value;
+    let unit = '';
+    let isMain = false;
+    
+    if (value && typeof value === 'object' && 'value' in value) {
+      val = (value as any).value;
+      unit = (value as any).unit || '';
+      isMain = (value as any).is_main || (value as any).isMain || false;
+    }
+    
+    // Красивые имена для стандартных параметров
+    if (key === 'U' || key === 'voltage') { displayName = 'Напряжение'; unit = unit || 'В'; }
+    else if (key === 'R' || key === 'resistance') { displayName = 'Сопротивление'; unit = unit || 'Ом'; }
+    else if (key === 'E') { displayName = 'Ёмкость (E)'; unit = unit || 'Втч'; }
+    else if (key === 'C' || key === 'capacity') { displayName = 'Ёмкость (C)'; unit = unit || '%'; }
+    else if (key === 'health') { displayName = 'Здоровье'; unit = unit || '%'; }
+    else if (key === 'battery_level') { displayName = 'Уровень заряда'; unit = unit || '%'; }
+    else if (key === 'operating_hours') { displayName = 'Наработка'; unit = unit || 'ч'; }
+    else if (key === 'uptime') { displayName = 'Время работы'; unit = unit || 'ч'; }
+    else if (key === 'packet_loss') { displayName = 'Потери пакетов'; unit = unit || '%'; }
+    
     mainResult.push({
-      name: 'Напряжение',
-      value: v && typeof v === 'object' && 'value' in v ? v.value : v,
-      unit: v && typeof v === 'object' ? v.unit || 'В' : 'В',
-      is_main: v && typeof v === 'object' ? v.is_main || v.isMain || false : false,
-      key: 'U'
-    });
-  }
-  
-  // Сопротивление - берём из R
-  if (params.R !== undefined) {
-    const v = params.R;
-    mainResult.push({
-      name: 'Сопротивление',
-      value: v && typeof v === 'object' && 'value' in v ? v.value : v,
-      unit: v && typeof v === 'object' ? v.unit || 'Ом' : 'Ом',
-      is_main: v && typeof v === 'object' ? v.is_main || v.isMain || false : false,
-      key: 'R'
-    });
-  }
-  
-  // Ёмкость (E)
-  if (params.E !== undefined) {
-    const v = params.E;
-    mainResult.push({
-      name: 'Ёмкость (E)',
-      value: v && typeof v === 'object' && 'value' in v ? v.value : v,
-      unit: v && typeof v === 'object' ? v.unit || '%' : '%',
-      is_main: v && typeof v === 'object' ? v.is_main || v.isMain || false : false,
-      key: 'E'
-    });
-  }
-  
-  // Ёмкость (C)
-  if (params.C !== undefined) {
-    const v = params.C;
-    mainResult.push({
-      name: 'Ёмкость (C)',
-      value: v && typeof v === 'object' && 'value' in v ? v.value : v,
-      unit: v && typeof v === 'object' ? v.unit || '%' : '%',
-      is_main: v && typeof v === 'object' ? v.is_main || v.isMain || false : false,
-      key: 'C'
+      name: displayName,
+      value: val,
+      unit: unit,
+      is_main: isMain,
+      key: key
     });
   }
   
   parameters.value = mainResult;
-  
-  // Дополнительные параметры (исключаем служебные поля)
-  const mainKeys = ['U', 'R', 'E', 'C', 'measurements', 'status'];
-  const excludedKeys = [
-    'mark', 'name', 'type', 'manufacturer', 'model', 'serial_number', 
-    'inventory_number', 'registration_number', 'location', 'note',
-    'production_date', 'registration_date', 'last_service_date',
-    'service_life', 'time_to_service', 'initial_resource', 
-    'remaining_resource', 'installed_in', 'node_name', 'node_id',
-    'created_at', 'updated_at', 'is_deleted', 'resource_id', 'id'
-  ];
-  const customResult: any[] = [];
-  
-  for (const [key, value] of Object.entries(params)) {
-    if (mainKeys.includes(key)) continue;
-    if (excludedKeys.includes(key)) continue;
-    if (key === 'Напряжение' || key === 'Сопротивление' || key === 'Ёмкость') continue;
-    if (resource.value[key] !== undefined) continue;
-    
-    const v = value as any;
-    if (v === null || v === undefined) continue;
-    
-    customResult.push({
-      name: key,
-      value: v && typeof v === 'object' && 'value' in v ? v.value : v,
-      unit: v && typeof v === 'object' ? v.unit || '' : '',
-      is_main: v && typeof v === 'object' ? v.is_main || v.isMain || false : false,
-      key: key,
-      is_custom: true
-    });
-  }
-  
   customParams.value = customResult;
-  
-  console.log('📊 Основные параметры:', mainResult);
-  console.log('📊 Дополнительные параметры:', customResult);
 }
 
 function goBack() {
@@ -660,7 +692,13 @@ function editResource() { formRef.value?.open(resource.value); }
 
 function openAddMeasurementModal() { addMeasurementModalRef.value?.open(resource.value.resource_id); }
 function openMeasurementsModal() { measurementsModalRef.value?.open(resource.value.resource_id); }
-function refresh() { loadData(); }
+function refresh() {
+  loadData();
+  // 👇 ДОБАВИТЬ ЭТО
+  setTimeout(() => {
+    extractAvailableParams();
+  }, 100);
+}
 
 function getExportData() {
   if (!resource.value) return [];
@@ -716,6 +754,7 @@ watch(selectedParam, () => {
 });
 
 watch(() => resource.value?.resource_params?.measurements, () => {
+  extractAvailableParams();
   setTimeout(() => renderChart(), 100);
 }, { deep: true });
 
@@ -737,39 +776,93 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.action-buttons { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.info-grid { background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
-.info-row { display: grid; grid-template-columns: 150px 1fr 150px 1fr; gap: 16px; padding: 8px 0; border-bottom: 1px solid #e0e4e8; }
-.info-row:last-child { border-bottom: none; }
-.info-label { font-weight: 600; color: #2c3e50; }
-.info-value { color: #1a2a3a; }
+.info-grid {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
 
-.alert-panel { background: #fff3e0; border: 1px solid #e0e4e8; border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
-.alert-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; cursor: pointer; background: #fff3e0; }
-.alert-header h4 { margin: 0; }
-.alert-list { padding: 0 16px 16px 16px; }
-.alert-item { padding: 6px 0; border-bottom: 1px solid #ffe0b3; }
-.alert-item:last-child { border-bottom: none; }
-.alert-item.danger { color: #c0392b; font-weight: 500; }
-.alert-item.warning { color: #e67e22; }
+.info-row {
+  display: grid;
+  grid-template-columns: 150px 1fr 150px 1fr;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e0e4e8;
+}
 
-.table-scroll-container { width: 100%; overflow-x: auto; border: 1px solid #e0e4e8; border-radius: 8px; background: white; margin: 10px 0; }
-.table-scroll-container .data-table { min-width: 500px; }
-.is-main-cell { cursor: pointer; text-align: center; }
-.is-main-cell:hover { background-color: #f0f2f5; }
-.empty-message { color: #999; font-style: italic; padding: 10px; }
+.info-row:last-child {
+  border-bottom: none;
+}
 
+.info-label {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.info-value {
+  color: #1a2a3a;
+}
+
+/* Блок предупреждений (сворачиваемый) */
+.alert-panel {
+  background: #fff3e0;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.alert-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  background: #fff3e0;
+}
+
+.alert-header h4 {
+  margin: 0;
+}
+
+.alert-list {
+  padding: 0 16px 16px 16px;
+}
+
+.alert-item {
+  padding: 6px 0;
+  border-bottom: 1px solid #ffe0b3;
+}
+
+.alert-item:last-child {
+  border-bottom: none;
+}
+
+.alert-item.danger {
+  color: #c0392b;
+  font-weight: 500;
+}
+
+.alert-item.warning {
+  color: #e67e22;
+}
+
+/* Ячейка основного параметра в таблице */
+.is-main-cell {
+  cursor: pointer;
+  text-align: center;
+}
+
+.is-main-cell:hover {
+  background-color: #f0f2f5;
+}
+
+/* Кнопка добавления параметра */
 .add-param-button {
   display: flex;
   justify-content: flex-end;
   margin-top: 10px;
-}
-
-.text-muted {
-  color: #6c757d;
-  font-size: 12px;
-  display: inline-block;
-  padding: 4px 8px;
 }
 
 /* Стили для графика */
@@ -808,16 +901,37 @@ onMounted(() => {
   background: white;
 }
 
-.measurement-buttons { display: flex; gap: 10px; margin-top: 20px; }
-.notes-section { margin-top: 20px; padding: 12px; background: #f8f9fa; border-radius: 8px; }
-.notes-section h4 { margin-bottom: 8px; }
+/* Кнопки измерений */
+.measurement-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
 
+/* Блок примечаний */
+.notes-section {
+  margin-top: 20px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+.action-buttons .btn {
+  margin-right: 12px;
+}
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.action-buttons .btn:last-child {
+  margin-right: 0;
+}
+.notes-section h4 {
+  margin-bottom: 8px;
+}
 .dropdown { position: relative; }
 .dropdown-menu { position: absolute; top: 100%; right: 0; margin-top: 4px; background: white; border: 1px solid #e0e4e8; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 100; min-width: 150px; }
 .dropdown-item { display: block; width: 100%; padding: 8px 12px; text-align: left; background: none; border: none; cursor: pointer; font-size: 14px; }
 .dropdown-item:hover { background-color: #f0f2f5; }
-
-.modal-body {
-  padding: 16px;
-}
 </style>

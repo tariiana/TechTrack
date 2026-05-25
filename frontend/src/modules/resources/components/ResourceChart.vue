@@ -144,9 +144,39 @@ watch(() => measurements.value, () => renderChart(), { deep: true });
 </script>
 
 <style scoped>
-.chart-container { margin-top: 20px; padding: 15px; background: white; border-radius: 8px; border: 1px solid #e0e4e8; }
-.chart-header { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
-.chart-select { width: 250px; }
-.chart-canvas { width: 100%; height: 300px; min-height: 300px; }
-.chart-empty { text-align: center; padding: 60px 20px; color: #999; background: #f8f9fa; border-radius: 8px; margin-top: 20px; }
+/* Уникальные стили графика (нет в глобальных) */
+.chart-container {
+  margin-top: 20px;
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e0e4e8;
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+}
+
+.chart-select {
+  width: 250px;
+}
+
+.chart-canvas {
+  width: 100%;
+  height: 300px;
+  min-height: 300px;
+}
+
+.chart-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-top: 20px;
+}
 </style>

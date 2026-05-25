@@ -1,6 +1,15 @@
 const { pool } = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 
+const AGGREGATE_RU_PATTERN = '%\u0430\u0433\u0440\u0435\u0433\u0430\u0442%';
+const AGGREGATE_EN_PATTERN = '%aggregate%';
+
+function makeHttpError(message, status = 400) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
 function normalizeDate(value) {
   if (!value) return null;
   if (typeof value === 'string') return value.slice(0, 10);
@@ -26,6 +35,20 @@ function normalizeNodes(rows) {
 }
 
 class Node {
+  static aggregateCondition() {
+    return `
+      (
+        LOWER(COALESCE(nt.name, '')) LIKE '${AGGREGATE_RU_PATTERN}'
+        OR LOWER(COALESCE(nt.name, '')) LIKE '${AGGREGATE_EN_PATTERN}'
+        OR COALESCE(array_length(nt.allowed_child_types, 1), 0) > 0
+        OR EXISTS (
+          SELECT 1 FROM equipment.nodes child
+          WHERE child.installed_in_node = n.node_id
+        )
+      )
+    `;
+  }
+
   static baseSelect() {
     return `
       SELECT
@@ -51,10 +74,8 @@ class Node {
         nt.name AS node_type_name,
         s.name AS subsystem_name,
         p.name AS parent_name,
-        EXISTS (
-          SELECT 1 FROM equipment.nodes child
-          WHERE child.installed_in_node = n.node_id
-        ) AS is_aggregate,
+        n.installed_in_node AS parent_id,
+        ${Node.aggregateCondition()} AS is_aggregate,
         EXISTS (
           SELECT 1 FROM equipment.instruments_history ih
           WHERE ih.node_id = n.node_id AND ih.valid_to IS NULL
@@ -186,7 +207,7 @@ class Node {
     const fallback = await pool.query(`
       SELECT node_type_id FROM equipment.node_types ORDER BY name LIMIT 1
     `);
-    if (!fallback.rows[0]) throw new Error('Не найден ни один вид узла');
+    if (!fallback.rows[0]) throw makeHttpError('Не найден ни один вид узла');
     return fallback.rows[0].node_type_id;
   }
 
@@ -204,7 +225,7 @@ class Node {
     const fallback = await pool.query(`
       SELECT subsys_id FROM equipment.subsystems ORDER BY name LIMIT 1
     `);
-    if (!fallback.rows[0]) throw new Error('Не найдена ни одна подсистема');
+    if (!fallback.rows[0]) throw makeHttpError('Не найдена ни одна подсистема');
     return fallback.rows[0].subsys_id;
   }
 
@@ -225,7 +246,9 @@ class Node {
       registration_number: merged.registration_number || merged.accounting_number || null,
       status: merged.status || 'получен',
       commission_date: merged.commission_date || null,
-      operation_mode: merged.operation_mode || null,
+      operation_mode: merged.operation_mode === '' || merged.operation_mode === undefined
+        ? null
+        : merged.operation_mode,
       decommission_date: merged.decommission_date || null,
       write_off_date: merged.write_off_date || null,
       location: merged.location || '',
@@ -301,7 +324,7 @@ class Node {
 
   static async update(id, data, userId) {
     const old = await Node.getById(id);
-    if (!old) throw new Error('Узел не найден');
+    if (!old) throw makeHttpError('Узел не найден', 404);
 
     const values = await Node.buildHistoryValues(id, data, old, userId);
 
@@ -317,11 +340,11 @@ class Node {
 
   static async writeOff(id, userId) {
     const node = await Node.getById(id);
-    if (!node) throw new Error('Узел не найден');
+    if (!node) throw makeHttpError('Узел не найден', 404);
 
     const children = await Node.getChildren(id);
     if (children.length > 0) {
-      throw new Error('Нельзя списать агрегат, содержащий узлы');
+      throw makeHttpError('Нельзя списать агрегат, содержащий узлы');
     }
 
     await Node.update(id, {
@@ -349,17 +372,17 @@ class Node {
     `, [parentId, childId]);
 
     if (result.rows[0]?.has_cycle) {
-      throw new Error('Циклическая вложенность узлов запрещена');
+      throw makeHttpError('Циклическая вложенность узлов запрещена');
     }
   }
 
   static async install(childId, parentId, userId) {
     const child = await Node.getById(childId);
-    if (!child) throw new Error('Дочерний узел не найден');
-    if (child.installed_in_node) throw new Error('Узел уже установлен в другой агрегат');
+    if (!child) throw makeHttpError('Дочерний узел не найден', 404);
+    if (child.installed_in_node) throw makeHttpError('Узел уже установлен в другой агрегат');
 
     const parent = await Node.getById(parentId);
-    if (!parent) throw new Error('Родительский узел не найден');
+    if (!parent) throw makeHttpError('Родительский узел не найден', 404);
 
     await Node.assertNoCycle(childId, parentId);
     await Node.update(childId, { installed_in_node: parentId }, userId);
@@ -369,8 +392,8 @@ class Node {
 
   static async uninstall(childId, userId) {
     const child = await Node.getById(childId);
-    if (!child) throw new Error('Узел не найден');
-    if (!child.installed_in_node) throw new Error('Узел не установлен ни в какой агрегат');
+    if (!child) throw makeHttpError('Узел не найден', 404);
+    if (!child.installed_in_node) throw makeHttpError('Узел не установлен ни в какой агрегат');
 
     await Node.update(childId, { installed_in_node: null }, userId);
     return { success: true };

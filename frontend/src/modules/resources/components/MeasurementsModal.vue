@@ -13,7 +13,7 @@
               <button class="dropdown-item" @click="exportToWord">Microsoft Word (.docx)</button>
             </div>
           </div>
-          <button class="btn btn-sm btn-primary" @click="openAddMeasurement">+ Добавить измерение</button>
+          <button v-if="canEdit" class="btn btn-sm btn-primary" @click="openAddMeasurement">+ Добавить измерение</button>
         </div>
       </div>
 
@@ -47,8 +47,9 @@
             <tr v-for="m in filteredAndSortedMeasurements" :key="m.id">
               <td v-for="col in visibleColumns" :key="col.key">{{ formatCell(m, col.key) }}</td>
               <td class="actions-cell">
-                <button class="btn btn-sm btn-secondary" @click="editMeasurement(m)">✏️</button>
-                <button class="btn btn-sm btn-danger" @click="confirmDeleteMeasurement(m.id)">🗑️</button>
+                <button v-if="canEdit" class="btn btn-sm btn-secondary" @click="editMeasurement(m)">✏️</button>
+                <button v-if="canEdit" class="btn btn-sm btn-danger" @click="confirmDeleteMeasurement(m.id)">🗑️</button>
+                <span v-if="!canEdit" class="text-muted">—</span>
               </td>
             </tr>
             <tr v-if="filteredAndSortedMeasurements.length === 0">
@@ -117,22 +118,47 @@ const allColumns = [
   { key: 'mark', label: 'Марка' },
   { key: 'registrationNumber', label: 'Учётный №' },
   { key: 'measurementDate', label: 'Дата измерения' },
-  { key: 'parametersSummary', label: 'Параметры' },  // 👈 ИЗМЕНЕНО
+  { key: 'parametersSummary', label: 'Параметры' },
 ];
 const selectedColumns = ref(allColumns.map(c => c.key));
 const visibleColumns = computed(() => allColumns.filter(c => selectedColumns.value.includes(c.key)));
 
+// 👇 canEdit — только для кнопок добавления/редактирования/удаления
+const canEdit = computed(() => {
+  const user = localStorage.getItem('user');
+  if (!user) return false;
+  try {
+    const role = JSON.parse(user).role;
+    return role === 'operator' || role === 'admin';
+  } catch {
+    return false;
+  }
+});
+
 function getParametersSummary(m: any): string {
   const params = m.parameters || {};
+  
+  // Убираем служебные ключи
+  const excludeKeys = ['_main', 'id', 'created_at', 'updated_at'];
+  
   const parts: string[] = [];
-  if (params.U !== undefined && params.U !== null) parts.push(`U = ${params.U}`);
-  if (params.R !== undefined && params.R !== null) parts.push(`R = ${params.R}`);
-  if (params.E !== undefined && params.E !== null) parts.push(`E = ${params.E}`);
-  if (params.C !== undefined && params.C !== null) parts.push(`C = ${params.C}`);
-  if (params.voltage !== undefined && params.voltage !== null) parts.push(`U = ${params.voltage}`);
-  if (params.resistance !== undefined && params.resistance !== null) parts.push(`R = ${params.resistance}`);
-  if (params.capacity !== undefined && params.capacity !== null) parts.push(`C = ${params.capacity}%`);
-  return parts.length ? parts.join('; ') : '-';
+  
+  for (const [key, value] of Object.entries(params)) {
+    // Пропускаем служебные ключи
+    if (excludeKeys.some(k => key.includes(k))) continue;
+    if (value === null || value === undefined) continue;
+    
+    // Красивое отображение для стандартных параметров
+    let displayKey = key;
+    if (key === 'U' || key === 'voltage') displayKey = 'Напряжение';
+    else if (key === 'R' || key === 'resistance') displayKey = 'Сопротивление';
+    else if (key === 'E') displayKey = 'Ёмкость (E)';
+    else if (key === 'C' || key === 'capacity') displayKey = 'Ёмкость (C)';
+    
+    parts.push(`${displayKey} = ${value}`);
+  }
+  
+  return parts.length > 0 ? parts.join('; ') : '-';
 }
 
 function formatCell(m: any, key: string): string {
@@ -302,7 +328,7 @@ function getExportData() {
     'Марка': m.mark || '-',
     'Учётный №': m.registrationNumber || '-',
     'Дата измерения': formatDate(m.measurementDate),
-    'Параметры': getParametersSummary(m),  // 👈 ИЗМЕНЕНО
+    'Параметры': getParametersSummary(m),
   }));
 }
 
@@ -354,9 +380,11 @@ watch(() => visible.value, (newVal) => {
 });
 
 defineExpose({ open, refresh });
+
 </script>
 
 <style scoped>
+/* Уникальные стили журнала измерений (нет в глобальных) */
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -365,11 +393,13 @@ defineExpose({ open, refresh });
   padding-bottom: 10px;
   border-bottom: 1px solid #e0e4e8;
 }
+
 .header-buttons {
   display: flex;
   gap: 10px;
   align-items: center;
 }
+
 .filter-panel {
   background: #f8f9fa;
   border: 1px solid #e0e4e8;
@@ -377,57 +407,50 @@ defineExpose({ open, refresh });
   padding: 15px;
   margin-bottom: 20px;
 }
+
 .filter-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 10px;
   align-items: end;
 }
-.table-scroll-container {
-  width: 100%;
-  overflow-x: auto;
-  max-height: 500px;
-  border: 1px solid #e0e4e8;
-  border-radius: 8px;
-  background: white;
-}
+
+/* Кастомный скроллбар (уникальный для этого компонента) */
 .table-scroll-container::-webkit-scrollbar {
   width: 12px;
   height: 12px;
 }
+
 .table-scroll-container::-webkit-scrollbar-track {
   background: #e0e4e8;
   border-radius: 6px;
 }
+
 .table-scroll-container::-webkit-scrollbar-thumb {
   background: #2c5f8a;
   border-radius: 6px;
   cursor: pointer;
 }
+
 .table-scroll-container::-webkit-scrollbar-thumb:hover {
   background: #1e4566;
 }
+
+/* Переопределение минимальной ширины таблицы */
 .table-scroll-container .data-table {
   min-width: 800px;
 }
-.actions-cell {
-  white-space: nowrap;
-}
-.actions-cell .btn {
-  margin-right: 4px;
-}
-.empty-data {
-  text-align: center;
-  padding: 20px;
-  color: #999;
-}
+
 .modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
   margin-top: 20px;
   padding-top: 10px;
   border-top: 1px solid #e0e4e8;
+}
+
+/* Переопределение размеров модального окна */
+.modal-content {
+  width: 1200px;
+  max-width: 95vw;
 }
 .dropdown {
   position: relative;
