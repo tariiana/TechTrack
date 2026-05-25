@@ -119,13 +119,13 @@
               {{ getStatusText(task.status_name) }}
               
               <!-- Просрочено, но не выполнено -->
-              <span v-if="task.status_name !== 'completed' && getDaysDiff(task.expiry_date) < 0" class="overdue-badge">
-                просрочено на {{ Math.abs(getDaysDiff(task.expiry_date)) }} дн.
+              <span v-if="task.status_name !== 'completed' && getDaysDiff(task.expiry_date) > 0" class="overdue-badge">
+                просрочено на {{ getDaysDiff(task.expiry_date) }} дн.
               </span>
-              
-              <!-- Выполнено с опозданием (сравниваем expiry_date с completed_date) -->
-              <span v-if="task.status_name === 'completed' && task.completed_date && getDaysDiff(task.expiry_date, task.completed_date) < 0" class="overdue-completed-badge">
-                опоздание на {{ Math.abs(getDaysDiff(task.expiry_date, task.completed_date)) }} дн.
+
+              <!-- Выполнено с опозданием -->
+              <span v-if="task.status_name === 'completed' && task.completed_date && getDaysDiff(task.expiry_date, task.completed_date) > 0" class="overdue-completed-badge">
+                опоздание на {{ getDaysDiff(task.expiry_date, task.completed_date) }} дн.
               </span>
             </td>
             <td>{{ task.notes || '-' }}</td>
@@ -251,7 +251,6 @@ function getDaysDiff(expiryDate: string, completedDate?: string): number {
   let targetDate = new Date();
   targetDate.setHours(0, 0, 0, 0);
   
-  // Если передана дата выполнения, используем её
   if (completedDate) {
     targetDate = new Date(completedDate);
     targetDate.setHours(0, 0, 0, 0);
@@ -260,17 +259,18 @@ function getDaysDiff(expiryDate: string, completedDate?: string): number {
   const expiry = new Date(expiryDate);
   expiry.setHours(0, 0, 0, 0);
   
-  // Если срок истёк - возвращаем отрицательное число
-  // Например: expiry=2024-01-31, today=2026-05-23 → разница = -843
-  const diff = Math.ceil((expiry.getTime() - targetDate.getTime()) / (1000 * 3600 * 24));
+  // Если дата выполнения или сегодня РАНЬШЕ срока - нет просрочки
+  if (targetDate <= expiry) {
+    return 0;  // не просрочено
+  }
+  
+  // Если позже - считаем количество дней просрочки
+  const diff = Math.ceil((targetDate.getTime() - expiry.getTime()) / (1000 * 3600 * 24));
   return diff;
 }
 
 function getRowClass(task: any): string {
-  console.log('=== Task:', task.node_name);
-  console.log('expiry_date:', task.expiry_date);
-  console.log('status:', task.status_name);
-  
+  // Если статус "Выполнено" - без подсветки
   if (task.status_name === 'completed') {
     console.log('→ completed, no color');
     return '';
@@ -279,14 +279,18 @@ function getRowClass(task: any): string {
   const daysDiff = getDaysDiff(task.expiry_date);
   console.log('daysDiff:', daysDiff);
   
-  if (daysDiff < 0) {
+  // Просрочено (красный)
+  if (daysDiff > 0) {
     console.log('→ expired-row (red)');
     return 'expired-row';
   }
-  if (daysDiff <= 30) {
+  
+  // Скоро (желтый) - меньше или равно 30 дней
+  if (daysDiff <= 30 && daysDiff > 0) {
     console.log('→ warning-row (yellow)');
     return 'warning-row';
   }
+  
   console.log('→ no color');
   return '';
 }
