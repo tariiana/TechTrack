@@ -77,7 +77,9 @@ app.use((req, res) => {
 // Обработка ошибок (исправленная версия)
 app.use((err, req, res, next) => {
     console.error('Unhandled error:', err);
-    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    const status = err.status || err.statusCode || (err.code === '22P02' ? 400 : 500);
+    const message = status >= 500 ? 'Внутренняя ошибка сервера' : err.message;
+    res.status(status).json({ success: false, status, error: message });
 });
 
 // Запуск сервера

@@ -1,8 +1,25 @@
 const { pool } = require('../config/db');
 const { v4: uuidv4, validate: isUuid } = require('uuid');
 
+const AGGREGATE_RU_PATTERN = '%\u0430\u0433\u0440\u0435\u0433\u0430\u0442%';
+const AGGREGATE_EN_PATTERN = '%aggregate%';
+
 const CONTENT_TYPES = new Set(['equipment', 'instrument', 'resource', 'maintenance', 'plan']);
 const MOVABLE_TYPES = new Set(['equipment', 'instrument', 'resource', 'maintenance']);
+
+function aggregateCondition() {
+  return `
+    (
+      LOWER(COALESCE(nt.name, '')) LIKE '${AGGREGATE_RU_PATTERN}'
+      OR LOWER(COALESCE(nt.name, '')) LIKE '${AGGREGATE_EN_PATTERN}'
+      OR COALESCE(array_length(nt.allowed_child_types, 1), 0) > 0
+      OR EXISTS (
+        SELECT 1 FROM equipment.nodes child
+        WHERE child.installed_in_node = n.node_id
+      )
+    )
+  `;
+}
 
 function makeHttpError(message, status = 400) {
   const error = new Error(message);
@@ -131,11 +148,7 @@ class Subsystem {
           n.status,
           n.location,
           nt.name AS node_type_name,
-          EXISTS (
-            SELECT 1
-            FROM equipment.nodes child
-            WHERE child.installed_in_node = n.node_id
-          ) AS is_aggregate
+          ${aggregateCondition()} AS is_aggregate
         FROM equipment.nodes n
         LEFT JOIN equipment.node_types nt ON nt.node_type_id = n.node_type_id
         WHERE n.subsystem_id = $1
@@ -198,10 +211,7 @@ class Subsystem {
           n.subsystem_id,
           s.name AS subsystem_name,
           nt.name AS node_type_name,
-          EXISTS (
-            SELECT 1 FROM equipment.nodes child
-            WHERE child.installed_in_node = n.node_id
-          ) AS is_aggregate
+          ${aggregateCondition()} AS is_aggregate
         FROM equipment.nodes n
         LEFT JOIN equipment.subsystems s ON s.subsys_id = n.subsystem_id
         LEFT JOIN equipment.node_types nt ON nt.node_type_id = n.node_type_id
