@@ -346,14 +346,17 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+
 .action-buttons {
   display: flex;
   gap: 10px;
 }
+
 .btn-fixed {
   min-width: 140px;
   text-align: center;
 }
+
 .badge-disabled {
   display: inline-block;
   padding: 4px 8px;
@@ -362,25 +365,27 @@ onUnmounted(() => {
   border-radius: 4px;
   font-size: 12px;
 }
+
 .actions-cell {
   white-space: nowrap;
 }
+
 .actions-cell .btn {
   margin-right: 4px;
 }
+
 .card {
   overflow-x: hidden;
 }
+
 .scrollable-table-container {
   width: 100%;
 }
-:deep(.scrollable-table-container) {
-  height: 650px;
-  max-height: calc(100vh - 250px);
-}
+
 .dropdown {
   position: relative;
 }
+
 .dropdown-menu {
   position: absolute;
   top: 100%;
@@ -393,6 +398,7 @@ onUnmounted(() => {
   z-index: 100;
   min-width: 200px;
 }
+
 .dropdown-item {
   display: block;
   width: 100%;
@@ -403,6 +409,7 @@ onUnmounted(() => {
   cursor: pointer;
   font-size: 14px;
 }
+
 .dropdown-item:hover {
   background-color: #f0f2f5;
 }

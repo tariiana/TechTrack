@@ -5,7 +5,6 @@
       <button class="btn btn-primary" @click="openAddForm">+ Добавить пользователя</button>
     </div>
 
-    <!-- Панель фильтров - без обводки и фона -->
     <div class="filter-row">
       <input
         v-model="filters.search"
@@ -17,7 +16,9 @@
       />
       <select v-model="filters.role_id" class="form-control" style="width: 180px" @change="applyFilters">
         <option value="">Все роли</option>
-        <option v-for="role in store.roles" :key="role.role_id" :value="role.role_id">{{ role.name }}</option>
+        <option v-for="role in store.roles" :key="role.role_id" :value="role.role_id">
+          {{ role.name }}
+        </option>
       </select>
       <select v-model="filters.is_active" class="form-control" style="width: 150px" @change="applyFilters">
         <option value="">Все статусы</option>
@@ -31,30 +32,18 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th @click="sortBy('login')">
-              Логин
-              <span class="sort-icon" v-if="sortField === 'login'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-            </th>
-            <th @click="sortBy('full_name')">
-              ФИО
-              <span class="sort-icon" v-if="sortField === 'full_name'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-            </th>
-            <th @click="sortBy('role_name')">
-              Роль
-              <span class="sort-icon" v-if="sortField === 'role_name'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-            </th>
-            <th @click="sortBy('is_active')">
-              Статус
-              <span class="sort-icon" v-if="sortField === 'is_active'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-            </th>
+            <th @click="sortBy('login')">Логин</th>
+            <th @click="sortBy('full_name')">ФИО</th>
+            <th @click="sortBy('role_name')">Роль</th>
+            <th @click="sortBy('is_active')">Статус</th>
             <th>Действия</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="user in filteredAndSortedUsers" :key="user.user_id">
             <td>{{ user.login }}</td>
-            <td>{{ user.full_name }}</td>
-            <td>{{ user.role_name }}</td>
+            <td>{{ user.full_name || user.name || '-' }}</td>
+            <td>{{ user.role_name || user.role || '-' }}</td>
             <td>
               <span :class="user.is_active ? 'status-active' : 'status-inactive'">
                 {{ user.is_active ? 'Активен' : 'Заблокирован' }}
@@ -109,23 +98,36 @@ function sortBy(field: 'login' | 'full_name' | 'role_name' | 'is_active') {
 const filteredAndSortedUsers = computed(() => {
   let list = [...store.users];
 
+  console.log('All users:', list);
+  console.log('Filters:', filters.value);
+
+  // Поиск по логину или ФИО
   if (filters.value.search) {
     const search = filters.value.search.toLowerCase();
     list = list.filter(u =>
-      u.login.toLowerCase().includes(search) ||
-      u.full_name.toLowerCase().includes(search)
+      u.login?.toLowerCase().includes(search) ||
+      u.full_name?.toLowerCase().includes(search) ||
+      u.name?.toLowerCase().includes(search)
     );
   }
 
+  // Фильтрация по роли (сравниваем role_id или role)
   if (filters.value.role_id) {
-    list = list.filter(u => u.role_id === Number(filters.value.role_id));
+    list = list.filter(u => {
+      // Проверяем role_id (число) или role (строка)
+      const userRoleId = u.role_id || u.roleId;
+      const userRole = u.role_name || u.role;
+      return String(userRoleId) === String(filters.value.role_id) || userRole === filters.value.role_id;
+    });
   }
 
+  // Фильтрация по статусу
   if (filters.value.is_active !== '') {
     const isActive = filters.value.is_active === 'true';
     list = list.filter(u => u.is_active === isActive);
   }
 
+  // Сортировка
   list.sort((a, b) => {
     let valA = a[sortField.value];
     let valB = b[sortField.value];
@@ -143,6 +145,7 @@ const filteredAndSortedUsers = computed(() => {
     return 0;
   });
 
+  console.log('Filtered users:', list);
   return list;
 });
 
@@ -188,19 +191,19 @@ onMounted(() => {
 .sort-icon {
   margin-left: 5px;
   font-size: 12px;
-  color: #2c5f8a;
+  color: var(--primary-color);
 }
 .status-active {
-  color: #27ae60;
+  color: var(--success-color);
   font-weight: 500;
 }
 .status-inactive {
-  color: #c0392b;
+  color: var(--danger-color);
   font-weight: 500;
 }
 .empty-data {
   text-align: center;
-  color: #999;
+  color: var(--text-muted);
   padding: 20px;
 }
 
@@ -209,8 +212,8 @@ onMounted(() => {
   overflow-x: auto;
   overflow-y: auto;
   max-height: 500px;
-  border: 1px solid #e0e4e8;
-  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
   background: white;
 }
 

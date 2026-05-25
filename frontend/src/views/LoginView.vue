@@ -73,7 +73,18 @@ async function handleLogin() {
     const success = await authStore.login(login.value, password.value);
     
     if (success) {
-      showToast('Добро пожаловать!', 'success');
+      // Получаем данные пользователя
+      const userStr = localStorage.getItem('user');
+      let userName = '';
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          userName = user.full_name || user.name || user.login || '';
+        } catch (e) {
+          userName = login.value;
+        }
+      }
+      showToast(`Добро пожаловать, ${userName}!`, 'success');
       setTimeout(() => {
         router.push('/');
       }, 500);

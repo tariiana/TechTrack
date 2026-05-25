@@ -11,11 +11,11 @@
 <style scoped>
 .scrollable-table-container {
   width: 100%;
-  height: 500px;
-  max-height: calc(100vh - 300px);
+  max-height: 70vh;
   display: flex;
   flex-direction: column;
   margin-top: 15px;
+  overflow: hidden;
 }
 
 .table-scroll {
@@ -28,6 +28,7 @@
   background: white;
 }
 
+/* Стилизация скроллбаров */
 .table-scroll::-webkit-scrollbar {
   width: 12px;
   height: 12px;
@@ -59,6 +60,7 @@
   min-width: max-content;
 }
 
+/* Фиксируем заголовок */
 .table-wrapper :deep(th) {
   position: sticky;
   top: 0;

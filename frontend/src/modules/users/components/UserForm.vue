@@ -26,6 +26,7 @@
         <div class="form-group">
           <label>Роль *</label>
           <select v-model="form.role_id" class="form-control">
+            <option value="" disabled>Выберите роль</option>
             <option v-for="role in store.roles" :key="role.role_id" :value="role.role_id">
               {{ role.name }}
             </option>
@@ -100,6 +101,7 @@ function validate(): boolean {
 
 async function loadRoles() {
   await store.fetchRoles();
+  console.log('Roles loaded:', store.roles);
   if (store.roles.length > 0 && !form.role_id) {
     form.role_id = store.roles[0]?.role_id || '';
   }
@@ -113,8 +115,9 @@ function open(user?: any) {
     isEdit.value = true;
     editId.value = user.user_id;
     form.login = user.login;
-    form.full_name = user.full_name;
-    form.role_id = user.role_id;
+    form.full_name = user.full_name || user.name || '';
+    // Поддержка разных форматов: role_id или role
+    form.role_id = user.role_id || user.roleId || '';
     form.is_active = user.is_active;
     form.password = '';
   }
@@ -180,11 +183,11 @@ defineExpose({ open });
 }
 .hint-text {
   font-size: 11px;
-  color: #6c757d;
+  color: var(--text-muted);
   display: block;
   margin-top: 4px;
 }
 .invalid {
-  border-color: #c0392b !important;
+  border-color: var(--danger-color) !important;
 }
 </style>
