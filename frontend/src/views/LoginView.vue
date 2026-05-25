@@ -26,7 +26,6 @@
           />
         </div>
         
-        <!-- Сообщение об ошибке прямо на форме -->
         <div v-if="loginError" class="error-message">
           ❌ {{ loginError }}
         </div>
@@ -98,21 +97,21 @@ async function handleLogin() {
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background: #e9ecef;
+  background: var(--bg-body);
 }
 
 .login-card {
-  background: white;
+  background: var(--bg-card);
   padding: 32px;
-  border-radius: 8px;
+  border-radius: var(--border-radius);
   width: 360px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-modal);
 }
 
 .login-card h2 {
   text-align: center;
   margin-bottom: 24px;
-  color: #2c3e50;
+  color: var(--text-secondary);
 }
 
 .form-group {
@@ -123,40 +122,40 @@ async function handleLogin() {
   display: block;
   margin-bottom: 5px;
   font-weight: 500;
-  color: #2c3e50;
+  color: var(--text-secondary);
 }
 
 .form-control {
   width: 100%;
   padding: 10px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 14px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--border-radius-small);
+  font-size: var(--font-size-base);
   transition: border-color 0.2s;
 }
 
 .form-control:focus {
   outline: none;
-  border-color: #2c5f8a;
+  border-color: var(--primary-color);
 }
 
 .form-control.is-invalid {
-  border-color: #c0392b;
+  border-color: var(--danger-color);
 }
 
 .form-control:disabled {
-  background-color: #e9ecef;
+  background-color: var(--bg-input-disabled);
   cursor: not-allowed;
 }
 
 .error-message {
   background-color: #f8d7da;
   border: 1px solid #f5c6cb;
-  color: #c0392b;
+  color: var(--danger-color);
   padding: 10px;
-  border-radius: 4px;
+  border-radius: var(--border-radius-small);
   margin-bottom: 15px;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   text-align: center;
 }
 
@@ -165,18 +164,18 @@ async function handleLogin() {
 }
 
 .btn-primary {
-  background-color: #2c5f8a;
-  color: white;
+  background-color: var(--primary-color);
+  color: var(--text-white);
   border: none;
   padding: 10px;
   font-size: 16px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--border-radius-small);
   transition: background-color 0.2s;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: #1e4566;
+  background-color: var(--primary-dark);
 }
 
 .btn-primary:disabled {

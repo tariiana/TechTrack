@@ -2,7 +2,7 @@
   <section class="subsystem-tree">
     <header class="tree-header">
       <h3>Подсистемы</h3>
-      <button class="btn btn-sm btn-primary" type="button" @click="openAddForm">
+      <button v-if="canEdit" class="btn btn-sm btn-primary" type="button" @click="openAddForm">
         Добавить
       </button>
     </header>
@@ -27,7 +27,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useSubsystemStore } from '../stores/subsystemsStore';
 import SubsystemTreeNode from './SubsystemTreeNode.vue';
 import SubsystemForm from './SubsystemForm.vue';
@@ -38,11 +38,20 @@ const store = useSubsystemStore();
 const formRef = ref<InstanceType<typeof SubsystemForm> | null>(null);
 const emit = defineEmits<{ (event: 'select-subsystem', id: string): void }>();
 
+// Проверка прав доступа
+const canEdit = computed(() => {
+  const user = localStorage.getItem('user');
+  if (!user) return false;
+  const role = JSON.parse(user).role;
+  return role === 'operator' || role === 'admin';
+});
+
 function onSelectSubsystem(id: string) {
   emit('select-subsystem', id);
 }
 
 function openAddForm() {
+  if (!canEdit.value) return;
   formRef.value?.open();
 }
 

@@ -8,6 +8,7 @@
       <SubsystemContentDetail
         v-if="selectedItem"
         :item="selectedItem"
+        :can-edit="canEdit"
         @back="selectedItem = null"
         @move="openMoveModal"
       />
@@ -19,9 +20,9 @@
             <p>{{ content.subsystem.location }}</p>
           </div>
           <div class="action-buttons">
-            <button class="btn btn-primary" type="button" @click="openAttachModal">Добавить содержимое</button>
-            <button class="btn btn-secondary" type="button" @click="openEditForm">Редактировать</button>
-            <button class="btn btn-danger" type="button" @click="confirmDelete">Удалить</button>
+            <button v-if="canEdit" class="btn btn-primary" type="button" @click="openAttachModal">Добавить содержимое</button>
+            <button v-if="canEdit" class="btn btn-secondary" type="button" @click="openEditForm">Редактировать</button>
+            <button v-if="canEdit" class="btn btn-danger" type="button" @click="confirmDelete">Удалить</button>
           </div>
         </header>
 
@@ -151,6 +152,14 @@ const attachModalRef = ref<InstanceType<typeof SubsystemAttachContentModal> | nu
 const moveModalRef = ref<InstanceType<typeof SubsystemMoveContentModal> | null>(null);
 const confirmDialog = ref<InstanceType<typeof ConfirmDialog> | null>(null);
 
+// Проверка прав доступа
+const canEdit = computed(() => {
+  const user = localStorage.getItem('user');
+  if (!user) return false;
+  const role = JSON.parse(user).role;
+  return role === 'operator' || role === 'admin';
+});
+
 const tabs: Array<{ key: SubsystemContentType; label: string }> = [
   { key: 'equipment', label: 'Оборудование' },
   { key: 'instrument', label: 'СИ' },
@@ -196,16 +205,19 @@ async function loadData() {
 }
 
 function openEditForm() {
+  if (!canEdit.value) return;
   if (content.value?.subsystem) {
     formRef.value?.open(content.value.subsystem);
   }
 }
 
 function openAttachModal() {
+  if (!canEdit.value) return;
   attachModalRef.value?.open(props.id);
 }
 
 function openMoveModal(item: SubsystemContentItem) {
+  if (!canEdit.value) return;
   moveModalRef.value?.open(item, props.id);
 }
 
@@ -225,6 +237,7 @@ async function handleMoved() {
 }
 
 async function confirmDelete() {
+  if (!canEdit.value) return;
   if (!content.value?.subsystem) return;
 
   const ok = await confirmDialog.value?.show(

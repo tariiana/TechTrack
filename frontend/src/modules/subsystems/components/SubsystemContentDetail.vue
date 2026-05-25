@@ -6,7 +6,7 @@
         <span class="detail-type">{{ typeLabel(item.type) }}</span>
         <h2>{{ item.title || item.name || 'Без названия' }}</h2>
       </div>
-      <div v-if="canMove" class="action-buttons">
+      <div v-if="canEdit && canMove" class="action-buttons">
         <button class="btn btn-secondary" type="button" @click="$emit('move', item)">Переместить</button>
       </div>
     </header>
@@ -14,32 +14,92 @@
     <template v-if="item.type === 'instrument'">
       <h3>Средство измерения</h3>
       <div class="module-grid four-col">
-        <InfoCell label="Тип" :value="display(item.node_type_name)" />
-        <InfoCell label="Марка" :value="display(item.model)" />
-        <InfoCell label="Производитель" :value="display(item.manufacturer)" />
-        <InfoCell label="Заводской номер" :value="display(item.serial_number)" />
-        <InfoCell label="Узел" :value="display(item.name)" />
-        <InfoCell label="Статус" :value="display(item.instrument_status)" />
-        <InfoCell label="Размещение" :value="display(item.location)" />
-        <InfoCell label="Табельный номер" :value="display(item.tab_number)" />
-        <InfoCell label="Последняя поверка" :value="display(formatDate(item.last_calibration_date))" />
-        <InfoCell label="Следующая поверка" :value="display(formatDate(item.next_calibration_date))" />
-        <InfoCell label="Межповерочный интервал" :value="intervalText" />
-        <InfoCell label="Поверитель" :value="display(item.calibrator)" />
+        <div class="detail-pair">
+          <div class="detail-label">Тип</div>
+          <div class="detail-value">{{ display(item.node_type_name) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Марка</div>
+          <div class="detail-value">{{ display(item.model) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Производитель</div>
+          <div class="detail-value">{{ display(item.manufacturer) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Заводской номер</div>
+          <div class="detail-value">{{ display(item.serial_number) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Узел</div>
+          <div class="detail-value">{{ display(item.name) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Статус</div>
+          <div class="detail-value">{{ display(item.instrument_status) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Размещение</div>
+          <div class="detail-value">{{ display(item.location) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Табельный номер</div>
+          <div class="detail-value">{{ display(item.tab_number) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Последняя поверка</div>
+          <div class="detail-value">{{ display(formatDate(item.last_calibration_date)) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Следующая поверка</div>
+          <div class="detail-value">{{ display(formatDate(item.next_calibration_date)) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Межповерочный интервал</div>
+          <div class="detail-value">{{ intervalText }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Поверитель</div>
+          <div class="detail-value">{{ display(item.calibrator) }}</div>
+        </div>
       </div>
     </template>
 
     <template v-else-if="item.type === 'resource'">
       <h3>Ресурс</h3>
       <div class="module-grid four-col">
-        <InfoCell label="Наименование" :value="display(item.title || item.node_name)" />
-        <InfoCell label="Марка" :value="display(resourceParam('mark') || item.model)" />
-        <InfoCell label="Тип" :value="resourceParam('type')" />
-        <InfoCell label="Узел" :value="display(item.node_name)" />
-        <InfoCell label="Производитель" :value="display(item.manufacturer)" />
-        <InfoCell label="Дата регистрации" :value="display(formatDate(item.registration_date))" />
-        <InfoCell label="Расположение" :value="display(item.location)" />
-        <InfoCell label="Примечание" :value="display(item.note)" />
+        <div class="detail-pair">
+          <div class="detail-label">Наименование</div>
+          <div class="detail-value">{{ display(item.title || item.node_name) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Марка</div>
+          <div class="detail-value">{{ display(resourceParam('mark') || item.model) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Тип</div>
+          <div class="detail-value">{{ resourceParam('type') }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Узел</div>
+          <div class="detail-value">{{ display(item.node_name) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Производитель</div>
+          <div class="detail-value">{{ display(item.manufacturer) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Дата регистрации</div>
+          <div class="detail-value">{{ display(formatDate(item.registration_date)) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Расположение</div>
+          <div class="detail-value">{{ display(item.location) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Примечание</div>
+          <div class="detail-value">{{ display(item.note) }}</div>
+        </div>
       </div>
 
       <section class="subsection">
@@ -106,28 +166,34 @@
       </div>
 
       <div class="module-grid two-col">
-        <InfoCell label="Дата создания" :value="display(formatDate(item.created_at))" />
-        <InfoCell label="Дата обновления" :value="display(formatDate(item.updated_at))" />
+        <div class="detail-pair">
+          <div class="detail-label">Дата создания</div>
+          <div class="detail-value">{{ display(formatDate(item.created_at)) }}</div>
+        </div>
+        <div class="detail-pair">
+          <div class="detail-label">Дата обновления</div>
+          <div class="detail-value">{{ display(formatDate(item.updated_at)) }}</div>
+        </div>
       </div>
     </template>
 
     <template v-else>
       <div class="equipment-layout">
         <div class="equipment-col">
-          <InfoLine label="Марка" :value="display(item.model)" />
-          <InfoLine label="Наименование" :value="display(item.title || item.name)" />
-          <InfoLine label="Подсистема" :value="display(item.subsystem_name || item.current_subsystem_name)" />
-          <InfoLine label="Производитель" :value="display(item.manufacturer)" />
-          <InfoLine label="Состояние" :value="display(item.status)" />
-          <InfoLine label="Заводской номер" :value="display(item.serial_number)" />
-          <InfoLine label="Учётный номер" :value="display(item.registration_number)" />
+          <div class="equipment-row"><strong>Марка</strong><span>{{ display(item.model) }}</span></div>
+          <div class="equipment-row"><strong>Наименование</strong><span>{{ display(item.title || item.name) }}</span></div>
+          <div class="equipment-row"><strong>Подсистема</strong><span>{{ display(item.subsystem_name || item.current_subsystem_name) }}</span></div>
+          <div class="equipment-row"><strong>Производитель</strong><span>{{ display(item.manufacturer) }}</span></div>
+          <div class="equipment-row"><strong>Состояние</strong><span>{{ display(item.status) }}</span></div>
+          <div class="equipment-row"><strong>Заводской номер</strong><span>{{ display(item.serial_number) }}</span></div>
+          <div class="equipment-row"><strong>Учётный номер</strong><span>{{ display(item.registration_number) }}</span></div>
         </div>
         <div class="equipment-col">
-          <InfoLine label="Тип" :value="item.is_aggregate ? 'Агрегат' : 'Блок'" />
-          <InfoLine label="Вид" :value="display(item.node_type_name)" />
-          <InfoLine label="Размещение" :value="display(item.location)" />
-          <InfoLine label="Инвентарный номер" :value="display(item.inventory_number)" />
-          <InfoLine label="Агрегат" :value="item.is_aggregate ? 'да' : 'нет'" />
+          <div class="equipment-row"><strong>Тип</strong><span>{{ item.is_aggregate ? 'Агрегат' : 'Блок' }}</span></div>
+          <div class="equipment-row"><strong>Вид</strong><span>{{ display(item.node_type_name) }}</span></div>
+          <div class="equipment-row"><strong>Размещение</strong><span>{{ display(item.location) }}</span></div>
+          <div class="equipment-row"><strong>Инвентарный номер</strong><span>{{ display(item.inventory_number) }}</span></div>
+          <div class="equipment-row"><strong>Агрегат</strong><span>{{ item.is_aggregate ? 'да' : 'нет' }}</span></div>
         </div>
       </div>
     </template>
@@ -135,42 +201,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, type PropType } from 'vue';
+import { computed, type PropType } from 'vue';
 import type { SubsystemContentItem } from '../types/subsystemsTypes';
 
-const props = defineProps<{ item: SubsystemContentItem }>();
+const props = defineProps<{
+  item: SubsystemContentItem;
+  canEdit?: boolean;
+}>();
+
 defineEmits<{
   (event: 'back'): void;
   (event: 'move', item: SubsystemContentItem): void;
 }>();
 
-const canMove = computed(() => props.item.type !== 'plan');
-
-const InfoCell = defineComponent({
-  props: {
-    label: { type: String, required: true },
-    value: { type: null as unknown as PropType<unknown>, default: '' },
-  },
-  setup(cellProps) {
-    return () => h('div', { class: 'detail-pair' }, [
-      h('div', { class: 'detail-label' }, cellProps.label),
-      h('div', { class: 'detail-value' }, normalizeValue(cellProps.value)),
-    ]);
-  },
-});
-
-const InfoLine = defineComponent({
-  props: {
-    label: { type: String, required: true },
-    value: { type: null as unknown as PropType<unknown>, default: '' },
-  },
-  setup(lineProps) {
-    return () => h('div', { class: 'equipment-row' }, [
-      h('strong', lineProps.label),
-      h('span', normalizeValue(lineProps.value)),
-    ]);
-  },
-});
+const canMove = computed(() => props.item.type !== 'plan' && props.canEdit);
 
 function normalizeValue(value: unknown) {
   if (value === null || value === undefined || value === '') return '-';
@@ -223,7 +267,6 @@ const resourceParams = computed(() => {
     if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'value' in raw) {
       value = (raw as { value: unknown }).value;
     }
-
     return { name, value: normalizeValue(value) };
   });
 });
@@ -287,24 +330,24 @@ const resourceParams = computed(() => {
   grid-template-columns: 180px 1fr;
 }
 
-:deep(.detail-pair) {
+.detail-pair {
   display: contents;
 }
 
-:deep(.detail-label),
-:deep(.detail-value) {
+.detail-pair .detail-label,
+.detail-pair .detail-value {
   min-width: 0;
   border-bottom: 1px solid #e0e4e8;
   padding: 10px 12px;
   font-size: 13px;
 }
 
-:deep(.detail-label) {
+.detail-pair .detail-label {
   color: #2c3e50;
   font-weight: 600;
 }
 
-:deep(.detail-value) {
+.detail-pair .detail-value {
   overflow-wrap: anywhere;
   color: #1a2a3a;
 }
@@ -324,7 +367,7 @@ const resourceParams = computed(() => {
   gap: 12px;
 }
 
-:deep(.equipment-row) {
+.equipment-row {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -332,12 +375,12 @@ const resourceParams = computed(() => {
   padding-bottom: 4px;
 }
 
-:deep(.equipment-row strong) {
+.equipment-row strong {
   flex: 0 0 165px;
   color: #2c3e50;
 }
 
-:deep(.equipment-row span) {
+.equipment-row span {
   min-width: 0;
   overflow-wrap: anywhere;
   color: #1a2a3a;
@@ -390,11 +433,11 @@ const resourceParams = computed(() => {
     grid-template-columns: 1fr;
   }
 
-  :deep(.equipment-row) {
+  .equipment-row {
     flex-direction: column;
   }
 
-  :deep(.equipment-row span) {
+  .equipment-row span {
     text-align: left;
   }
 }

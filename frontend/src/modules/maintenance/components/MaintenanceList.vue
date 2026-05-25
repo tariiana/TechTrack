@@ -3,18 +3,19 @@
     <div style="display: flex; justify-content: space-between; margin-bottom: 20px">
       <h2>Планы-графики технического обслуживания</h2>
       <div class="button-group">
-        <div class="dropdown">
-          <button class="btn btn-secondary" @click="toggleDropdown">📎 Экспорт</button>
-          <div v-if="dropdownOpen" class="dropdown-menu">
+        <div class="dropdown" ref="dropdownRef">
+          <button class="btn btn-secondary" @click="toggleDropdown">
+            📎 Экспорт {{ dropdownOpen ? '▲' : '▼' }}
+          </button>
+          <div v-if="dropdownOpen" class="dropdown-menu-right">
             <button class="dropdown-item" @click="exportToExcel">Microsoft Excel (.xlsx)</button>
             <button class="dropdown-item" @click="exportToWord">Microsoft Word (.docx)</button>
           </div>
         </div>
-        <button class="btn btn-primary" @click="openAddForm">+ Добавить план</button>
+        <button v-if="canEdit" class="btn btn-primary" @click="openAddForm">+ Добавить план</button>
       </div>
     </div>
 
-    <!-- Поиск и фильтры -->
     <div class="filter-panel">
       <div class="filter-row">
         <input
@@ -44,24 +45,14 @@
       </div>
     </div>
 
-    <!-- ОБЁРТКА ДЛЯ ТАБЛИЦЫ -->
     <div class="table-wrapper">
       <table class="data-table">
         <thead>
           <tr>
-            <th @click="sortBy('name')">
-              Название плана
-              <span class="sort-icon" v-if="sortField === 'name'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-            </th>
-            <th @click="sortBy('startDate')">
-              Дата начала
-              <span class="sort-icon" v-if="sortField === 'startDate'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-            </th>
-            <th @click="sortBy('endDate')">
-              Дата окончания
-              <span class="sort-icon" v-if="sortField === 'endDate'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-            </th>
-            <th>Действия</th>
+            <th @click="sortBy('name')">Название плана</th>
+            <th @click="sortBy('startDate')">Дата начала</th>
+            <th @click="sortBy('endDate')">Дата окончания</th>
+            <th v-if="canEdit">Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -69,20 +60,19 @@
             <td>{{ plan.name }}</td>
             <td>{{ formatDate(plan.start_date) }}</td>
             <td>{{ plan.end_date ? formatDate(plan.end_date) : '—' }}</td>
-            <td>
+            <td v-if="canEdit">
               <button class="btn btn-sm btn-secondary" @click="viewPlan(plan.plan_id)">Открыть</button>
               <button class="btn btn-sm btn-secondary" @click="editPlan(plan)">✏️</button>
               <button class="btn btn-sm btn-danger" @click="deletePlan(plan.plan_id)">🗑️</button>
             </td>
           </tr>
           <tr v-if="filteredAndSortedPlans.length === 0">
-            <td colspan="4">Нет данных</td>
+            <td :colspan="canEdit ? 4 : 3">Нет данных</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Модальные окна -->
     <MaintenanceForm ref="formRef" @saved="refresh" />
     <ConfirmDialog ref="confirmDialog" />
   </div>
@@ -101,16 +91,23 @@ const router = useRouter()
 const store = useMaintenanceStore()
 const formRef = ref()
 const confirmDialog = ref()
+const dropdownRef = ref()
 
-// Фильтры
 const searchQuery = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
 const dropdownOpen = ref(false)
 
-// Сортировка
+const canEdit = computed(() => {
+  const user = localStorage.getItem('user');
+  if (!user) return false;
+  const role = JSON.parse(user).role;
+  return role === 'operator' || role === 'admin';
+});
+
 const sortField = ref<'name' | 'startDate' | 'endDate'>('startDate')
 const sortOrder = ref<'asc' | 'desc'>('asc')
+
 function sortBy(field: 'name' | 'startDate' | 'endDate') {
   if (sortField.value === field) {
     sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
@@ -119,13 +116,11 @@ function sortBy(field: 'name' | 'startDate' | 'endDate') {
     sortOrder.value = 'asc';
   }
 }
+
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
-  // Пробуем создать объект Date из строки
   const date = new Date(dateStr);
-  // Проверяем, что дата валидна
-  if (isNaN(date.getTime())) return dateStr; // если не распарсилось, возвращаем как есть
-
+  if (isNaN(date.getTime())) return dateStr;
   const day = date.getDate().toString().padStart(2, '0');
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const year = date.getFullYear();
@@ -135,13 +130,11 @@ function formatDate(dateStr: string | null | undefined): string {
 const filteredAndSortedPlans = computed(() => {
   let list = [...store.plans]
 
-  // Фильтрация по названию
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     list = list.filter((p) => p.name.toLowerCase().includes(q))
   }
 
-  // Фильтрация по диапазону дат
   if (dateFrom.value) {
     list = list.filter((p) => p.start_date >= dateFrom.value)
   }
@@ -149,7 +142,6 @@ const filteredAndSortedPlans = computed(() => {
     list = list.filter((p) => p.start_date <= dateTo.value)
   }
 
-  // Сортировка
   list.sort((a, b) => {
     let valA = a[sortField.value === 'startDate' ? 'start_date' : sortField.value === 'endDate' ? 'end_date' : sortField.value]
     let valB = b[sortField.value === 'startDate' ? 'start_date' : sortField.value === 'endDate' ? 'end_date' : sortField.value]
@@ -173,14 +165,17 @@ function viewPlan(id: string) {
 }
 
 function openAddForm() {
+  if (!canEdit.value) return;
   formRef.value?.open()
 }
 
 function editPlan(plan: any) {
+  if (!canEdit.value) return;
   formRef.value?.open(plan)
 }
 
 async function deletePlan(id: string) {
+  if (!canEdit.value) return;
   const ok = await confirmDialog.value?.show('Удаление', 'Удалить план-график?');
   if (ok) {
     await store.deletePlan(id);
@@ -192,7 +187,6 @@ function refresh() {
   store.fetchPlans()
 }
 
-// Экспорт
 function getExportData() {
   return filteredAndSortedPlans.value.map((p) => ({
     'Название плана': p.name,
@@ -234,7 +228,7 @@ function toggleDropdown() {
 
 function handleClickOutside(event: MouseEvent) {
   const target = event.target as HTMLElement
-  if (!target.closest('.dropdown')) {
+  if (dropdownRef.value && !dropdownRef.value.contains(target)) {
     dropdownOpen.value = false
   }
 }
@@ -252,19 +246,36 @@ onUnmounted(() => {
 <style scoped>
 .button-group { display: flex; gap: 10px; position: relative; }
 .dropdown { position: relative; }
-.dropdown-menu {
-  position: absolute; top: 100%; left: 0; margin-top: 4px;
-  background: white; border: 1px solid #e0e4e8; border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 100; min-width: 220px;
+.dropdown-menu-right {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: auto;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #e0e4e8;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  z-index: 100;
+  min-width: 220px;
 }
 .dropdown-item {
-  display: block; width: 100%; padding: 8px 12px; text-align: left;
-  background: none; border: none; cursor: pointer; font-size: 14px;
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
 }
 .dropdown-item:hover { background-color: #f0f2f5; }
 .filter-panel {
-  background: #f8f9fa; border: 1px solid #e0e4e8;
-  border-radius: 8px; padding: 15px; margin-bottom: 20px;
+  background: #f8f9fa;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
 }
 .filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .filter-label { font-size: 14px; color: #6c757d; }

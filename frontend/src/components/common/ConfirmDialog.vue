@@ -58,24 +58,24 @@ defineExpose({ show })
 }
 
 .modal-content {
-  background: white;
-  border-radius: 8px;
+  background: var(--bg-modal);
+  border-radius: var(--border-radius);
   width: 400px;
   max-width: 90%;
   padding: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-modal);
 }
 
 .modal-header {
-  font-size: 18px;
+  font-size: var(--font-size-large);
   font-weight: 600;
   margin-bottom: 15px;
-  color: #2c3e50;
+  color: var(--text-secondary);
 }
 
 .modal-message {
-  font-size: 14px;
-  color: #2c3e50;
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
   margin-bottom: 20px;
   line-height: 1.5;
 }
@@ -84,33 +84,5 @@ defineExpose({ show })
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-}
-
-.btn {
-  padding: 8px 16px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background-color: #2c5f8a;
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: #1e4566;
-}
-
-.btn-secondary {
-  background-color: #e9ecef;
-  color: #2c3e50;
-  border: 1px solid #ced4da;
-}
-
-.btn-secondary:hover {
-  background-color: #dee2e6;
 }
 </style>

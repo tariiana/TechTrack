@@ -7,56 +7,10 @@ function getRequestUserId(req) {
 
 async function getAll(req, res, next) {
   try {
-    const {
-      search,
-      status,
-      verifier,
-      calibrator,
-      result,
-      verificationStatus,
-      verification_status,
-      dueWithinDays,
-      days,
-      overdue,
-      nextCalibrationFrom,
-      nextCalibrationTo,
-      sortBy,
-      sort_by,
-      sortDir,
-      sort_dir,
-    } = req.query;
-    const instruments = await MeasuringInstrument.getAll({
-      search,
-      status,
-      verifier,
-      calibrator,
-      result,
-      verificationStatus,
-      verification_status,
-      dueWithinDays,
-      days,
-      overdue,
-      nextCalibrationFrom,
-      nextCalibrationTo,
-      sortBy,
-      sort_by,
-      sortDir,
-      sort_dir,
-    });
+    const { search, status } = req.query;
+    const instruments = await MeasuringInstrument.getAll({ search, status });
     res.json(instruments);
   } catch (err) { next(err); }
-}
-
-async function getUpcoming(req, res, next) {
-  try {
-    const instruments = await MeasuringInstrument.getUpcoming(req.query.days);
-    res.json(instruments);
-  } catch (err) {
-    if (err.status) {
-      return res.status(err.status).json(ResponseFormatter.error(err.message, err.status));
-    }
-    next(err);
-  }
 }
 
 async function getById(req, res, next) {
@@ -149,7 +103,6 @@ async function updateVerification(req, res, next) {
 
 module.exports = {
   getAll,
-  getUpcoming,
   getById,
   create,
   update,

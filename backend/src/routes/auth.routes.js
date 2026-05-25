@@ -3,7 +3,6 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { pool } = require('../config/db');
 const { authMiddleware } = require('../middleware/auth');
-const { auditLog } = require('../utils/auditLogger');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key';
 const TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
@@ -22,16 +21,8 @@ function toPublicUser(user) {
 router.post('/login', async (req, res) => {
   try {
     const { login, password } = req.body || {};
-    const ipAddress = req.ip || req.socket.remoteAddress || null;
-    const userAgent = req.headers['user-agent'] || null;
 
     if (!login || !password) {
-      await auditLog({
-        action: 'LOGIN_FAILED',
-        entityType: 'auth',
-        ipAddress,
-        userAgent,
-      });
       return res.status(400).json({ error: 'Логин и пароль обязательны' });
     }
 
@@ -45,23 +36,10 @@ router.post('/login', async (req, res) => {
 
     const user = result.rows[0];
     if (!user) {
-      await auditLog({
-        action: 'LOGIN_FAILED',
-        entityType: 'auth',
-        ipAddress,
-        userAgent,
-      });
       return res.status(401).json({ error: 'Неверный логин или пароль' });
     }
 
     if (!user.is_active) {
-      await auditLog({
-        userId: user.user_id,
-        action: 'LOGIN_BLOCKED',
-        entityType: 'auth',
-        ipAddress,
-        userAgent,
-      });
       return res.status(403).json({ error: 'Пользователь заблокирован' });
     }
 
@@ -70,13 +48,6 @@ router.post('/login', async (req, res) => {
       : password === user.password_hash;
 
     if (!isValidPassword) {
-      await auditLog({
-        userId: user.user_id,
-        action: 'LOGIN_FAILED',
-        entityType: 'auth',
-        ipAddress,
-        userAgent,
-      });
       return res.status(401).json({ error: 'Неверный логин или пароль' });
     }
 
@@ -92,14 +63,6 @@ router.post('/login', async (req, res) => {
       JWT_SECRET,
       { expiresIn: TOKEN_EXPIRES_IN }
     );
-
-    await auditLog({
-      userId: user.user_id,
-      action: 'LOGIN_SUCCESS',
-      entityType: 'auth',
-      ipAddress,
-      userAgent,
-    });
 
     return res.json({
       success: true,

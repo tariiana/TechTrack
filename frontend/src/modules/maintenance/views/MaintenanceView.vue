@@ -3,46 +3,47 @@
     <div style="display: flex; justify-content: space-between; margin-bottom: 20px">
       <h2>Планы-графики технического обслуживания</h2>
       <div class="button-group">
-        <div class="dropdown">
-          <button class="btn btn-secondary" @click="toggleDropdown">📎 Экспорт</button>
-          <div v-if="dropdownOpen" class="dropdown-menu">
+        <div class="dropdown" ref="dropdownRef">
+          <button class="btn btn-secondary" @click="toggleDropdown">
+            📎 Экспорт {{ dropdownOpen ? '▲' : '▼' }}
+          </button>
+          <div v-if="dropdownOpen" class="dropdown-menu-right">
             <button class="dropdown-item" @click="exportToExcel">Microsoft Excel (.xlsx)</button>
             <button class="dropdown-item" @click="exportToWord">Microsoft Word (.docx)</button>
           </div>
         </div>
-        <button class="btn btn-primary" @click="openAddForm">+ Добавить план</button>
+        <button v-if="canEdit" class="btn btn-primary" @click="openAddForm">+ Добавить план</button>
       </div>
     </div>
 
-    <!-- Поиск и фильтры -->
-      <div class="filter-row">
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Поиск по названию"
-          class="form-control"
-          style="width: 250px"
-          @input="applyFilters"
-        />
-        <input
-          v-model="dateFrom"
-          type="date"
-          class="form-control"
-          style="width: 180px"
-          @change="applyFilters"
-        />
-        <span class="filter-label">—</span>
-        <input
-          v-model="dateTo"
-          type="date"
-          class="form-control"
-          style="width: 180px"
-          @change="applyFilters"
-        />
-        <button class="btn btn-secondary" @click="resetFilters">Сбросить</button>
-      </div>
+    <div class="filter-row">
+      <input
+        v-model="searchQuery"
+        type="text"
+        placeholder="Поиск по названию"
+        class="form-control"
+        style="width: 250px"
+        @input="applyFilters"
+      />
+      <input
+        v-model="dateFrom"
+        type="date"
+        class="form-control"
+        style="width: 180px"
+        @change="applyFilters"
+      />
+      <span class="filter-label">—</span>
+      <input
+        v-model="dateTo"
+        type="date"
+        class="form-control"
+        style="width: 180px"
+        @change="applyFilters"
+      />
+      <button class="btn btn-secondary" @click="resetFilters">Сбросить</button>
+    </div>
     <br>
-    <!-- Таблица планов с прокруткой -->
+
     <div class="table-scroll-container">
       <table class="data-table">
         <thead>
@@ -60,8 +61,8 @@
             <td>{{ plan.end_date ? formatDate(plan.end_date) : '—' }}</td>
             <td>
               <button class="btn btn-sm btn-secondary" @click="viewPlan(plan.plan_id)">Открыть</button>
-              <button class="btn btn-sm btn-secondary" @click="editPlan(plan)">✏️</button>
-              <button class="btn btn-sm btn-danger" @click="deletePlan(plan.plan_id)">🗑️</button>
+              <button v-if="canEdit" class="btn btn-sm btn-secondary" @click="editPlan(plan)">✏️</button>
+              <button v-if="canEdit" class="btn btn-sm btn-danger" @click="deletePlan(plan.plan_id)">🗑️</button>
             </td>
           </tr>
           <tr v-if="filteredAndSortedPlans.length === 0">
@@ -89,23 +90,34 @@ const router = useRouter()
 const store = useMaintenanceStore()
 const formRef = ref()
 const confirmDialog = ref()
+const dropdownRef = ref()
 
-// Фильтры
 const searchQuery = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
 const dropdownOpen = ref(false)
 
-// Сортировка
+const canEdit = computed(() => {
+  const user = localStorage.getItem('user');
+  if (!user) return false;
+  const role = JSON.parse(user).role;
+  return role === 'operator' || role === 'admin';
+});
+
 const sortField = ref<'name' | 'startDate' | 'endDate'>('startDate')
 const sortOrder = ref<'asc' | 'desc'>('asc')
 
+function sortBy(field: 'name' | 'startDate' | 'endDate') {
+  if (sortField.value === field) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortField.value = field;
+    sortOrder.value = 'asc';
+  }
+}
+
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
-  
-  // Если уже в формате DD.MM.YYYY, возвращается как есть
-  if (dateStr.includes('.')) return dateStr;
-  
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) return dateStr;
   const day = date.getDate().toString().padStart(2, '0');
@@ -114,94 +126,24 @@ function formatDate(dateStr: string | null | undefined): string {
   return `${day}.${month}.${year}`;
 }
 
-function sortBy(field: 'name' | 'startDate' | 'endDate') {
-  if (sortField.value === field) {
-    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortField.value = field
-    sortOrder.value = 'asc'
-  }
-}
-
 const filteredAndSortedPlans = computed(() => {
   let list = [...store.plans]
 
-  // Поиск по названию
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     list = list.filter((p) => p.name.toLowerCase().includes(q))
   }
 
-  // Функция для парсинга даты
-function parseDate(dateStr: string): Date | null {
-  if (!dateStr) return null
-  
-  // Проверяем формат DD.MM.YYYY
-  if (dateStr.includes('.')) {
-    const parts = dateStr.split('.')
-    if (parts.length === 3) {
-      const day = parseInt(parts[0] || '0', 10)
-      const month = parseInt(parts[1] || '0', 10) - 1
-      const year = parseInt(parts[2] || '0', 10)
-      if (!isNaN(day) && !isNaN(month) && !isNaN(year) && day > 0 && month >= 0) {
-        return new Date(year, month, day)
-      }
-    }
+  if (dateFrom.value) {
+    list = list.filter((p) => p.start_date >= dateFrom.value)
   }
-  
-  // Формат YYYY-MM-DD
-  const date = new Date(dateStr)
-  return isNaN(date.getTime()) ? null : date
-}
-
-  const fromDate = dateFrom.value ? parseDate(dateFrom.value) : null
-  const toDate = dateTo.value ? parseDate(dateTo.value) : null
-
-  if (fromDate && !toDate) {
-    // Только дата начала
-    list = list.filter((p) => {
-      const planStart = parseDate(p.start_date)
-      if (!planStart) return false
-      return planStart.toDateString() === fromDate.toDateString()
-    })
-  } 
-  else if (!fromDate && toDate) {
-    // Только дата окончания
-    list = list.filter((p) => {
-      if (!p.end_date) return false
-      const planEnd = parseDate(p.end_date)
-      if (!planEnd) return false
-      return planEnd.toDateString() === toDate.toDateString()
-    })
-  }
-  else if (fromDate && toDate) {
-    // Обе даты - проверка на пересечение диапазонов
-    list = list.filter((p) => {
-      const planStart = parseDate(p.start_date)
-      if (!planStart) return false
-      
-      const planEnd = p.end_date ? parseDate(p.end_date) : planStart
-      if (!planEnd) return false
-      
-      // Проверка: план пересекается с выбранным диапазоном
-      return planStart <= toDate && planEnd >= fromDate
-    })
+  if (dateTo.value) {
+    list = list.filter((p) => p.start_date <= dateTo.value)
   }
 
-  // Сортировка
   list.sort((a, b) => {
     let valA = a[sortField.value === 'startDate' ? 'start_date' : sortField.value === 'endDate' ? 'end_date' : sortField.value]
     let valB = b[sortField.value === 'startDate' ? 'start_date' : sortField.value === 'endDate' ? 'end_date' : sortField.value]
-    
-    // Парсим даты для корректного сравнения
-    if (sortField.value === 'startDate' || sortField.value === 'endDate') {
-      const dateA = parseDate(valA)
-      const dateB = parseDate(valB)
-      if (dateA && dateB) {
-        return sortOrder.value === 'asc' ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime()
-      }
-    }
-    
     if (valA < valB) return sortOrder.value === 'asc' ? -1 : 1
     if (valA > valB) return sortOrder.value === 'asc' ? 1 : -1
     return 0
@@ -222,14 +164,17 @@ function viewPlan(id: string) {
 }
 
 function openAddForm() {
+  if (!canEdit.value) return;
   formRef.value?.open()
 }
 
 function editPlan(plan: any) {
+  if (!canEdit.value) return;
   formRef.value?.open(plan)
 }
 
 async function deletePlan(id: string) {
+  if (!canEdit.value) return;
   const ok = await confirmDialog.value?.show('Удаление', 'Удалить план-график?');
   if (ok) {
     await store.deletePlan(id);
@@ -282,7 +227,7 @@ function toggleDropdown() {
 
 function handleClickOutside(event: MouseEvent) {
   const target = event.target as HTMLElement
-  if (!target.closest('.dropdown')) {
+  if (dropdownRef.value && !dropdownRef.value.contains(target)) {
     dropdownOpen.value = false
   }
 }
@@ -300,17 +245,65 @@ onUnmounted(() => {
 <style scoped>
 .button-group { display: flex; gap: 10px; position: relative; }
 .dropdown { position: relative; }
-.dropdown-menu {
-  position: absolute; top: 100%; left: 0; margin-top: 4px;
-  background: white; border: 1px solid #e0e4e8; border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 100; min-width: 220px;
+.dropdown-menu-right {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: auto;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #e0e4e8;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  z-index: 100;
+  min-width: 220px;
 }
 .dropdown-item {
-  display: block; width: 100%; padding: 8px 12px; text-align: left;
-  background: none; border: none; cursor: pointer; font-size: 14px;
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
 }
 .dropdown-item:hover { background-color: #f0f2f5; }
 .filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .filter-label { font-size: 14px; color: #6c757d; }
 .sort-icon { margin-left: 5px; font-size: 12px; color: #2c5f8a; }
+
+.table-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 500px;
+  border: 1px solid #e0e4e8;
+  border-radius: 8px;
+  background: white;
+}
+
+.table-scroll-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #e0e4e8;
+  border-radius: 6px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #2c5f8a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #1e4566;
+}
+
+.table-scroll-container .data-table {
+  min-width: 600px;
+}
 </style>

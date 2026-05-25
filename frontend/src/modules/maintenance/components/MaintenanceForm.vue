@@ -45,7 +45,7 @@
 
 <script setup lang="ts">
 import { showToast } from '@/utils/toast';
-import { ref, reactive, watch } from 'vue';
+import { ref, reactive, watch, computed } from 'vue';
 import { useMaintenanceStore } from '../stores/maintenanceStore';
 
 const store = useMaintenanceStore();
@@ -56,6 +56,14 @@ const error = ref('');
 const autoMessage = ref('');
 const generating = ref(false);
 const dateError = ref('');
+
+// Проверка прав доступа
+const canEdit = computed(() => {
+  const user = localStorage.getItem('user');
+  if (!user) return false;
+  const role = JSON.parse(user).role;
+  return role === 'operator' || role === 'admin';
+});
 
 const form = reactive({
   name: '',
@@ -83,6 +91,12 @@ watch([() => form.startDate, () => form.endDate], () => {
 });
 
 function open(plan?: any) {
+  // Проверка прав - observer не может открыть форму
+  if (!canEdit.value) {
+    showToast('Недостаточно прав для выполнения действия', 'error');
+    return;
+  }
+  
   reset();
   if (plan) {
     isEdit.value = true;

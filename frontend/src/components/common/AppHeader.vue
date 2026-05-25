@@ -63,7 +63,7 @@ const confirmLogout = async () => {
 
 <style scoped>
 .app-header {
-  background: #2c5f8a;
+  background: var(--primary-color);
   width: 100%;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -72,7 +72,7 @@ const confirmLogout = async () => {
   padding: 0 20px;
   gap: 15px;
   flex-wrap: wrap;
-  min-height: 56px;
+  min-height: var(--header-height);
   height: auto;
 }
 
@@ -90,8 +90,8 @@ const confirmLogout = async () => {
 
 .logo-text {
   font-weight: bold;
-  font-size: 18px;
-  color: white;
+  font-size: var(--font-size-large);
+  color: var(--text-white);
 }
 
 .nav-menu {
@@ -101,11 +101,11 @@ const confirmLogout = async () => {
 }
 
 .nav-menu a {
-  color: white;
+  color: var(--text-white);
   text-decoration: none;
   padding: 8px 12px;
-  font-size: 14px;
-  border-radius: 4px;
+  font-size: var(--font-size-base);
+  border-radius: var(--border-radius-small);
   transition: background-color 0.2s;
   white-space: nowrap;
 }
@@ -126,8 +126,8 @@ const confirmLogout = async () => {
 }
 
 .user-name {
-  font-size: 14px;
-  color: white;
+  font-size: var(--font-size-base);
+  color: var(--text-white);
   opacity: 0.9;
   white-space: nowrap;
 }
@@ -165,10 +165,10 @@ const confirmLogout = async () => {
   }
   .nav-menu a {
     padding: 6px 10px;
-    font-size: 12px;
+    font-size: var(--font-size-small);
   }
   .user-name {
-    font-size: 12px;
+    font-size: var(--font-size-small);
   }
 }
 </style>

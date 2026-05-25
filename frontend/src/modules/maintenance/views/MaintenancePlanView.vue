@@ -14,71 +14,48 @@
       <p v-if="plan.description"><strong>Описание:</strong> {{ plan.description }}</p>
     </div>
 
-    <!-- Поиск и фильтры -->
-      <div class="filter-row">
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Поиск по всем полям..."
-          class="form-control"
-          style="width: 300px"
-          @input="applyFilters"
-        />
-        <select v-model="statusFilter" class="form-control" style="width: 150px" @change="applyFilters">
-          <option value="">Все статусы</option>
-          <option value="pending">Ожидает</option>
-          <option value="in_progress">В работе</option>
-          <option value="completed">Выполнено</option>
-          <option value="not_completed">Не выполнено</option>
-        </select>
-        <select v-model="serviceTypeFilter" class="form-control" style="width: 180px" @change="applyFilters">
-          <option value="">Все типы ТО</option>
-          <option value="плановое ТО">Плановое ТО</option>
-          <option value="внеплановое ТО">Внеплановое ТО</option>
-          <option value="капитальный ремонт">Капитальный ремонт</option>
-          <option value="текущий ремонт">Текущий ремонт</option>
-          <option value="аварийный ремонт">Аварийный ремонт</option>
-          <option value="модернизация">Модернизация</option>
-        </select>
-        <button class="btn btn-secondary" @click="resetFilters">Сбросить</button>
-      </div>
-      <br>
+    <div class="filter-row">
+      <input
+        v-model="searchQuery"
+        type="text"
+        placeholder="Поиск по всем полям..."
+        class="form-control"
+        style="width: 300px"
+        @input="applyFilters"
+      />
+      <select v-model="statusFilter" class="form-control" style="width: 150px" @change="applyFilters">
+        <option value="">Все статусы</option>
+        <option value="pending">Ожидает</option>
+        <option value="in_progress">В работе</option>
+        <option value="completed">Выполнено</option>
+        <option value="not_completed">Не выполнено</option>
+      </select>
+      <select v-model="serviceTypeFilter" class="form-control" style="width: 180px" @change="applyFilters">
+        <option value="">Все типы ТО</option>
+        <option value="плановое ТО">Плановое ТО</option>
+        <option value="внеплановое ТО">Внеплановое ТО</option>
+        <option value="капитальный ремонт">Капитальный ремонт</option>
+        <option value="текущий ремонт">Текущий ремонт</option>
+        <option value="аварийный ремонт">Аварийный ремонт</option>
+        <option value="модернизация">Модернизация</option>
+      </select>
+      <button class="btn btn-secondary" @click="resetFilters">Сбросить</button>
+    </div>
+    <br>
 
-    <!-- Таблица мероприятий с прокруткой -->
     <div class="table-scroll-container">
       <table class="data-table">
         <thead>
           <tr>
             <th @click="sortBy('index')">№ п/п</th>
-            <th @click="sortBy('node_name')">
-              Наименование агрегата
-              <span class="sort-icon" v-if="sortField === 'node_name'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-            </th>
-            <th @click="sortBy('location')">
-              Местоположение
-              <span class="sort-icon" v-if="sortField === 'location'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-            </th>
-            <th @click="sortBy('expiry_date')">
-              Дата истечения срока ТО
-              <span class="sort-icon" v-if="sortField === 'expiry_date'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-            </th>
-            <th @click="sortBy('completed_date')">
-              Дата проведения ТО
-              <span class="sort-icon" v-if="sortField === 'completed_date'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-            </th>
-            <th @click="sortBy('service_type')">
-              Тип обслуживания
-              <span class="sort-icon" v-if="sortField === 'service_type'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-            </th>
-            <th @click="sortBy('status_name')">
-              Статус
-              <span class="sort-icon" v-if="sortField === 'status_name'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-            </th>
-            <th @click="sortBy('notes')">
-              Примечание
-              <span class="sort-icon" v-if="sortField === 'notes'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-            </th>
-            <th>Действия</th>
+            <th @click="sortBy('node_name')">Наименование агрегата</th>
+            <th @click="sortBy('location')">Местоположение</th>
+            <th @click="sortBy('expiry_date')">Дата истечения срока ТО</th>
+            <th @click="sortBy('completed_date')">Дата проведения ТО</th>
+            <th @click="sortBy('service_type')">Тип обслуживания</th>
+            <th @click="sortBy('status_name')">Статус</th>
+            <th @click="sortBy('notes')">Примечание</th>
+            <th v-if="canEdit">Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -99,16 +76,13 @@
             <td>
               <template v-if="task.completed_date">
                 {{ formatDate(task.completed_date) }}
-                <!-- Если дата выполнения позже срока -->
-               <span v-if="getDaysDiff(task.expiry_date, task.completed_date) > 0" class="overdue-completed-badge">
+                <span v-if="getDaysDiff(task.expiry_date, task.completed_date) > 0" class="overdue-completed-badge">
                   (просрочено на {{ getDaysDiff(task.expiry_date, task.completed_date) }} дн.)
                 </span>
-                <!-- Галочка только для выполненных мероприятий -->
                 <span v-if="task.status_name === 'completed'" class="success-check">✅</span>
               </template>
               <template v-else>
                 <span class="not-completed">—</span>
-                <!-- Если не выполнено, но уже просрочено -->
                 <span v-if="getDaysDiff(task.expiry_date) < 0" class="overdue-badge">
                   просрочено на {{ Math.abs(getDaysDiff(task.expiry_date)) }} дн.
                 </span>
@@ -117,47 +91,43 @@
             <td>{{ task.service_type }}</td>
             <td>
               {{ getStatusText(task.status_name) }}
-              
-              <!-- Просрочено, но не выполнено -->
               <span v-if="task.status_name !== 'completed' && getDaysDiff(task.expiry_date) > 0" class="overdue-badge">
                 просрочено на {{ getDaysDiff(task.expiry_date) }} дн.
               </span>
-
-              <!-- Выполнено с опозданием -->
               <span v-if="task.status_name === 'completed' && task.completed_date && getDaysDiff(task.expiry_date, task.completed_date) > 0" class="overdue-completed-badge">
                 опоздание на {{ getDaysDiff(task.expiry_date, task.completed_date) }} дн.
               </span>
             </td>
             <td>{{ task.notes || '-' }}</td>
-            <td>
+            <td v-if="canEdit">
               <button class="btn btn-sm btn-secondary" @click="openEditTaskForm(task)">✏️</button>
               <button class="btn btn-sm btn-danger" @click="deleteTask(task.maintenance_id)">🗑️</button>
             </td>
           </tr>
           <tr v-if="filteredAndSortedTasks.length === 0">
-            <td colspan="9">Нет данных</td>
+            <td :colspan="canEdit ? 9 : 8">Нет данных</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Кнопки действий -->
     <div class="action-bar">
       <div class="button-group">
-        <div class="dropdown">
-          <button class="btn btn-secondary" @click="toggleExportDropdown">📎 Экспорт плана</button>
-          <div v-if="exportDropdownOpen" class="dropdown-menu">
+        <div class="dropdown" ref="exportDropdownRef">
+          <button class="btn btn-secondary" @click="toggleExportDropdown">
+            📎 Экспорт плана {{ exportDropdownOpen ? '▲' : '▼' }}
+          </button>
+          <div v-if="exportDropdownOpen" class="dropdown-menu-right">
             <button class="dropdown-item" @click="exportTasksToExcel">Excel</button>
             <button class="dropdown-item" @click="exportTasksToWord">Word</button>
           </div>
         </div>
         <button class="btn btn-secondary" @click="openChartModal">📊 График нагрузки</button>
         <button class="btn btn-secondary" @click="openCalendarModal">📅 Календарь</button>
-        <button class="btn btn-primary" @click="openAddTaskForm">+ Добавить мероприятие</button>
+        <button v-if="canEdit" class="btn btn-primary" @click="openAddTaskForm">+ Добавить мероприятие</button>
       </div>
     </div>
 
-    <!-- Модальные окна -->
     <MaintenanceTaskForm 
       ref="taskFormRef" 
       :tasks="tasks"
@@ -202,6 +172,7 @@ const planFormRef = ref();
 const confirmDialog = ref();
 const chartModalRef = ref();
 const calendarModalRef = ref();
+const exportDropdownRef = ref();
 
 const plan = ref<any>(null);
 const tasks = ref<any[]>([]);
@@ -259,39 +230,29 @@ function getDaysDiff(expiryDate: string, completedDate?: string): number {
   const expiry = new Date(expiryDate);
   expiry.setHours(0, 0, 0, 0);
   
-  // Если дата выполнения или сегодня РАНЬШЕ срока - нет просрочки
   if (targetDate <= expiry) {
-    return 0;  // не просрочено
+    return 0;
   }
   
-  // Если позже - считаем количество дней просрочки
   const diff = Math.ceil((targetDate.getTime() - expiry.getTime()) / (1000 * 3600 * 24));
   return diff;
 }
 
 function getRowClass(task: any): string {
-  // Если статус "Выполнено" - без подсветки
   if (task.status_name === 'completed') {
-    console.log('→ completed, no color');
     return '';
   }
   
   const daysDiff = getDaysDiff(task.expiry_date);
-  console.log('daysDiff:', daysDiff);
   
-  // Просрочено (красный)
   if (daysDiff > 0) {
-    console.log('→ expired-row (red)');
     return 'expired-row';
   }
   
-  // Скоро (желтый) - меньше или равно 30 дней
   if (daysDiff <= 30 && daysDiff > 0) {
-    console.log('→ warning-row (yellow)');
     return 'warning-row';
   }
   
-  console.log('→ no color');
   return '';
 }
 
@@ -321,6 +282,10 @@ function getDaysWord(days: number): string {
 
 function openChartModal() {
   chartModalRef.value?.open();
+}
+
+function openCalendarModal() {
+  calendarModalRef.value?.open();
 }
 
 async function loadData() {
@@ -381,14 +346,11 @@ function resetFilters() {
   serviceTypeFilter.value = '';
 }
 
-function openCalendarModal() {
-  calendarModalRef.value?.open();
-}
-
 function goBack() { router.back(); }
 function editPlan() { planFormRef.value?.open(plan.value); }
 
 async function deletePlan() {
+  if (!canEdit.value) return;
   const ok = await confirmDialog.value?.show('Удаление', 'Удалить план?');
   if (ok) {
     await maintenanceStore.deletePlan(plan.value.plan_id);
@@ -398,10 +360,17 @@ async function deletePlan() {
 }
 
 function goToNode(nodeId: number) { router.push(`/equipment/${nodeId}`); }
-function openAddTaskForm() { taskFormRef.value?.open(plan.value.plan_id); }
-function openEditTaskForm(task: any) { taskFormRef.value?.open(plan.value.plan_id, task); }
+function openAddTaskForm() { 
+  if (!canEdit.value) return;
+  taskFormRef.value?.open(plan.value.plan_id); 
+}
+function openEditTaskForm(task: any) { 
+  if (!canEdit.value) return;
+  taskFormRef.value?.open(plan.value.plan_id, task); 
+}
 
 async function deleteTask(id: number) {
+  if (!canEdit.value) return;
   const ok = await confirmDialog.value?.show('Удаление', 'Вы точно хотите удалить мероприятие?');
   if (ok) {
     await maintenanceStore.deleteTask(id);
@@ -459,7 +428,6 @@ function exportTasksToExcel() {
   showToast('Экспорт плана в Excel выполнен успешно', 'success');
 }
 
-
 function exportTasksToWord() {
   const data = getTasksExportData()
   if (data.length === 0) {
@@ -473,10 +441,15 @@ function exportTasksToWord() {
   showToast('Экспорт плана в Word выполнен успешно', 'success');
 }
 
-function toggleExportDropdown() { exportDropdownOpen.value = !exportDropdownOpen.value; }
+function toggleExportDropdown() { 
+  exportDropdownOpen.value = !exportDropdownOpen.value; 
+}
+
 function handleClickOutside(event: MouseEvent) {
   const target = event.target as HTMLElement;
-  if (!target.closest('.dropdown')) exportDropdownOpen.value = false;
+  if (exportDropdownRef.value && !exportDropdownRef.value.contains(target)) {
+    exportDropdownOpen.value = false;
+  }
 }
 
 onMounted(() => {
@@ -505,33 +478,43 @@ onUnmounted(() => {
 .action-bar { margin-top: 20px; display: flex; justify-content: flex-end; }
 .button-group { display: flex; gap: 10px; position: relative; }
 .dropdown { position: relative; }
-.dropdown-menu {
-  position: absolute; top: 100%; left: 0; margin-top: 4px;
-  background: white; border: 1px solid #e0e4e8; border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 100; min-width: 150px;
+.dropdown-menu-right {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: auto;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #e0e4e8;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  z-index: 100;
+  min-width: 150px;
 }
 .dropdown-item {
-  display: block; width: 100%; padding: 8px 12px; text-align: left;
-  background: none; border: none; cursor: pointer; font-size: 14px;
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
 }
 .dropdown-item:hover { background-color: #f0f2f5; }
 .filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .link-btn {
-  background: none; border: none; color: #2c5f8a; cursor: pointer; font-size: 15px; text-align: left;
+  background: none;
+  border: none;
+  color: #2c5f8a;
+  cursor: pointer;
+  font-size: 15px;
+  text-align: left;
 }
 .link-btn:hover { color: #1e4566; }
-.success-check {
-  margin-left: 5px;
-  font-size: 14px;
-}
-.not-completed {
-  color: #999;
-}
-.sort-icon {
-  margin-left: 5px;
-  font-size: 12px;
-  color: #2c5f8a;
-}
+.success-check { margin-left: 5px; font-size: 14px; }
+.not-completed { color: #999; }
+.sort-icon { margin-left: 5px; font-size: 12px; color: #2c5f8a; }
 .overdue-badge {
   display: inline-block;
   margin-left: 8px;
@@ -550,17 +533,8 @@ onUnmounted(() => {
   border-radius: 4px;
   font-size: 10px;
 }
-/* Цветовые классы для строк */
-.warning-row {
-  background-color: #ffd699;
-}
-.warning-row:hover {
-  background-color: #ffbb55;
-}
-.expired-row {
-  background-color: #ffb3b3;
-}
-.expired-row:hover {
-  background-color: #ff8080;
-}
+.warning-row { background-color: #ffd699; }
+.warning-row:hover { background-color: #ffbb55; }
+.expired-row { background-color: #ffb3b3; }
+.expired-row:hover { background-color: #ff8080; }
 </style>

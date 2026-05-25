@@ -31,27 +31,27 @@ defineExpose({ show })
   top: 20px;
   right: 20px;
   padding: 14px 24px;
-  border-radius: 8px;
-  color: white;
+  border-radius: var(--border-radius);
+  color: var(--text-white);
   z-index: 9999;
   animation: slideIn 0.3s ease;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   font-weight: 500;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-modal);
   min-width: 200px;
   text-align: center;
 }
 
 .toast.success {
-  background-color: #27ae60;
+  background-color: var(--success-color);
 }
 
 .toast.error {
-  background-color: #c0392b;
+  background-color: var(--danger-color);
 }
 
 .toast.info {
-  background-color: #2c5f8a;
+  background-color: var(--primary-color);
 }
 
 @keyframes slideIn {

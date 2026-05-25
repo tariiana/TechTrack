@@ -23,8 +23,8 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: auto;
-  border: 1px solid #e0e4e8;
-  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
   background: white;
 }
 
@@ -34,18 +34,18 @@
 }
 
 .table-scroll::-webkit-scrollbar-track {
-  background: #e0e4e8;
+  background: var(--scrollbar-track);
   border-radius: 6px;
 }
 
 .table-scroll::-webkit-scrollbar-thumb {
-  background: #2c5f8a;
+  background: var(--scrollbar-thumb);
   border-radius: 6px;
   cursor: pointer;
 }
 
 .table-scroll::-webkit-scrollbar-thumb:hover {
-  background: #1e4566;
+  background: var(--scrollbar-thumb-hover);
 }
 
 .table-wrapper {
@@ -59,11 +59,14 @@
   min-width: max-content;
 }
 
-/* Фиксируем заголовок */
 .table-wrapper :deep(th) {
   position: sticky;
   top: 0;
-  background: #f8f9fa;
   z-index: 10;
+  background-color: var(--bg-table-header);
+}
+
+.table-wrapper :deep(th):hover {
+  background-color: var(--bg-table-header-hover);
 }
 </style>

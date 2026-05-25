@@ -111,12 +111,19 @@ const overdueWarning = ref('');
 const confirmDialog = ref();
 const submitted = ref(false);
 
+// Проверка прав доступа
+const canEdit = computed(() => {
+  const user = localStorage.getItem('user');
+  if (!user) return false;
+  const role = JSON.parse(user).role;
+  return role === 'operator' || role === 'admin';
+});
+
 // Переменные для поиска
 const searchQuery = ref('');
 const showDropdown = ref(false);
 const filteredEquipment = ref<any[]>([]);
 
-// Функция фильтрации оборудования
 function filterEquipment() {
   if (!searchQuery.value.trim()) {
     filteredEquipment.value = equipmentNodes.value;
@@ -129,16 +136,13 @@ function filterEquipment() {
   showDropdown.value = true;
 }
 
-// Выбор оборудования из списка
 function selectEquipment(node: any) {
   form.node_id = node.node_id;
   searchQuery.value = node.name;
   showDropdown.value = false;
-  // При смене оборудования обновляем проверку просрочки
   checkOverdue();
 }
 
-// Закрытие выпадающего списка
 function closeDropdown() {
   setTimeout(() => {
     showDropdown.value = false;
@@ -148,37 +152,26 @@ function closeDropdown() {
 // Функция проверки, является ли день выходным или праздником
 function isWeekendOrHoliday(dateStr: string): { isHoliday: boolean; message: string } {
   if (!dateStr) return { isHoliday: false, message: '' };
-  
   const date = new Date(dateStr);
   const dayOfWeek = date.getDay();
-  
   if (dayOfWeek === 0) {
     return { isHoliday: true, message: 'Выбранное число - воскресенье (выходной день)' };
   }
   if (dayOfWeek === 6) {
     return { isHoliday: true, message: 'Выбранное число - суббота (выходной день)' };
   }
-  
   const holidays: Record<string, string> = {
-    '01-01': 'Новый год',
-    '01-02': 'Новый год',
-    '01-07': 'Рождество',
-    '02-23': 'День защитника Отечества',
-    '03-08': 'Международный женский день',
-    '05-01': 'Праздник Весны и Труда',
-    '05-09': 'День Победы',
-    '06-12': 'День России',
-    '11-04': 'День народного единства',
+    '01-01': 'Новый год', '01-02': 'Новый год', '01-07': 'Рождество',
+    '02-23': 'День защитника Отечества', '03-08': 'Международный женский день',
+    '05-01': 'Праздник Весны и Труда', '05-09': 'День Победы',
+    '06-12': 'День России', '11-04': 'День народного единства',
   };
-  
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   const key = `${month}-${day}`;
-  
   if (holidays[key]) {
     return { isHoliday: true, message: `Выбранное число - ${holidays[key]} (праздничный день)` };
   }
-  
   return { isHoliday: false, message: '' };
 }
 
@@ -191,7 +184,6 @@ function checkDate() {
   holidayWarning.value = result.message;
 }
 
-// Функция для склонения дней
 function getDaysWord(days: number): string {
   const lastDigit = days % 10;
   const lastTwoDigits = days % 100;
@@ -210,19 +202,13 @@ function formatDateSimple(dateStr: string): string {
   return `${day}.${month}.${year}`;
 }
 
-// Проверка просрочки (дата проведения позже срока ТО)
 function checkOverdue() {
   overdueWarning.value = '';
-  
   if (!form.completed_date || !form.node_id) return;
-  
-  // Ищем задачу для этого оборудования, чтобы узнать expiry_date
   const taskForNode = props.tasks?.find(t => t.node_id === form.node_id);
   if (!taskForNode?.expiry_date) return;
-  
   const completedDate = new Date(form.completed_date);
   const expiryDate = new Date(taskForNode.expiry_date);
-  
   if (completedDate > expiryDate) {
     const daysDiff = Math.ceil((completedDate.getTime() - expiryDate.getTime()) / (1000 * 3600 * 24));
     overdueWarning.value = `⚠️ Внимание! Дата проведения ТО на ${daysDiff} ${getDaysWord(daysDiff)} позже истечения срока ТО (${formatDateSimple(taskForNode.expiry_date)}). Рекомендуется указать корректную дату.`;
@@ -249,7 +235,6 @@ watch(() => form.completed_date, () => {
   checkOverdue();
 });
 
-// Следим за сменой оборудования
 watch(() => form.node_id, () => {
   checkOverdue();
 });
@@ -261,6 +246,12 @@ function loadEquipment() {
 }
 
 function open(pId: number, task?: any) {
+  // Проверка прав - observer не может открыть форму
+  if (!canEdit.value) {
+    showToast('Недостаточно прав для выполнения действия', 'error');
+    return;
+  }
+  
   reset();
   loadEquipment();
   planId.value = pId;
@@ -271,7 +262,6 @@ function open(pId: number, task?: any) {
     form.status_name = task.status_name;
     form.completed_date = task.completed_date || '';
     form.notes = task.notes || '';
-    
     const selectedNode = equipmentNodes.value.find(n => n.node_id === task.node_id);
     searchQuery.value = selectedNode?.name || '';
   } else {

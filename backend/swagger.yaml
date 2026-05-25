@@ -1,0 +1,143 @@
+openapi: 3.0.0
+info:
+  title: Equipment Management API
+  version: 2.0.0
+  description: API для системы учета оборудования
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+
+paths:
+  /nodes:
+    get:
+      summary: Получить список узлов
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: sort
+          in: query
+          description: 'Сортировка: -created_at (по убыванию) или name,-status'
+          schema: { type: string, default: '-created_at' }
+        - name: filters
+          in: query
+          description: 'JSON фильтров: {"status": "исправен", "manufacturer": {"operator": "like", "value": "НПП"}}'
+          schema: { type: string }
+        - name: columns
+          in: query
+          description: 'Выбор колонок через запятую: node_id,manufacturer,model'
+          schema: { type: string }
+      responses:
+        200:
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { type: array }
+                  meta:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      page: { type: integer }
+                      limit: { type: integer }
+                      pages: { type: integer }
+    post:
+      summary: Создать узел
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [node_type_id, manufacturer, model, status, location, subsystem_id]
+              properties:
+                node_type_id: { type: string, format: uuid }
+                manufacturer: { type: string }
+                model: { type: string }
+                status: { type: string, enum: ['получен (не проверен)', 'исправен', 'неисправен', 'в ремонте', 'на поверке', 'законсервирован', 'списан'] }
+                location: { type: string }
+                subsystem_id: { type: string, format: uuid }
+                parameters: { type: object }
+      responses:
+        201:
+          description: Создано успешно
+
+  /nodes/{id}:
+    get:
+      summary: Получить узел по ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        200:
+          description: Карточка узла
+
+  /nodes/{parentId}/install/{childId}:
+    post:
+      summary: Установить узел в агрегат
+      parameters:
+        - name: parentId
+          in: path
+          required: true
+        - name: childId
+          in: path
+          required: true
+      responses:
+        200:
+          description: Успешно установлено
+
+  /nodes/{childId}/uninstall:
+    delete:
+      summary: Извлечь узел из агрегата
+      parameters:
+        - name: childId
+          in: path
+          required: true
+      responses:
+        200:
+          description: Успешно извлечено
+
+  /subsystems:
+    get:
+      summary: Получить дерево подсистем
+      responses:
+        200:
+          description: Дерево подсистем
+
+  /instruments/upcoming:
+    get:
+      summary: Получить СИ с истекающей поверкой
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer, default: 30 }
+      responses:
+        200:
+          description: Список СИ для предупреждения
+
+  /maintenance/plan:
+    post:
+      summary: Сгенерировать план ТО
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [aggregate_ids, start_date]
+              properties:
+                aggregate_ids: { type: array, items: { type: string } }
+                start_date: { type: string, format: date }
+                plan_name: { type: string }
+      responses:
+        200:
+          description: План создан

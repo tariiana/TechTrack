@@ -136,6 +136,8 @@ const canEdit = computed(() => {
   const role = JSON.parse(user).role;
   return role === 'operator' || role === 'admin';
 });
+const canExport = computed(() => true);
+const canConfigureColumns = computed(() => true);
 
 const visibleOrderedColumns = computed(() => {
   return columnOrder.value.filter(key => visibleColumns.value[key]);
@@ -339,6 +341,8 @@ onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
   if (searchTimer) clearTimeout(searchTimer);
 });
+
+
 </script>
 
 <style scoped>
@@ -402,4 +406,5 @@ onUnmounted(() => {
 .dropdown-item:hover {
   background-color: #f0f2f5;
 }
+
 </style>

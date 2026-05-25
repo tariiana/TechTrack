@@ -54,6 +54,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
 import { useUsersStore } from '../stores/usersStore';
+import { showToast } from '@/utils/toast';
 
 const store = useUsersStore();
 const visible = ref(false);
@@ -152,13 +153,16 @@ async function save() {
 
     if (isEdit.value && editId.value) {
       await store.updateUser(editId.value, data);
+      showToast('Пользователь успешно обновлён', 'success');
     } else {
       await store.createUser(data);
+      showToast('Пользователь успешно создан', 'success');
     }
     close();
     window.dispatchEvent(new Event('user-saved'));
   } catch (err: any) {
     error.value = err.message || 'Ошибка при сохранении пользователя';
+    showToast(error.value, 'error');
   }
 }
 
@@ -182,12 +186,5 @@ defineExpose({ open });
 }
 .invalid {
   border-color: #c0392b !important;
-  background-color: #ffe0e0;
-}
-.error-text {
-  color: #c0392b;
-  font-size: 12px;
-  margin-top: 4px;
-  display: block;
 }
 </style>

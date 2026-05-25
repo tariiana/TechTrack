@@ -20,14 +20,6 @@ async function getById(req, res, next) {
   } catch (err) { next(err); }
 }
 
-async function getTemplate(req, res, next) {
-  try {
-    const template = await NodeType.getTemplate(req.params.id);
-    if (!template) return res.status(404).json(ResponseFormatter.error('Вид узла не найден', 404));
-    res.json(template);
-  } catch (err) { next(err); }
-}
-
 async function create(req, res, next) {
   try {
     const newType = await NodeType.create(req.body, getRequestUserId(req));
@@ -52,7 +44,6 @@ async function deleteType(req, res, next) {
 module.exports = {
   getAll,
   getById,
-  getTemplate,
   create,
   update,
   delete: deleteType,

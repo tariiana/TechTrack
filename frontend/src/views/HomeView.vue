@@ -126,7 +126,7 @@
       </div>
     </div>
 
-    <!-- Блок срочных уведомлений (прокручивается) -->
+    <!-- Блок срочных уведомлений -->
     <div class="alerts-section" v-if="urgentAlerts.length > 0">
       <h3>⚠️ Срочные уведомления</h3>
       <div class="alerts-list">
@@ -139,7 +139,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useEquipmentStore } from '@/modules/equipment/stores/equipmentStore'
 import { useSIStore } from '@/modules/si/stores/siStore'
@@ -198,14 +198,11 @@ async function loadDashboardData() {
 }
 
 async function loadStats() {
-  // Статистика оборудования
-  // Используем rawNodes (все узлы) или nodes (отфильтрованные)
   const equipmentNodes = equipmentStore.rawNodes || equipmentStore.nodes || []
   stats.value.equipment.total = equipmentNodes.filter((n: any) => !n.is_deleted).length
   stats.value.equipment.aggregates = equipmentNodes.filter((n: any) => n.type === 'aggregate' && !n.is_deleted).length
   stats.value.equipment.blocks = equipmentNodes.filter((n: any) => n.type === 'block' && !n.is_deleted).length
 
-  // Статистика СИ
   const siList = siStore.allInstruments || []
   stats.value.si.total = siList.filter((s: any) => !s.is_deleted).length
   
@@ -223,7 +220,6 @@ async function loadStats() {
   stats.value.si.expiringSoon = expiringSoon
   stats.value.si.expired = expired
 
-  // Статистика ресурсов
   const resourcesList = resourcesStore.resources || []
   stats.value.resources.total = resourcesList.length
   let critical = 0
@@ -237,11 +233,9 @@ async function loadStats() {
   stats.value.resources.critical = critical
   stats.value.resources.warning = warning
 
-  // Статистика обслуживания
   const plansList = maintenanceStore.plans || []
   stats.value.maintenance.plansCount = plansList.length
 
-  // Сбор срочных уведомлений
   urgentAlerts.value = []
 
   for (const si of siList) {
@@ -276,38 +270,27 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.data-table {
-  min-width: 100%;
-  width: max-content;
-  max-width: 100%;
-}
-
-/* Убеждаемся, что карточка не растягивается */
-.card {
-  overflow-x: auto;
-}
 .dashboard {
   max-width: 1400px;
   margin: 0 auto;
 }
 
-/* Фиксированные блоки модулей */
 .fixed-modules {
   position: sticky;
   top: 20px;
   z-index: 10;
-  background: #f0f2f5;
+  background: var(--bg-body);
   padding-bottom: 10px;
 }
 
 .dashboard-title {
   font-size: 24px;
-  color: #2c3e50;
+  color: var(--text-secondary);
   margin-bottom: 8px;
 }
 
 .dashboard-subtitle {
-  color: #6c757d;
+  color: var(--text-muted);
   margin-bottom: 32px;
 }
 
@@ -318,19 +301,19 @@ onMounted(async () => {
 }
 
 .module-card {
-  background: white;
+  background: var(--bg-card);
   border-radius: 12px;
   padding: 20px;
   cursor: pointer;
   transition: all 0.2s ease;
-  border: 1px solid #e0e4e8;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-card);
 }
 
 .module-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-  border-color: #2c5f8a;
+  border-color: var(--primary-color);
 }
 
 .module-icon {
@@ -363,7 +346,7 @@ onMounted(async () => {
 .module-card h3 {
   font-size: 18px;
   margin-bottom: 16px;
-  color: #2c3e50;
+  color: var(--text-secondary);
 }
 
 .module-stats {
@@ -377,7 +360,7 @@ onMounted(async () => {
   flex: 1;
   text-align: center;
   padding: 8px 4px;
-  background: #f8f9fa;
+  background: var(--bg-sidebar);
   border-radius: 8px;
 }
 
@@ -385,25 +368,25 @@ onMounted(async () => {
   display: block;
   font-size: 20px;
   font-weight: bold;
-  color: #2c5f8a;
+  color: var(--primary-color);
 }
 
 .stat-label {
   display: block;
   font-size: 11px;
-  color: #6c757d;
+  color: var(--text-muted);
   margin-top: 4px;
 }
 
 .module-footer {
   text-align: right;
-  border-top: 1px solid #e0e4e8;
+  border-top: 1px solid var(--border-color);
   padding-top: 12px;
 }
 
 .module-link {
   font-size: 13px;
-  color: #2c5f8a;
+  color: var(--primary-color);
   font-weight: 500;
 }
 
@@ -411,19 +394,18 @@ onMounted(async () => {
   text-decoration: underline;
 }
 
-/* Блок уведомлений (прокручивается) */
 .alerts-section {
-  background: white;
+  background: var(--bg-card);
   border-radius: 12px;
   padding: 20px;
-  border: 1px solid #e0e4e8;
+  border: 1px solid var(--border-color);
   margin-top: 20px;
 }
 
 .alerts-section h3 {
   font-size: 18px;
   margin-bottom: 16px;
-  color: #c0392b;
+  color: var(--danger-color);
 }
 
 .alerts-list {
@@ -439,15 +421,15 @@ onMounted(async () => {
 }
 
 .alert-item.danger {
-  background-color: #ffe0e0;
-  border-left: 4px solid #c0392b;
-  color: #c0392b;
+  background-color: var(--row-expired);
+  border-left: 4px solid var(--danger-color);
+  color: var(--danger-color);
 }
 
 .alert-item.warning {
-  background-color: #fff3e0;
-  border-left: 4px solid #e67e22;
-  color: #e67e22;
+  background-color: var(--row-warning);
+  border-left: 4px solid var(--warning-color);
+  color: var(--warning-color);
 }
 
 @media (max-width: 768px) {

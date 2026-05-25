@@ -60,7 +60,6 @@ app.use('/api/subsystems', require('./src/routes/subsystems.routes'));
 app.use('/api/node-types', require('./src/routes/nodeTypes.routes'));
 app.use('/api/resources', require('./src/routes/resources.routes'));
 app.use('/api/users', require('./src/routes/users.routes'));
-app.use('/api/audit', require('./src/routes/audit.routes'));
 
 // Health check
 app.get('/health', (req, res) => {

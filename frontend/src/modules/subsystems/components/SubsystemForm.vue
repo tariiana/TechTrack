@@ -59,7 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { reactive, ref, computed } from 'vue';
 import { useSubsystemStore } from '../stores/subsystemsStore';
 import type { Subsystem, SubsystemPayload, SubsystemTreeItem } from '../types/subsystemsTypes';
 
@@ -72,6 +72,14 @@ const error = ref('');
 const parentOptions = ref<Subsystem[]>([]);
 
 const emit = defineEmits<{ (event: 'saved', subsystem: Subsystem): void }>();
+
+// Проверка прав доступа
+const canEdit = computed(() => {
+  const user = localStorage.getItem('user');
+  if (!user) return false;
+  const role = JSON.parse(user).role;
+  return role === 'operator' || role === 'admin';
+});
 
 const errors = reactive({
   name: '',
@@ -91,7 +99,6 @@ function collectDescendantIds(nodes: SubsystemTreeItem[], id: string, found = fa
     if (isInsideTarget) result.add(node.subsys_id);
     collectDescendantIds(node.children || [], id, isInsideTarget, result);
   }
-
   return result;
 }
 
@@ -136,6 +143,11 @@ function validate(): boolean {
 }
 
 async function open(subsystem?: Subsystem, parentId: string | null = null) {
+  // Проверка прав - observer не может открыть форму добавления/редактирования
+  if (!canEdit.value) {
+    return;
+  }
+
   reset();
 
   if (subsystem) {
