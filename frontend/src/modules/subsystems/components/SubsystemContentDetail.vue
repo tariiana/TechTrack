@@ -1,5 +1,25 @@
 <template>
   <section class="content-detail">
+    <template v-if="embeddedComponent && embeddedContentId">
+      <header v-if="canMove" class="embedded-action-bar">
+        <div>
+          <span class="detail-type">{{ typeLabel(item.type) }}</span>
+          <h2>{{ item.title || item.name || 'Без названия' }}</h2>
+        </div>
+        <button class="btn btn-secondary" type="button" @click="$emit('move', item)">
+          Переместить в подсистему
+        </button>
+      </header>
+
+      <component
+        :is="embeddedComponent"
+        embedded
+        :embedded-id="embeddedContentId"
+        @back="$emit('back')"
+      />
+    </template>
+
+    <template v-else>
     <header class="detail-header">
       <button class="btn btn-secondary btn-sm" type="button" @click="$emit('back')">Назад</button>
       <div class="detail-title">
@@ -197,12 +217,18 @@
         </div>
       </div>
     </template>
+    </template>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, type PropType } from 'vue';
+import { computed, defineAsyncComponent } from 'vue';
 import type { SubsystemContentItem } from '../types/subsystemsTypes';
+
+const EquipmentCardView = defineAsyncComponent(() => import('@/modules/equipment/views/EquipmentCardView.vue'));
+const SICardView = defineAsyncComponent(() => import('@/modules/si/views/SICardView.vue'));
+const ResourceCard = defineAsyncComponent(() => import('@/modules/resources/components/ResourceCard.vue'));
+const MaintenancePlanView = defineAsyncComponent(() => import('@/modules/maintenance/views/MaintenancePlanView.vue'));
 
 const props = defineProps<{
   item: SubsystemContentItem;
@@ -215,6 +241,22 @@ defineEmits<{
 }>();
 
 const canMove = computed(() => props.item.type !== 'plan' && props.canEdit);
+
+const embeddedComponent = computed(() => {
+  if (props.item.type === 'equipment') return EquipmentCardView;
+  if (props.item.type === 'instrument') return SICardView;
+  if (props.item.type === 'resource') return ResourceCard;
+  if (props.item.type === 'plan') return MaintenancePlanView;
+  return null;
+});
+
+const embeddedContentId = computed(() => {
+  const item = props.item as Record<string, unknown>;
+  const id = item.type === 'plan'
+    ? item.plan_id || item.id
+    : item.node_id || item.id;
+  return id ? String(id) : '';
+});
 
 function normalizeValue(value: unknown) {
   if (value === null || value === undefined || value === '') return '-';
@@ -284,6 +326,23 @@ const resourceParams = computed(() => {
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 14px;
   align-items: start;
+}
+
+.embedded-action-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid #e0e5eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f7f9fb;
+}
+
+.embedded-action-bar h2 {
+  color: #263746;
+  font-size: 18px;
+  line-height: 1.25;
 }
 
 .detail-title {

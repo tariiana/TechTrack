@@ -189,6 +189,13 @@ import { formatDate } from '@/utils/dateUtils';
 const route = useRoute();
 const router = useRouter();
 const store = useEquipmentStore();
+const props = defineProps<{
+  embedded?: boolean;
+  embeddedId?: string | number | null;
+}>();
+const emit = defineEmits<{
+  (event: 'back'): void;
+}>();
 
 const addChildModalRef = ref();
 const confirmDialog = ref();
@@ -203,8 +210,13 @@ const newLocation = ref('');
 const parentName = ref('');
 const showEditModal = ref(false);
 const editingNodeId = ref<string | null>(null);
+const targetNodeId = computed(() => {
+  const id = props.embedded ? props.embeddedId : route.params.id;
+  return id ? String(id) : '';
+});
 
 const canEdit = computed(() => {
+  if (props.embedded) return false;
   const user = localStorage.getItem('user');
   if (!user) return false;
   try { return ['operator','admin'].includes(JSON.parse(user).role); } catch { return false; }
@@ -323,7 +335,8 @@ async function loadParentName() {
 }
 
 async function loadById(id?: string) {
-  const targetId = id ?? (route.params.id as string);
+  const targetId = id ?? targetNodeId.value;
+  if (!targetId) return;
   const data = await store.getNode(targetId);
   if (data) {
     node.value = data;
@@ -332,16 +345,22 @@ async function loadById(id?: string) {
     moveHistory.value = await store.getMoveHistoryForNode(targetId);
     compositionHistory.value = [];
     await loadParentName();
-  } else router.push('/equipment');
+  } else if (!props.embedded) router.push('/equipment');
 }
 
-function refresh() { loadById(); }
-function goBack() { router.push('/equipment'); }
+function refresh() { loadById(node.value?.node_id); }
+function goBack() {
+  if (props.embedded) {
+    emit('back');
+    return;
+  }
+  router.push('/equipment');
+}
 function editNode() { editingNodeId.value = node.value?.node_id; showEditModal.value = true; }
 async function deleteNode() {
   if (await confirmDialog.value?.show('Списание', 'Списать узел?')) {
     await store.deleteNode(node.value.node_id);
-    router.push('/equipment');
+    goBack();
   }
 }
 function openMoveModal() { newLocation.value = node.value?.location || ''; showMoveModal.value = true; }
@@ -372,19 +391,28 @@ async function deleteResource(nodeId: string) {
   }
 }
 function viewChild(childId: string) {
+  if (props.embedded) {
+    loadById(childId);
+    return;
+  }
   const child = store.allNodes.find((n: any) => n.node_id === childId);
   if (child?.is_si) router.push({ path: '/si', query: { nodeId: childId } });
   else router.push(`/equipment/${childId}`);
 }
 function goToParent() {
+  if (props.embedded && node.value?.installed_in_node) {
+    loadById(node.value.installed_in_node);
+    return;
+  }
   if (node.value?.installed_in_node) router.push(`/equipment/${node.value.installed_in_node}`);
 }
 function goToResource(resourceId: string) {
+  if (props.embedded) return;
   router.push(`/resources/${resourceId}`);
 }
 
-watch(() => route.params.id, (newId) => {
-  if (newId) loadById(newId as string);
+watch(targetNodeId, (newId) => {
+  if (newId) loadById(newId);
 }, { immediate: true });
 </script>
 <style scoped>

@@ -152,7 +152,7 @@
 <script setup lang="ts">
 import CalendarModal from '../components/CalendarModal.vue';
 import { showToast } from '@/utils/toast';
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMaintenanceStore } from '../stores/maintenanceStore';
 import { useEquipmentStore } from '@/modules/equipment/stores/equipmentStore';
@@ -167,6 +167,13 @@ const route = useRoute();
 const router = useRouter();
 const maintenanceStore = useMaintenanceStore();
 const equipmentStore = useEquipmentStore();
+const props = defineProps<{
+  embedded?: boolean;
+  embeddedId?: string | number | null;
+}>();
+const emit = defineEmits<{
+  (event: 'back'): void;
+}>();
 const taskFormRef = ref();
 const planFormRef = ref();
 const confirmDialog = ref();
@@ -183,8 +190,13 @@ const exportDropdownOpen = ref(false);
 
 const sortField = ref<'node_name' | 'location' | 'expiry_date' | 'completed_date' | 'service_type' | 'status_name' | 'notes'>('expiry_date');
 const sortOrder = ref<'asc' | 'desc'>('asc');
+const targetPlanId = computed(() => {
+  const id = props.embedded ? props.embeddedId : route.params.id;
+  return id ? String(id) : '';
+});
 
 const canEdit = computed(() => {
+  if (props.embedded) return false;
   const user = localStorage.getItem('user');
   if (!user) return false;
   const role = JSON.parse(user).role;
@@ -289,7 +301,8 @@ function openCalendarModal() {
 }
 
 async function loadData() {
-  const id = route.params.id as string;
+  const id = targetPlanId.value;
+  if (!id) return;
   plan.value = await maintenanceStore.fetchPlanById(id);
   if (plan.value) {
     tasks.value = plan.value.tasks || [];
@@ -346,7 +359,13 @@ function resetFilters() {
   serviceTypeFilter.value = '';
 }
 
-function goBack() { router.back(); }
+function goBack() {
+  if (props.embedded) {
+    emit('back');
+    return;
+  }
+  router.back();
+}
 function editPlan() { planFormRef.value?.open(plan.value); }
 
 async function deletePlan() {
@@ -355,11 +374,14 @@ async function deletePlan() {
   if (ok) {
     await maintenanceStore.deletePlan(plan.value.plan_id);
     showToast('План успешно удалён', 'success');
-    router.back();
+    goBack();
   }
 }
 
-function goToNode(nodeId: number) { router.push(`/equipment/${nodeId}`); }
+function goToNode(nodeId: number) {
+  if (props.embedded) return;
+  router.push(`/equipment/${nodeId}`);
+}
 function openAddTaskForm() { 
   if (!canEdit.value) return;
   taskFormRef.value?.open(plan.value.plan_id); 
@@ -452,8 +474,9 @@ function handleClickOutside(event: MouseEvent) {
   }
 }
 
+watch(targetPlanId, loadData, { immediate: true });
+
 onMounted(() => {
-  loadData();
   document.addEventListener('click', handleClickOutside);
   window.addEventListener('plan-saved', refresh);
   window.addEventListener('task-saved', refresh);

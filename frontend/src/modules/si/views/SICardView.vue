@@ -120,7 +120,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useSIStore } from '../stores/siStore';
 import SIForm from '../components/SIForm.vue';
@@ -131,6 +131,13 @@ import { formatDate, getDaysUntilVerification } from '@/utils/dateUtils';
 const route = useRoute();
 const router = useRouter();
 const store = useSIStore();
+const props = defineProps<{
+  embedded?: boolean;
+  embeddedId?: string | number | null;
+}>();
+const emit = defineEmits<{
+  (event: 'back'): void;
+}>();
 const siFormRef = ref();
 const verFormRef = ref();
 const confirmDialog = ref();
@@ -140,8 +147,13 @@ const verifications = ref<any[]>([]);
 const lastVerificationDate = ref('');
 const nextVerificationDate = ref('');
 const paramsList = ref<any[]>([]);
+const targetInstrumentId = computed(() => {
+  const id = props.embedded ? props.embeddedId : route.params.id;
+  return id ? String(id) : '';
+});
 
 const canEdit = computed(() => {
+  if (props.embedded) return false;
   const user = localStorage.getItem('user');
   if (!user) return false;
   const role = JSON.parse(user).role;
@@ -187,7 +199,8 @@ function loadParamsFromJson() {
 }
 
 async function loadData() {
-  const id = String(route.params.id);
+  const id = targetInstrumentId.value;
+  if (!id) return;
   instrument.value = await store.fetchInstrumentById(id);
   if (instrument.value) {
     const data = await store.fetchVerifications(id);
@@ -198,23 +211,35 @@ async function loadData() {
   }
 }
 
-function goBack() { router.push('/si'); }
+function goBack() {
+  if (props.embedded) {
+    emit('back');
+    return;
+  }
+  router.push('/si');
+}
 function editInstrument() { siFormRef.value?.open(instrument.value); }
 async function writeOffInstrument() {
   const ok = await confirmDialog.value?.show('Списание', 'Списать СИ?');
   if (ok) {
     await store.writeOffInstrument(instrument.value.id);
-    router.push('/si');
+    goBack();
   }
 }
 function openAddVerification() { verFormRef.value?.open(instrument.value.id); }
 function editVerification(v: any) { verFormRef.value?.open(instrument.value.id, v); }
 function refresh() { loadData(); }
 
+watch(targetInstrumentId, loadData, { immediate: true });
+
 onMounted(() => {
-  loadData();
   window.addEventListener('si-saved', refresh);
   window.addEventListener('verification-saved', refresh);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('si-saved', refresh);
+  window.removeEventListener('verification-saved', refresh);
 });
 </script>
 

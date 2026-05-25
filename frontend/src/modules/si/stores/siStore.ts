@@ -8,6 +8,7 @@ type EntityId = string | number;
 export const useSIStore = defineStore('si', () => {
   const instruments = ref<any[]>([]);
   const verifications = ref<any[]>([]);
+  const nodeTypes = ref<any[]>([]);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
   const filterParams = ref({ search: '', status: '' });
@@ -83,6 +84,20 @@ export const useSIStore = defineStore('si', () => {
     }
   }
 
+  async function fetchNodeTypes(force = false) {
+    if (!force && nodeTypes.value.length > 0) return nodeTypes.value;
+
+    try {
+      const data = await apiFetch('/node-types');
+      nodeTypes.value = Array.isArray(data) ? data : [];
+      return nodeTypes.value;
+    } catch (err: any) {
+      error.value = err.message;
+      nodeTypes.value = [];
+      return [];
+    }
+  }
+
   function getVerificationsForSI(siId: EntityId) {
     return verifications.value
       .filter(v => String(v.siId) === String(siId))
@@ -153,12 +168,14 @@ export const useSIStore = defineStore('si', () => {
     instruments: filteredInstruments,
     allInstruments,
     verifications,
+    nodeTypes,
     isLoading,
     error,
     filterParams,
     fetchInstruments,
     fetchInstrumentById,
     fetchVerifications,
+    fetchNodeTypes,
     getVerificationsForSI,
     getLastVerificationDate,
     getNextVerificationDate,

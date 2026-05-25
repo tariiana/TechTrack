@@ -12,7 +12,6 @@
             <option value="instrument">СИ</option>
             <option value="resource">Ресурсы</option>
             <option value="maintenance">Обслуживание</option>
-            <option value="plan">Планы ТО</option>
           </select>
         </div>
 
@@ -90,7 +89,6 @@ function typeLabel(type: string) {
     instrument: 'СИ',
     resource: 'Ресурс',
     maintenance: 'ТО',
-    plan: 'План',
   };
   return labels[type] || type;
 }
@@ -112,7 +110,8 @@ async function runSearch() {
   error.value = '';
 
   try {
-    results.value = await store.searchContent(query.value.trim(), selectedType.value);
+    const found = await store.searchContent(query.value.trim(), selectedType.value);
+    results.value = found.filter((item) => item.type !== 'plan');
     selectedItem.value = null;
   } catch (err: any) {
     results.value = [];

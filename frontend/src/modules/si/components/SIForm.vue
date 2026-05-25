@@ -23,8 +23,13 @@
           <input v-model="form.model" class="form-control" />
         </div>
         <div class="form-group">
-          <label>Тип</label>
-          <input v-model="form.typeName" class="form-control" />
+          <label>Тип*</label>
+          <select v-model="form.typeName" class="form-control">
+            <option value="" disabled>Выберите тип</option>
+            <option v-for="type in store.nodeTypes" :key="type.node_type_id" :value="type.name">
+              {{ type.name }}
+            </option>
+          </select>
         </div>
       </div>
 
@@ -129,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue';
+import { ref, reactive, watch, onMounted } from 'vue';
 import { useSIStore } from '../stores/siStore';
 import { showToast } from '@/utils/toast';
 
@@ -147,6 +152,10 @@ interface ParamItem {
 }
 
 const paramsList = ref<ParamItem[]>([]);
+
+onMounted(() => {
+  store.fetchNodeTypes();
+});
 
 // Преобразование JSON параметров в список
 function paramsFromJson(json: Record<string, any>): ParamItem[] {
@@ -286,6 +295,10 @@ function validate(): boolean {
     error.value = 'Введите наименование';
     return false;
   }
+  if (!form.typeName.trim()) {
+    error.value = 'Укажите тип средства измерения';
+    return false;
+  }
   if (!form.tabNumber) {
     error.value = 'Введите табельный номер';
     return false;
@@ -312,7 +325,7 @@ async function save() {
     name: form.name,
     manufacturer: form.manufacturer,
     model: form.model,
-    typeName: form.typeName,
+    typeName: form.typeName.trim(),
     serialNumber: form.serialNumber,
     inventoryNumber: form.inventoryNumber,
     tabNumber: form.tabNumber,

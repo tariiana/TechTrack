@@ -138,7 +138,7 @@
     <!-- Кнопки журнала и добавления измерения -->
     <div class="measurement-buttons">
       <button class="btn btn-secondary" @click="openMeasurementsModal">📊 Журнал измерений</button>
-      <button class="btn btn-primary" @click="openAddMeasurementModal">+ Добавить измерение</button>
+      <button v-if="canEdit" class="btn btn-primary" @click="openAddMeasurementModal">+ Добавить измерение</button>
     </div>
 
     <div class="text-muted" style="margin-top: 15px">
@@ -214,6 +214,13 @@ function formatOptional(value: any): string {
 const route = useRoute();
 const router = useRouter();
 const store = useResourcesStore();
+const props = defineProps<{
+  embedded?: boolean;
+  embeddedId?: string | number | null;
+}>();
+const emit = defineEmits<{
+  (event: 'back'): void;
+}>();
 const formRef = ref();
 const addMeasurementModalRef = ref();
 const measurementsModalRef = ref();
@@ -230,6 +237,10 @@ const chartKey = ref(0);
 const chartCanvas = ref<HTMLCanvasElement | null>(null);
 let chartInstance: any = null;
 const selectedParam = ref('U');
+const targetResourceId = computed(() => {
+  const id = props.embedded ? props.embeddedId : route.params.id;
+  return id ? String(id) : '';
+});
 
 // Переменные для модального окна дополнительных параметров
 const showCustomParamModal = ref(false);
@@ -254,6 +265,7 @@ const hasChartData = computed(() => {
 });
 
 const canEdit = computed(() => {
+  if (props.embedded) return false;
   const user = localStorage.getItem('user');
   if (!user) return false;
   const role = JSON.parse(user).role;
@@ -529,7 +541,8 @@ async function renderChart() {
 }
 
 async function loadData() {
-  const id = route.params.id as string;
+  const id = targetResourceId.value;
+  if (!id) return;
   try {
     resource.value = await store.fetchResourceById(id);
     await loadParameters();
@@ -636,7 +649,13 @@ async function loadParameters() {
   console.log('📊 Дополнительные параметры:', customResult);
 }
 
-function goBack() { router.back(); }
+function goBack() {
+  if (props.embedded) {
+    emit('back');
+    return;
+  }
+  router.back();
+}
 function editResource() { formRef.value?.open(resource.value); }
 
 function openAddMeasurementModal() { addMeasurementModalRef.value?.open(resource.value.resource_id); }
@@ -700,6 +719,8 @@ watch(() => resource.value?.resource_params?.measurements, () => {
   setTimeout(() => renderChart(), 100);
 }, { deep: true });
 
+watch(targetResourceId, loadData, { immediate: true });
+
 onUnmounted(() => {
   if (chartInstance) {
     chartInstance.destroy();
@@ -710,7 +731,6 @@ onUnmounted(() => {
 });
 
 onMounted(() => {
-  loadData();
   document.addEventListener('click', handleClickOutside);
   window.addEventListener('resource-saved', refresh);
 });
