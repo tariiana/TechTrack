@@ -98,7 +98,7 @@
 
           <div class="about-developers">
             <h3>Разработчики:</h3>
-            <p>Студенты ДИТИ НИЯУ МИФИ</p>
+            <p>Студенты техникума ДИТИ НИЯУ МИФИ</p>
           </div>
         </div>
         <div class="modal-footer">

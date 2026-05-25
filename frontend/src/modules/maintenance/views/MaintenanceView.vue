@@ -23,14 +23,12 @@
         placeholder="Поиск по названию"
         class="form-control"
         style="width: 250px"
-        @input="applyFilters"
       />
       <input
         v-model="dateFrom"
         type="date"
         class="form-control"
         style="width: 180px"
-        @change="applyFilters"
       />
       <span class="filter-label">—</span>
       <input
@@ -38,19 +36,27 @@
         type="date"
         class="form-control"
         style="width: 180px"
-        @change="applyFilters"
       />
       <button class="btn btn-secondary" @click="resetFilters">Сбросить</button>
     </div>
     <br>
 
-    <div class="table-scroll-container">
+    <ScrollableTable>
       <table class="data-table">
         <thead>
           <tr>
-            <th @click="sortBy('name')">Название плана</th>
-            <th @click="sortBy('startDate')">Дата начала</th>
-            <th @click="sortBy('endDate')">Дата окончания</th>
+            <th @click="sortBy('name')">
+              Название плана
+              <span class="sort-icon" v-if="sortField === 'name'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+            </th>
+            <th @click="sortBy('startDate')">
+              Дата начала
+              <span class="sort-icon" v-if="sortField === 'startDate'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+            </th>
+            <th @click="sortBy('endDate')">
+              Дата окончания
+              <span class="sort-icon" v-if="sortField === 'endDate'">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+            </th>
             <th>Действия</th>
           </tr>
         </thead>
@@ -66,11 +72,11 @@
             </td>
           </tr>
           <tr v-if="filteredAndSortedPlans.length === 0">
-            <td colspan="4">Нет данных</td>
+            <td colspan="4" class="text-center">Нет данных</td>
           </tr>
         </tbody>
       </table>
-    </div>
+    </ScrollableTable>
 
     <MaintenanceForm ref="formRef" @saved="refresh" />
     <ConfirmDialog ref="confirmDialog" />
@@ -84,6 +90,7 @@ import { useRouter } from 'vue-router'
 import { useMaintenanceStore } from '../stores/maintenanceStore'
 import MaintenanceForm from '../components/MaintenanceForm.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import ScrollableTable from '@/components/common/ScrollableTable.vue'
 import * as exportUtils from '@/utils/exportUtils'
 
 const router = useRouter()
@@ -126,24 +133,58 @@ function formatDate(dateStr: string | null | undefined): string {
   return `${day}.${month}.${year}`;
 }
 
+// Преобразование строки в дату с нормализацией времени
+function parseDate(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return null;
+  // Устанавливаем время в 00:00:00 для корректного сравнения
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
 const filteredAndSortedPlans = computed(() => {
   let list = [...store.plans]
 
+  // Фильтр по названию (мгновенно)
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     list = list.filter((p) => p.name.toLowerCase().includes(q))
   }
 
-  if (dateFrom.value) {
-    list = list.filter((p) => p.start_date >= dateFrom.value)
-  }
-  if (dateTo.value) {
-    list = list.filter((p) => p.start_date <= dateTo.value)
+  const fromDate = parseDate(dateFrom.value)
+  const toDate = parseDate(dateTo.value)
+
+  // Фильтр по диапазону дат
+  if (fromDate && toDate) {
+    // Если введены обе даты - ищем планы, у которых дата начала в диапазоне [fromDate, toDate]
+    list = list.filter((p) => {
+      const startDate = parseDate(p.start_date)
+      if (!startDate) return false
+      return startDate >= fromDate && startDate <= toDate
+    })
+  } else if (fromDate) {
+    // Если введена только дата начала - ищем планы, которые начинаются строго с этой даты
+    list = list.filter((p) => {
+      const startDate = parseDate(p.start_date)
+      if (!startDate) return false
+      return startDate.getTime() === fromDate.getTime()
+    })
+  } else if (toDate) {
+    // Если введена только дата окончания - ищем планы, которые заканчиваются строго с этой даты
+    list = list.filter((p) => {
+      const endDate = parseDate(p.end_date)
+      if (!endDate) return false
+      return endDate.getTime() === toDate.getTime()
+    })
   }
 
+  // Сортировка
   list.sort((a, b) => {
     let valA = a[sortField.value === 'startDate' ? 'start_date' : sortField.value === 'endDate' ? 'end_date' : sortField.value]
     let valB = b[sortField.value === 'startDate' ? 'start_date' : sortField.value === 'endDate' ? 'end_date' : sortField.value]
+    if (valA === null || valA === undefined) return 1
+    if (valB === null || valB === undefined) return -1
     if (valA < valB) return sortOrder.value === 'asc' ? -1 : 1
     if (valA > valB) return sortOrder.value === 'asc' ? 1 : -1
     return 0
@@ -152,7 +193,6 @@ const filteredAndSortedPlans = computed(() => {
   return list
 })
 
-function applyFilters() {}
 function resetFilters() {
   searchQuery.value = ''
   dateFrom.value = ''
@@ -272,38 +312,44 @@ onUnmounted(() => {
 .filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .filter-label { font-size: 14px; color: #6c757d; }
 .sort-icon { margin-left: 5px; font-size: 12px; color: #2c5f8a; }
+.text-center { text-align: center; }
 
-.table-scroll-container {
+/* Стили для таблицы без дублирующихся границ */
+.data-table {
   width: 100%;
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: 500px;
-  border: 1px solid #e0e4e8;
-  border-radius: 8px;
-  background: white;
+  border-collapse: collapse;
 }
 
-.table-scroll-container::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+.data-table th,
+.data-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e0e4e8;
 }
 
-.table-scroll-container::-webkit-scrollbar-track {
-  background: #e0e4e8;
-  border-radius: 6px;
+/* Убираем верхнюю границу у таблицы, так как она есть в ScrollableTable */
+.data-table thead tr:first-child th {
+  border-top: none;
 }
 
-.table-scroll-container::-webkit-scrollbar-thumb {
-  background: #2c5f8a;
-  border-radius: 6px;
+.data-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
   cursor: pointer;
+  user-select: none;
 }
 
-.table-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: #1e4566;
+.data-table th:hover {
+  background-color: #e8f0fe;
 }
 
-.table-scroll-container .data-table {
-  min-width: 600px;
+.data-table tbody tr:hover {
+  background-color: #f5f5f5;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+  margin: 0 2px;
 }
 </style>

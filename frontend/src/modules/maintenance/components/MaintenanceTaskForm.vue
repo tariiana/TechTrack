@@ -61,6 +61,7 @@
           v-model="form.completed_date" 
           class="form-control" 
           :class="{ 'warning-date': holidayWarning || overdueWarning }"
+          @change="checkOverdue"
         />
         <small class="text-muted">Укажите, когда было проведено ТО</small>
         <div v-if="holidayWarning" class="warning-text">
@@ -94,6 +95,7 @@ import { ref, reactive, onMounted, watch, computed } from 'vue';
 import { useMaintenanceStore } from '../stores/maintenanceStore';
 import { useEquipmentStore } from '@/modules/equipment/stores/equipmentStore';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
+import { apiFetch } from '@/api/client';
 
 const props = defineProps<{
   tasks?: any[];
@@ -110,6 +112,7 @@ const holidayWarning = ref('');
 const overdueWarning = ref('');
 const confirmDialog = ref();
 const submitted = ref(false);
+const isLoadingExpiry = ref(false);
 
 // Проверка прав доступа
 const canEdit = computed(() => {
@@ -124,6 +127,9 @@ const searchQuery = ref('');
 const showDropdown = ref(false);
 const filteredEquipment = ref<any[]>([]);
 
+// Хранилище для актуального срока ТО
+const currentExpiryDate = ref<string | null>(null);
+
 function filterEquipment() {
   if (!searchQuery.value.trim()) {
     filteredEquipment.value = equipmentNodes.value;
@@ -136,11 +142,66 @@ function filterEquipment() {
   showDropdown.value = true;
 }
 
-function selectEquipment(node: any) {
+// Загрузка актуального срока ТО с бэкенда через эндпоинт /nodes/:id/with-expiry
+async function fetchNodeExpiryDate(nodeId: number) {
+  if (!nodeId) {
+    currentExpiryDate.value = null;
+    return;
+  }
+  
+  isLoadingExpiry.value = true;
+  overdueWarning.value = '';
+  
+  try {
+    // Используем новый эндпоинт с вычисленным expiry_date
+    console.log(`Загрузка данных узла ${nodeId} с /nodes/${nodeId}/with-expiry`);
+    const response = await apiFetch(`/nodes/${nodeId}/with-expiry`);
+    const nodeData = response.data || response;
+    
+    console.log('Загружены данные узла:', nodeData);
+    
+    // Получаем expiry_date из ответа
+    currentExpiryDate.value = nodeData.expiry_date || null;
+    
+    if (currentExpiryDate.value) {
+      console.log('Актуальный срок ТО:', currentExpiryDate.value);
+    } else {
+      console.warn('Поле expiry_date не найдено в ответе, ищем альтернативы...');
+      // Если нет expiry_date, пробуем использовать commission_date как fallback
+      if (nodeData.commission_date) {
+        console.log('Используем commission_date как fallback:', nodeData.commission_date);
+        currentExpiryDate.value = nodeData.commission_date;
+      }
+    }
+    
+    // После загрузки проверяем просрочку
+    await checkOverdue();
+  } catch (err) {
+    console.error('Ошибка загрузки срока ТО:', err);
+    
+    // Fallback: пробуем обычный эндпоинт /nodes/:id
+    try {
+      console.log(`Пробуем fallback: /nodes/${nodeId}`);
+      const fallbackResponse = await apiFetch(`/nodes/${nodeId}`);
+      const fallbackData = fallbackResponse.data || fallbackResponse;
+      currentExpiryDate.value = fallbackData.expiry_date || fallbackData.commission_date || null;
+      console.log('Fallback данные:', currentExpiryDate.value);
+    } catch (fallbackErr) {
+      console.error('Fallback также не сработал:', fallbackErr);
+      currentExpiryDate.value = null;
+    }
+  } finally {
+    isLoadingExpiry.value = false;
+  }
+}
+
+async function selectEquipment(node: any) {
   form.node_id = node.node_id;
   searchQuery.value = node.name;
   showDropdown.value = false;
-  checkOverdue();
+  
+  // Загружаем актуальный срок ТО с бэкенда
+  await fetchNodeExpiryDate(node.node_id);
 }
 
 function closeDropdown() {
@@ -202,16 +263,57 @@ function formatDateSimple(dateStr: string): string {
   return `${day}.${month}.${year}`;
 }
 
-function checkOverdue() {
+/**
+ * Проверка просрочки на основе актуального срока ТО
+ */
+async function checkOverdue() {
+  // Очищаем предыдущее предупреждение
   overdueWarning.value = '';
-  if (!form.completed_date || !form.node_id) return;
-  const taskForNode = props.tasks?.find(t => t.node_id === form.node_id);
-  if (!taskForNode?.expiry_date) return;
+  
+  // Проверяем наличие всех необходимых данных
+  if (!form.completed_date || !form.node_id) {
+    console.log('Нет даты или оборудования');
+    return;
+  }
+  
+  // Если еще загружается срок ТО, ждем
+  if (isLoadingExpiry.value) {
+    console.log('Загрузка срока ТО, ждем...');
+    return;
+  }
+  
+  // Если срок ТО не загружен, пробуем загрузить
+  if (!currentExpiryDate.value) {
+    console.log('Срок ТО не загружен, пробуем загрузить...');
+    await fetchNodeExpiryDate(form.node_id);
+    return;
+  }
+  
   const completedDate = new Date(form.completed_date);
-  const expiryDate = new Date(taskForNode.expiry_date);
+  const expiryDate = new Date(currentExpiryDate.value);
+  
+  // Сбрасываем время для корректного сравнения
+  completedDate.setHours(0, 0, 0, 0);
+  expiryDate.setHours(0, 0, 0, 0);
+  
+  console.log('Сравнение дат:', {
+    completed: completedDate,
+    expiry: expiryDate,
+    completedStr: form.completed_date,
+    expiryStr: currentExpiryDate.value
+  });
+  
   if (completedDate > expiryDate) {
     const daysDiff = Math.ceil((completedDate.getTime() - expiryDate.getTime()) / (1000 * 3600 * 24));
-    overdueWarning.value = `⚠️ Внимание! Дата проведения ТО на ${daysDiff} ${getDaysWord(daysDiff)} позже истечения срока ТО (${formatDateSimple(taskForNode.expiry_date)}). Рекомендуется указать корректную дату.`;
+    const daysWord = getDaysWord(daysDiff);
+    overdueWarning.value = `⚠️ Внимание! Дата проведения ТО на ${daysDiff} ${daysWord} позже истечения срока ТО (${formatDateSimple(currentExpiryDate.value)}). Рекомендуется указать корректную дату.`;
+    console.log('Установлено предупреждение:', overdueWarning.value);
+  } else {
+    console.log('Дата в пределах срока или раньше');
+    if (completedDate < expiryDate) {
+      const daysRemaining = Math.ceil((expiryDate.getTime() - completedDate.getTime()) / (1000 * 3600 * 24));
+      console.log(`До истечения срока осталось ${daysRemaining} дней`);
+    }
   }
 }
 
@@ -230,13 +332,19 @@ const form = reactive({
   notes: '',
 });
 
-watch(() => form.completed_date, () => {
+watch(() => form.completed_date, async () => {
   checkDate();
-  checkOverdue();
+  await checkOverdue();
 });
 
-watch(() => form.node_id, () => {
-  checkOverdue();
+watch(() => form.node_id, async () => {
+  // При смене оборудования загружаем актуальный срок
+  if (form.node_id) {
+    await fetchNodeExpiryDate(form.node_id);
+  } else {
+    currentExpiryDate.value = null;
+    overdueWarning.value = '';
+  }
 });
 
 function loadEquipment() {
@@ -245,7 +353,7 @@ function loadEquipment() {
   filteredEquipment.value = equipmentNodes.value;
 }
 
-function open(pId: number, task?: any) {
+async function open(pId: number, task?: any) {
   // Проверка прав - observer не может открыть форму
   if (!canEdit.value) {
     showToast('Недостаточно прав для выполнения действия', 'error');
@@ -255,6 +363,7 @@ function open(pId: number, task?: any) {
   reset();
   loadEquipment();
   planId.value = pId;
+  
   if (task) {
     editId.value = task.maintenance_id;
     form.node_id = task.node_id;
@@ -264,13 +373,15 @@ function open(pId: number, task?: any) {
     form.notes = task.notes || '';
     const selectedNode = equipmentNodes.value.find(n => n.node_id === task.node_id);
     searchQuery.value = selectedNode?.name || '';
+    // Загружаем актуальный срок ТО для оборудования
+    if (task.node_id) {
+      await fetchNodeExpiryDate(task.node_id);
+    }
   } else {
     form.completed_date = formatDate(new Date());
     searchQuery.value = '';
   }
-  setTimeout(() => {
-    checkOverdue();
-  }, 100);
+  
   visible.value = true;
 }
 
@@ -283,11 +394,13 @@ function reset() {
   error.value = '';
   holidayWarning.value = '';
   overdueWarning.value = '';
+  currentExpiryDate.value = null;
   editId.value = null;
   planId.value = null;
   searchQuery.value = '';
   showDropdown.value = false;
   submitted.value = false;
+  isLoadingExpiry.value = false;
 }
 
 function close() {
@@ -325,7 +438,7 @@ async function save() {
   }
 
   try {
-    // ✅ Преобразуем node_id в строку (UUID)
+    // Преобразуем node_id в строку (UUID)
     const nodeIdStr = String(form.node_id);
     
     const data = {

@@ -20,7 +20,7 @@
               <span>— не выполнено</span>
             </div>
             <div class="status-legend-item">
-              <div class="status-color hatched"></div>
+              <div ref="hatchLegendItem" class="status-color hatched" :style="{ backgroundImage: `url(${hatchPatternUrl})` }"></div>
               <span>— выполнено</span>
             </div>
           </div>
@@ -74,6 +74,7 @@ const chartCanvas = ref<HTMLCanvasElement | null>(null);
 const chartContainer = ref<HTMLElement | null>(null);
 let chartInstance: any = null;
 const summaryData = ref<any[]>([]);
+const hatchPatternUrl = ref<string>('');
 
 const monthNames = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -95,6 +96,27 @@ function getColorForType(type: string): string {
   return typeColors[type] || '#999';
 }
 
+// Создание паттерна штриховки в виде dataURL 
+function createHatchPatternDataURL(baseColor: string): string {
+  const patternSize = 10;
+  const canvas = document.createElement('canvas');
+  canvas.width = patternSize;
+  canvas.height = patternSize;
+  const ctx = canvas.getContext('2d')!;
+  
+  ctx.fillStyle = baseColor;
+  ctx.fillRect(0, 0, patternSize, patternSize);
+  
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(patternSize, patternSize);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  
+  return canvas.toDataURL();
+}
+
 function createHatchPattern(ctx: CanvasRenderingContext2D, baseColor: string): CanvasPattern {
   const patternSize = 10;
   const patternCanvas = document.createElement('canvas');
@@ -108,7 +130,7 @@ function createHatchPattern(ctx: CanvasRenderingContext2D, baseColor: string): C
   patternCtx.beginPath();
   patternCtx.moveTo(0, 0);
   patternCtx.lineTo(patternSize, patternSize);
-  patternCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+  patternCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
   patternCtx.lineWidth = 1.5;
   patternCtx.stroke();
   
@@ -271,8 +293,8 @@ async function renderChart() {
         x: {
           stacked: true,
           grid: {
-            display: true,           // Включаем сетку для насечек
-            drawOnChartArea: false,  // Рисуем только на оси, не на области графика
+            display: true,
+            drawOnChartArea: false,
             color: '#999',
             lineWidth: 1
           },
@@ -320,10 +342,22 @@ async function exportAsPNG() {
   if (!chartContainer.value) return;
   
   try {
+    // Временно заменяем backgroundImage на canvas для корректного экспорта
+    const hatchElement = document.querySelector('.status-color.hatched') as HTMLElement;
+    const originalBgImage = hatchElement?.style.backgroundImage;
+    
+    if (hatchElement) {
+      hatchElement.style.backgroundImage = `url(${hatchPatternUrl.value})`;
+    }
+    
     const canvas = await html2canvas(chartContainer.value, {
       scale: 2,
       backgroundColor: '#ffffff'
     });
+    
+    if (hatchElement && originalBgImage !== undefined) {
+      hatchElement.style.backgroundImage = originalBgImage;
+    }
     
     const link = document.createElement('a');
     link.download = `${props.planName.replace(/\s/g, '_')}_график_ТО.png`;
@@ -345,6 +379,13 @@ async function exportAsPDF() {
       chartCanvas.value.style.height = 'auto';
     }
     
+    const hatchElement = document.querySelector('.status-color.hatched') as HTMLElement;
+    const originalBgImage = hatchElement?.style.backgroundImage;
+    
+    if (hatchElement) {
+      hatchElement.style.backgroundImage = `url(${hatchPatternUrl.value})`;
+    }
+    
     const canvas = await html2canvas(chartContainer.value, {
       scale: 2,
       backgroundColor: '#ffffff',
@@ -357,8 +398,16 @@ async function exportAsPDF() {
         if (clonedCanvas) {
           (clonedCanvas as HTMLElement).style.height = 'auto';
         }
+        const clonedHatch = clonedDoc.querySelector('.status-color.hatched') as HTMLElement;
+        if (clonedHatch) {
+          clonedHatch.style.backgroundImage = `url(${hatchPatternUrl.value})`;
+        }
       }
     });
+    
+    if (hatchElement && originalBgImage !== undefined) {
+      hatchElement.style.backgroundImage = originalBgImage;
+    }
     
     if (chartCanvas.value && originalHeight) {
       chartCanvas.value.style.height = originalHeight;
@@ -396,9 +445,18 @@ async function exportAsPDF() {
 }
 
 function open() {
+  // Создаем паттерн для легенды при открытии
+  hatchPatternUrl.value = createHatchPatternDataURL('#2c5f8a');
+  
   visible.value = true;
   nextTick(() => {
     renderChart();
+    // Применяем паттерн к элементу легенды
+    const hatchElement = document.querySelector('.status-color.hatched') as HTMLElement;
+    if (hatchElement) {
+      hatchElement.style.backgroundImage = `url(${hatchPatternUrl.value})`;
+      hatchElement.style.backgroundSize = '10px 10px';
+    }
   });
 }
 
@@ -527,13 +585,8 @@ defineExpose({ open });
 }
 
 .status-color.hatched {
-  background: repeating-linear-gradient(
-    45deg,
-    #2c5f8a,
-    #2c5f8a 2px,
-    rgba(255, 255, 255, 0.5) 2px,
-    rgba(255, 255, 255, 0.5) 5px
-  );
+  background-size: 10px 10px;
+  background-repeat: repeat;
 }
 
 .chart-summary {
