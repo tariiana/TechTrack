@@ -124,12 +124,8 @@ function prepareChartData(tasks: any[]) {
     pendingMonthlyData[i] = {};
     completedMonthlyData[i] = {};
     for (const type of serviceTypes) {
-      const pendingMonth = pendingMonthlyData[i];
-      const completedMonth = completedMonthlyData[i];
-      if (pendingMonth && completedMonth) {
-        pendingMonth[type] = 0;
-        completedMonth[type] = 0;
-      }
+      pendingMonthlyData[i]![type] = 0;
+      completedMonthlyData[i]![type] = 0;
     }
   }
   
@@ -143,11 +139,11 @@ function prepareChartData(tasks: any[]) {
         
         if (task.status_name === 'completed') {
           if (completedMonthlyData[month] && completedMonthlyData[month][type] !== undefined) {
-            completedMonthlyData[month][type]++;
+            completedMonthlyData[month]![type]++;
           }
         } else {
           if (pendingMonthlyData[month] && pendingMonthlyData[month][type] !== undefined) {
-            pendingMonthlyData[month][type]++;
+            pendingMonthlyData[month]![type]++;
           }
         }
       }
@@ -169,8 +165,8 @@ function prepareChartData(tasks: any[]) {
       borderWidth: 1,
       stack: type,
       isCompleted: false,
-      barPercentage: 0.7,
-      categoryPercentage: 0.9
+      barPercentage: 0.9,
+      categoryPercentage: 0.95
     });
     
     // Выполненные (штриховка) – добавляем только если есть данные
@@ -195,8 +191,8 @@ function prepareChartData(tasks: any[]) {
         borderWidth: 1,
         stack: type,
         isCompleted: true,
-        barPercentage: 0.7,
-        categoryPercentage: 0.9
+        barPercentage: 0.9,
+        categoryPercentage: 0.95
       });
     }
   }
@@ -247,7 +243,8 @@ async function renderChart() {
         legend: {
           position: 'top',
           labels: {
-            font: { size: 12 },
+            font: { size: 13 },
+            boxWidth: 12,
             filter: (legendItem, data) => {
               const idx = legendItem.datasetIndex;
               if (idx === undefined) return false;
@@ -273,35 +270,46 @@ async function renderChart() {
       scales: {
         x: {
           stacked: true,
-          offset: true,
           grid: {
-            offset: true,
+            display: true,           // Включаем сетку для насечек
+            drawOnChartArea: false,  // Рисуем только на оси, не на области графика
+            color: '#999',
+            lineWidth: 1
           },
           title: { 
             display: true, 
             text: 'Месяцы', 
-            font: { size: 13, weight: 'bold' } 
+            font: { size: 14, weight: 'bold' } 
           },
           ticks: { 
-            font: { size: 11 },
-            autoSkip: false,
+            font: { size: 12 },
+            autoSkip: true,
             maxRotation: 45,
-            minRotation: 45
+            minRotation: 0
           }
         },
         y: {
           stacked: true,
           beginAtZero: true,
+          grid: {
+            color: '#e0e4e8',
+            lineWidth: 1
+          },
           title: {
             display: true,
             text: 'Количество ТО',
-            font: { size: 13, weight: 'bold' }
+            font: { size: 14, weight: 'bold' }
           },
           ticks: { 
             stepSize: 1, 
             precision: 0, 
-            font: { size: 11 } 
+            font: { size: 12 } 
           }
+        }
+      },
+      elements: {
+        bar: {
+          borderRadius: 4
         }
       }
     }
@@ -367,11 +375,11 @@ async function exportAsPDF() {
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = pdf.internal.pageSize.getHeight();
     
-    let imgWidth = pdfWidth - 10;
+    let imgWidth = pdfWidth - 20;
     let imgHeight = (canvas.height * imgWidth) / canvas.width;
     
-    if (imgHeight > pdfHeight - 10) {
-      imgHeight = pdfHeight - 10;
+    if (imgHeight > pdfHeight - 20) {
+      imgHeight = pdfHeight - 20;
       imgWidth = (canvas.width * imgHeight) / canvas.height;
     }
     
@@ -402,25 +410,38 @@ defineExpose({ open });
 </script>
 
 <style scoped>
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
 .modal-content {
   background: white;
   border-radius: 12px;
-  width: 900px;
+  width: 1100px;
   max-width: 95%;
   max-height: 95vh;
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  padding: 16px;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid #e0e4e8;
   flex-shrink: 0;
 }
@@ -428,30 +449,26 @@ defineExpose({ open });
 .modal-scrollable {
   flex: 1;
   overflow-y: auto;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   padding-right: 4px;
 }
 
 .modal-scrollable::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 .modal-scrollable::-webkit-scrollbar-track {
   background: #e0e4e8;
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 .modal-scrollable::-webkit-scrollbar-thumb {
   background: #2c5f8a;
-  border-radius: 4px;
-}
-
-.modal-scrollable::-webkit-scrollbar-thumb:hover {
-  background: #1e4566;
+  border-radius: 3px;
 }
 
 .chart-container {
-  padding: 12px;
+  padding: 8px;
   background: white;
   border-radius: 8px;
   overflow: visible !important;
@@ -460,18 +477,19 @@ defineExpose({ open });
 .chart-canvas {
   width: 100%;
   height: auto !important;
-  min-height: 350px;
+  min-height: 380px;
+  max-height: 420px;
 }
 
 .chart-header-info {
   text-align: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .chart-header-info h3 {
-  margin: 0 0 3px 0;
+  margin: 0 0 2px 0;
   color: #2c5f8a;
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .chart-header-info p {
@@ -482,10 +500,10 @@ defineExpose({ open });
 
 .status-legend {
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 20px;
   margin: 8px 0;
-  padding: 5px 10px;
+  padding: 6px 10px;
   background: #f8f9fa;
   border-radius: 6px;
 }
@@ -493,14 +511,14 @@ defineExpose({ open });
 .status-legend-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
+  gap: 6px;
+  font-size: 14px;
   color: #2c3e50;
 }
 
 .status-color {
-  width: 24px;
-  height: 16px;
+  width: 22px;
+  height: 14px;
   border-radius: 2px;
 }
 
@@ -519,16 +537,16 @@ defineExpose({ open });
 }
 
 .chart-summary {
-  margin-top: 15px;
+  margin-top: 10px;
   background: #f8f9fa;
   border-radius: 8px;
 }
 
 .chart-summary h4 {
   margin: 0;
-  padding: 12px;
+  padding: 10px;
   color: #2c5f8a;
-  font-size: 14px;
+  font-size: 16px;
   border-bottom: 1px solid #e0e4e8;
 }
 
@@ -537,16 +555,16 @@ defineExpose({ open });
   flex-wrap: wrap;
   gap: 10px;
   margin: 0;
-  padding: 12px;
+  padding: 10px;
   list-style: none;
 }
 
 .chart-summary li {
   background: white;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 7px 14px;
+  border-radius: 7px;
   border: 1px solid #e0e4e8;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .modal-footer {
@@ -560,6 +578,35 @@ defineExpose({ open });
 
 .export-buttons {
   display: flex;
-  gap: 10px;
+  gap: 12px;
+}
+
+.btn {
+  padding: 8px 20px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background-color: #2c5f8a;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #1e4566;
+}
+
+.btn-secondary {
+  background-color: #e9ecef;
+  color: #2c3e50;
+  border: 1px solid #ced4da;
+}
+
+.btn-secondary:hover {
+  background-color: #dee2e6;
 }
 </style>

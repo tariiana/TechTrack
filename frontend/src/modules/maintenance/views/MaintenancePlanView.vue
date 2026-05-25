@@ -158,7 +158,11 @@
     </div>
 
     <!-- Модальные окна -->
-    <MaintenanceTaskForm ref="taskFormRef" @saved="refresh" />
+    <MaintenanceTaskForm 
+      ref="taskFormRef" 
+      :tasks="tasks"
+      @saved="refresh" 
+    />
     <MaintenanceForm ref="planFormRef" @saved="refresh" />
     <ConfirmDialog ref="confirmDialog" />
     <ChartModal
