@@ -38,7 +38,7 @@ async function upsert(req, res, next) {
 
 async function deleteResource(req, res, next) {
   try {
-    const result = await Resource.delete(req.params.nodeId);
+    const result = await Resource.delete(req.params.nodeId, getRequestUserId(req));
     if (!result.success) {
       return res.status(404).json(ResponseFormatter.error('Resource not found', 404));
     }

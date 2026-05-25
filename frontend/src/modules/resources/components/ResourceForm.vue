@@ -53,12 +53,12 @@
             <div class="form-group">
   <label>Статус</label>
   <select v-model="form.status" class="form-control">
-    <option value="активный">Получен</option>
-    <option value="на обслуживании">Исправен</option>
-     <option value="на обслуживании">Неисправен</option>
-    <option value="ремонт">В ремонте</option>
-    <option value="ремонт">На поверке</option>
-    <option value="ремонт">Законсервирован</option>
+    <option value="Получен">Получен</option>
+    <option value="Исправен">Исправен</option>
+    <option value="Неисправен">Неисправен</option>
+    <option value="В ремонте">В ремонте</option>
+    <option value="На поверке">На поверке</option>
+    <option value="Законсервирован">Законсервирован</option>
     <option value="списан">Списан</option>
   </select>
 </div>
@@ -166,8 +166,19 @@ const form = reactive({
   installed_in: '',
   location: '',
   note: '',
-  status: 'Исправен', 
+  status: 'Исправен',
 });
+
+function normalizeFormStatus(status: any): string {
+  const value = String(status || '').trim();
+  const legacyMap: Record<string, string> = {
+    'активный': 'Получен',
+    'на обслуживании': 'Исправен',
+    'ремонт': 'В ремонте',
+    'Списан': 'списан',
+  };
+  return legacyMap[value] || value || 'Исправен';
+}
 
 function getCurrentDate(): string {
   return new Date().toISOString().slice(0, 10);
@@ -190,7 +201,7 @@ function reset() {
   form.installed_in = '';
   form.location = '';
   form.note = '';
-  form.status = 'активный';  
+  form.status = 'Получен';
   workHours.value = 8760;
   calcResult.value = null;
   error.value = '';
@@ -291,7 +302,7 @@ async function open(resource?: any) {
     form.installed_in = resource.installed_in || '';
     form.location = resource.location || '';
     form.note = resource.note || '';
-    form.status = resource.status || 'Исправен';  
+    form.status = normalizeFormStatus(resource.status);  
   }
 
   visible.value = true;

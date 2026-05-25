@@ -61,6 +61,21 @@ function firstPresent(...values) {
   return null;
 }
 
+function normalizeText(value) {
+  return String(value || '').trim().toLocaleLowerCase('ru-RU');
+}
+
+function isWrittenOffStatus(value) {
+  return normalizeText(value) === '\u0441\u043f\u0438\u0441\u0430\u043d';
+}
+
+function toBoolean(value) {
+  if (value === true) return true;
+  if (value === false || isBlank(value)) return false;
+  const text = normalizeText(value);
+  return text === 'true' || text === '1' || text === '\u0434\u0430';
+}
+
 function getMeasurementValue(params, ...keys) {
   for (const key of keys) {
     const value = pickValue(params, key);
@@ -127,12 +142,29 @@ function mapResource(row) {
     row.node_registration_number,
     row.node_inventory_number
   );
+  const rawStatus = firstPresent(
+    pickValue(params, 'status'),
+    row.node_status
+  );
+  const status = isWrittenOffStatus(rawStatus) ? '\u0441\u043f\u0438\u0441\u0430\u043d' : rawStatus;
+  const isDeleted = isWrittenOffStatus(status)
+    || toBoolean(pickValue(params, 'is_deleted'))
+    || toBoolean(pickValue(params, 'isDeleted'));
+  const hasStoredMeasurements = Array.isArray(params.measurements);
+  const {
+    status: _status,
+    is_deleted: _isDeleted,
+    isDeleted: _isDeletedCamel,
+    write_off_date: writeOffDate,
+    ...visibleParams
+  } = params;
   const resourceParams = {
-    ...params,
-    measurements: Array.isArray(params.measurements) ? params.measurements : [],
+    ...visibleParams,
+    ...(hasStoredMeasurements ? { measurements: params.measurements } : {}),
   };
 
   return {
+    __hasStoredMeasurements: hasStoredMeasurements,
     node_id: row.node_id,
     nodeId: row.node_id,
     resource_id: row.node_id,
@@ -143,6 +175,7 @@ function mapResource(row) {
     node_model: row.node_model,
     node_location: row.node_location,
     node_status: row.node_status,
+    status,
     manufacturer: row.node_manufacturer,
     registrationNumber,
     inventory_number: row.node_inventory_number,
@@ -165,7 +198,9 @@ function mapResource(row) {
     updated_at: row.valid_from,
     valid_from: row.valid_from,
     valid_to: row.valid_to,
-    is_deleted: false,
+    write_off_date: normalizeDate(writeOffDate),
+    is_deleted: isDeleted,
+    isDeleted,
   };
 }
 
@@ -205,8 +240,24 @@ function baseSelect() {
 }
 
 function buildParams(data, existingParams, node) {
-  const params = { ...normalizeParams(existingParams) };
+  const existing = normalizeParams(existingParams);
   const incomingParams = normalizeParams(data.resource_params);
+  const hasResourceParams = hasOwn(data, 'resource_params');
+  const params = hasResourceParams ? {} : { ...existing };
+
+  if (hasResourceParams) {
+    for (const key of RESERVED_PARAM_KEYS) {
+      if (hasOwn(existing, key)) params[key] = existing[key];
+    }
+
+    for (const key of ['status', 'is_deleted', 'isDeleted', 'write_off_date']) {
+      if (hasOwn(existing, key)) params[key] = existing[key];
+    }
+
+    if (hasOwn(existing, 'measurements') && !hasOwn(incomingParams, 'measurements')) {
+      params.measurements = existing.measurements;
+    }
+  }
 
   for (const [key, value] of Object.entries(incomingParams)) {
     if (RESERVED_PARAM_KEYS.has(key) && !hasOwn(data, key)) continue;
@@ -225,6 +276,30 @@ function buildParams(data, existingParams, node) {
       else params[key] = data[key];
     } else if (!hasOwn(params, key) && fallbackValues[key] !== undefined && fallbackValues[key] !== null) {
       params[key] = fallbackValues[key];
+    }
+  }
+
+  if (hasOwn(data, 'status')) {
+    params.status = data.status;
+  }
+
+  if (hasOwn(data, 'is_deleted')) {
+    params.is_deleted = data.is_deleted;
+  }
+
+  if (hasOwn(data, 'isDeleted')) {
+    params.is_deleted = data.isDeleted;
+  }
+
+  if (toBoolean(params.is_deleted) && !isWrittenOffStatus(params.status)) {
+    params.status = '\u0441\u043f\u0438\u0441\u0430\u043d';
+  }
+
+  if (isWrittenOffStatus(params.status)) {
+    params.status = '\u0441\u043f\u0438\u0441\u0430\u043d';
+    params.is_deleted = true;
+    if (!params.write_off_date) {
+      params.write_off_date = new Date().toISOString().slice(0, 10);
     }
   }
 
@@ -263,12 +338,13 @@ async function attachMeasurements(resources) {
       ? resource.resource_params.measurements
       : [];
     const generated = grouped.get(resource.node_id) || [];
+    const { __hasStoredMeasurements, ...cleanResource } = resource;
 
     return {
-      ...resource,
+      ...cleanResource,
       resource_params: {
         ...resource.resource_params,
-        measurements: existing.length ? existing : generated,
+        measurements: __hasStoredMeasurements ? existing : generated,
       },
     };
   });
@@ -384,14 +460,23 @@ class Resource {
     }
   }
 
-  static async delete(nodeId) {
-    const result = await db.query(`
-      UPDATE equipment.resources_history
-      SET valid_to = CURRENT_TIMESTAMP
-      WHERE node_id = $1 AND valid_to IS NULL
-    `, [nodeId]);
+  static async delete(nodeId, userId = null) {
+    const resource = await this.getById(nodeId);
+    if (!resource) return { success: false };
 
-    return { success: result.rowCount > 0 };
+    await this.upsert(nodeId, {
+      ...resource,
+      status: '\u0441\u043f\u0438\u0441\u0430\u043d',
+      is_deleted: true,
+      resource_params: {
+        ...resource.resource_params,
+        status: '\u0441\u043f\u0438\u0441\u0430\u043d',
+        is_deleted: true,
+        write_off_date: new Date().toISOString().slice(0, 10),
+      },
+    }, userId);
+
+    return { success: true };
   }
 
   static async calculate(nodeId, workHoursPerYear) {
