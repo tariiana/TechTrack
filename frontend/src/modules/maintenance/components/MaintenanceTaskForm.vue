@@ -3,14 +3,33 @@
     <div class="modal-content" style="width: 500px">
       <div class="modal-header">{{ editId ? 'Редактирование мероприятия' : 'Добавление мероприятия' }}</div>
 
+      <!-- Поле выбора оборудования с поиском -->
       <div class="form-group">
         <label>Оборудование*</label>
-        <select v-model="form.node_id" class="form-control">
-          <option :value="null">-- Выберите --</option>
-          <option v-for="node in equipmentNodes" :key="node.node_id" :value="node.node_id">
-            {{ node.name }}
-          </option>
-        </select>
+        <div class="equipment-search">
+          <input 
+            type="text"
+            v-model="searchQuery"
+            @input="filterEquipment"
+            @focus="showDropdown = true"
+            @blur="closeDropdown"
+            class="form-control"
+            :class="{ 'invalid': !form.node_id && submitted }"
+            placeholder="Введите название агрегата для поиска..."
+          />
+          <div v-if="showDropdown && filteredEquipment.length > 0" class="equipment-dropdown">
+            <div 
+              v-for="node in filteredEquipment" 
+              :key="node.node_id"
+              class="equipment-option"
+              @click="selectEquipment(node)"
+            >
+              {{ node.name }}
+            </div>
+          </div>
+        </div>
+        <small class="text-muted">Введите название для поиска, затем выберите из списка</small>
+        <div v-if="!form.node_id && submitted" class="error-text">Выберите оборудование</div>
       </div>
 
       <div class="form-group">
@@ -36,8 +55,17 @@
       </div>
 
       <div class="form-group">
-        <label>Фактическая дата проведения ТО</label>
-        <input type="date" v-model="form.completed_date" class="form-control" />
+        <label>Дата проведения ТО</label>
+        <input 
+          type="date" 
+          v-model="form.completed_date" 
+          class="form-control" 
+          :class="{ 'warning-date': holidayWarning }"
+        />
+        <small class="text-muted">Укажите, когда было проведено ТО</small>
+        <div v-if="holidayWarning" class="warning-text">
+          ⚠️ {{ holidayWarning }}
+        </div>
       </div>
 
       <div class="form-group">
@@ -51,14 +79,18 @@
         <button class="btn btn-secondary" @click="close">Отмена</button>
         <button class="btn btn-primary" @click="save">Сохранить</button>
       </div>
+
+      <ConfirmDialog ref="confirmDialog" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { showToast } from '@/utils/toast';
+import { ref, reactive, onMounted, watch } from 'vue';
 import { useMaintenanceStore } from '../stores/maintenanceStore';
 import { useEquipmentStore } from '@/modules/equipment/stores/equipmentStore';
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 
 const maintenanceStore = useMaintenanceStore();
 const equipmentStore = useEquipmentStore();
@@ -67,8 +99,88 @@ const editId = ref<number | null>(null);
 const planId = ref<number | null>(null);
 const error = ref('');
 const equipmentNodes = ref<any[]>([]);
+const holidayWarning = ref('');
+const confirmDialog = ref();
+const submitted = ref(false);
 
-// Форматирование даты в YYYY-MM-DD
+// Переменные для поиска
+const searchQuery = ref('');
+const showDropdown = ref(false);
+const filteredEquipment = ref<any[]>([]);
+
+// Функция фильтрации оборудования
+function filterEquipment() {
+  if (!searchQuery.value.trim()) {
+    filteredEquipment.value = equipmentNodes.value;
+  } else {
+    const query = searchQuery.value.toLowerCase();
+    filteredEquipment.value = equipmentNodes.value.filter(node => 
+      node.name.toLowerCase().includes(query)
+    );
+  }
+  showDropdown.value = true;
+}
+
+// Выбор оборудования из списка
+function selectEquipment(node: any) {
+  form.node_id = node.node_id;
+  searchQuery.value = node.name;
+  showDropdown.value = false;
+}
+
+// Закрытие выпадающего списка
+function closeDropdown() {
+  setTimeout(() => {
+    showDropdown.value = false;
+  }, 200);
+}
+
+// Функция проверки, является ли день выходным или праздником
+function isWeekendOrHoliday(dateStr: string): { isHoliday: boolean; message: string } {
+  if (!dateStr) return { isHoliday: false, message: '' };
+  
+  const date = new Date(dateStr);
+  const dayOfWeek = date.getDay();
+  
+  if (dayOfWeek === 0) {
+    return { isHoliday: true, message: 'Выбранное число - воскресенье (выходной день)' };
+  }
+  if (dayOfWeek === 6) {
+    return { isHoliday: true, message: 'Выбранное число - суббота (выходной день)' };
+  }
+  
+  const holidays: Record<string, string> = {
+    '01-01': 'Новый год',
+    '01-02': 'Новый год',
+    '01-07': 'Рождество',
+    '02-23': 'День защитника Отечества',
+    '03-08': 'Международный женский день',
+    '05-01': 'Праздник Весны и Труда',
+    '05-09': 'День Победы',
+    '06-12': 'День России',
+    '11-04': 'День народного единства',
+  };
+  
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const key = `${month}-${day}`;
+  
+  if (holidays[key]) {
+    return { isHoliday: true, message: `Выбранное число - ${holidays[key]} (праздничный день)` };
+  }
+  
+  return { isHoliday: false, message: '' };
+}
+
+function checkDate() {
+  if (!form.completed_date) {
+    holidayWarning.value = '';
+    return;
+  }
+  const result = isWeekendOrHoliday(form.completed_date);
+  holidayWarning.value = result.message;
+}
+
 function formatDate(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -84,8 +196,13 @@ const form = reactive({
   notes: '',
 });
 
+watch(() => form.completed_date, () => {
+  checkDate();
+});
+
 function loadEquipment() {
   equipmentNodes.value = equipmentStore.nodes || [];
+  filteredEquipment.value = equipmentNodes.value;
 }
 
 function open(pId: number, task?: any) {
@@ -99,9 +216,13 @@ function open(pId: number, task?: any) {
     form.status_name = task.status_name;
     form.completed_date = task.completed_date || '';
     form.notes = task.notes || '';
+    
+    // Устанавливаем текст поиска по выбранному оборудованию
+    const selectedNode = equipmentNodes.value.find(n => n.node_id === task.node_id);
+    searchQuery.value = selectedNode?.name || '';
   } else {
-    // При создании нового мероприятия подставляем текущую дату
     form.completed_date = formatDate(new Date());
+    searchQuery.value = '';
   }
   visible.value = true;
 }
@@ -113,8 +234,12 @@ function reset() {
   form.completed_date = '';
   form.notes = '';
   error.value = '';
+  holidayWarning.value = '';
   editId.value = null;
   planId.value = null;
+  searchQuery.value = '';
+  showDropdown.value = false;
+  submitted.value = false;
 }
 
 function close() {
@@ -122,9 +247,23 @@ function close() {
 }
 
 async function save() {
+  submitted.value = true;
+  
   if (!form.node_id) {
     error.value = 'Выберите оборудование';
+    showToast('Выберите оборудование', 'error');
     return;
+  }
+
+  if (form.completed_date) {
+    const check = isWeekendOrHoliday(form.completed_date);
+    if (check.isHoliday) {
+      const confirmed = await confirmDialog.value?.show(
+        'Подтверждение',
+        `${check.message}. Продолжить сохранение?`
+      );
+      if (!confirmed) return;
+    }
   }
 
   try {
@@ -138,14 +277,17 @@ async function save() {
 
     if (editId.value) {
       await maintenanceStore.updateTask(editId.value, data);
+      showToast('Мероприятие успешно обновлено', 'success');
     } else {
       if (!planId.value) return;
       await maintenanceStore.createTask({ ...data, plan_id: planId.value });
+      showToast('Мероприятие успешно добавлено', 'success');
     }
     close();
     window.dispatchEvent(new Event('task-saved'));
   } catch (err: any) {
     error.value = err.message || 'Ошибка сохранения мероприятия';
+    showToast(error.value, 'error');
   }
 }
 
@@ -158,5 +300,41 @@ defineExpose({ open });
   color: #6c757d;
   display: block;
   margin-top: 4px;
+}
+.warning-date {
+  border-color: #e67e22 !important;
+  background-color: #fff3e0;
+}
+.warning-text {
+  color: #e67e22;
+  font-size: 12px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.equipment-search {
+  position: relative;
+}
+.equipment-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+}
+.equipment-option {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.equipment-option:hover {
+  background-color: #e8f0fe;
 }
 </style>

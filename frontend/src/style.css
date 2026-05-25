@@ -106,6 +106,18 @@ body {
   background-color: #f8f9fa;
 }
 
+.data-table tr.warning-row:hover {
+  background-color: #ffbb55;
+}
+
+.data-table tr.expired-row:hover {
+  background-color: #ff8080;
+}
+
+.data-table tr.disabled-row:hover {
+  background-color: #d0d0d0;
+}
+
 /* ===== КНОПКИ ===== */
 .btn {
   padding: 8px 16px;

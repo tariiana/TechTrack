@@ -15,7 +15,6 @@ const CLIENT_TO_DB_STATUS = {
   'на поверке': 'на поверке',
   'в ремонте': 'в ремонте',
   'списано': 'списано',
-  'списано': 'списано',
   'РІ СЌРєСЃРїР»СѓР°С‚Р°С†РёРё': 'в эксплуатации',
   'РЅР° РїРѕРІРµСЂРєРµ': 'на поверке',
   'РІ СЂРµРјРѕРЅС‚Рµ': 'в ремонте',
@@ -35,6 +34,10 @@ const CLIENT_TO_DB_RESULT = {
   'РЅРµ РіРѕРґРµРЅ': 'не годен',
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const DB_STATUSES = new Set(Object.values(DB_TO_CLIENT_STATUS));
+const DB_RESULTS = new Set(Object.values(CLIENT_TO_DB_RESULT));
+
 function normalizeDate(value) {
   if (!value) return null;
   if (typeof value === 'string') return value.slice(0, 10);
@@ -52,16 +55,58 @@ function makeHttpError(message, status = 400) {
   return err;
 }
 
+function assertUuid(value, fieldName = 'id') {
+  if (!UUID_RE.test(String(value || ''))) {
+    throw makeHttpError(`Некорректный UUID: ${fieldName}`);
+  }
+}
+
+function assertNonEmpty(value, message) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    throw makeHttpError(message);
+  }
+}
+
+function assertPositiveNumber(value, message) {
+  if (value === undefined || value === null || Number(value) <= 0 || Number.isNaN(Number(value))) {
+    throw makeHttpError(message);
+  }
+}
+
+function assertDate(value, fieldName) {
+  const date = normalizeDate(value);
+  if (!date || Number.isNaN(new Date(date).getTime())) {
+    throw makeHttpError(`Некорректная дата: ${fieldName}`);
+  }
+  return date;
+}
+
+function assertDateOrder(transferDate, receiptDate) {
+  const transfer = normalizeDate(transferDate);
+  const receipt = normalizeDate(receiptDate);
+  if (transfer && receipt && transfer > receipt) {
+    throw makeHttpError('Дата передачи не может быть позже даты получения');
+  }
+}
+
 function normalizeStatus(status, fallback = 'в эксплуатации') {
   if (!status) return fallback;
   const text = String(status).trim();
-  return CLIENT_TO_DB_STATUS[text] || CLIENT_TO_DB_STATUS[text.toLowerCase()] || text;
+  const normalized = CLIENT_TO_DB_STATUS[text] || CLIENT_TO_DB_STATUS[text.toLowerCase()] || text;
+  if (!DB_STATUSES.has(normalized)) {
+    throw makeHttpError(`Недопустимый статус СИ: ${status}`);
+  }
+  return normalized;
 }
 
 function normalizeResult(result) {
   if (!result) return 'годен';
   const text = String(result).trim();
-  return CLIENT_TO_DB_RESULT[text] || CLIENT_TO_DB_RESULT[text.toLowerCase()] || text;
+  const normalized = CLIENT_TO_DB_RESULT[text] || CLIENT_TO_DB_RESULT[text.toLowerCase()] || text;
+  if (!DB_RESULTS.has(normalized)) {
+    throw makeHttpError(`Недопустимый результат поверки: ${result}`);
+  }
+  return normalized;
 }
 
 function toClientStatus(status) {
@@ -201,6 +246,57 @@ function hasAny(data, fields) {
   return fields.some((field) => data[field] !== undefined);
 }
 
+function getTabNumber(data) {
+  return data.tabNumber || data.tab_number;
+}
+
+function getCalibrationInterval(data) {
+  return data.verificationInterval ?? data.calibration_interval;
+}
+
+function validateInstrumentInput(data, { create = false } = {}) {
+  if (create) {
+    assertNonEmpty(getTabNumber(data), 'Укажите табельный номер СИ');
+    assertPositiveNumber(getCalibrationInterval(data), 'Межповерочный интервал должен быть больше 0');
+  }
+
+  if (data.nodeId || data.node_id) assertUuid(data.nodeId || data.node_id, 'nodeId');
+  if (data.nodeTypeId || data.node_type_id || data.typeId) assertUuid(data.nodeTypeId || data.node_type_id || data.typeId, 'nodeTypeId');
+  if (data.subsystemId || data.subsystem_id || data.subsys_id) assertUuid(data.subsystemId || data.subsystem_id || data.subsys_id, 'subsystemId');
+  if (data.installed_in_node || data.parentId) assertUuid(data.installed_in_node || data.parentId, 'installed_in_node');
+  if (getCalibrationInterval(data) !== undefined) {
+    assertPositiveNumber(getCalibrationInterval(data), 'Межповерочный интервал должен быть больше 0');
+  }
+  if (data.status !== undefined) normalizeStatus(data.status);
+  if (getTabNumber(data) !== undefined) assertNonEmpty(getTabNumber(data), 'Укажите табельный номер СИ');
+}
+
+function validateVerificationInput(data, { create = false } = {}) {
+  if (create) {
+    const date = data.receiptDate || data.calibrationDate || data.lastVerificationDate || data.transferDate;
+    assertDate(date, 'дата поверки');
+  }
+
+  if (data.transferDate !== undefined) assertDate(data.transferDate, 'Дата передачи');
+  if (data.receiptDate !== undefined) assertDate(data.receiptDate, 'Дата получения');
+  if (data.calibrationDate !== undefined) assertDate(data.calibrationDate, 'Дата поверки');
+  if (data.lastVerificationDate !== undefined) assertDate(data.lastVerificationDate, 'Дата последней поверки');
+  assertDateOrder(data.transferDate, data.receiptDate);
+
+  if (data.result !== undefined) normalizeResult(data.result);
+  if (create) assertNonEmpty(data.verifier || data.calibrator, 'Укажите поверителя');
+}
+
+function parseBoolean(value) {
+  if (value === undefined || value === null || value === '') return null;
+  return ['true', '1', 'yes', 'да'].includes(String(value).toLowerCase());
+}
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 class MeasuringInstrument {
   static baseSelect() {
     return `
@@ -252,6 +348,7 @@ class MeasuringInstrument {
     const where = [];
     const values = [];
     let idx = 1;
+    const nextDateSql = `(last_cal.calibration_date + (i.calibration_interval * INTERVAL '1 year'))::date`;
 
     if (filters.search) {
       where.push(`(
@@ -272,16 +369,100 @@ class MeasuringInstrument {
       idx++;
     }
 
+    if (filters.verifier || filters.calibrator) {
+      where.push(`last_cal.calibrator ILIKE $${idx}`);
+      values.push(`%${filters.verifier || filters.calibrator}%`);
+      idx++;
+    }
+
+    if (filters.result) {
+      where.push(`last_cal.result = $${idx}`);
+      values.push(normalizeResult(filters.result));
+      idx++;
+    }
+
+    if (filters.nextCalibrationFrom) {
+      where.push(`${nextDateSql} >= $${idx}::date`);
+      values.push(assertDate(filters.nextCalibrationFrom, 'nextCalibrationFrom'));
+      idx++;
+    }
+
+    if (filters.nextCalibrationTo) {
+      where.push(`${nextDateSql} <= $${idx}::date`);
+      values.push(assertDate(filters.nextCalibrationTo, 'nextCalibrationTo'));
+      idx++;
+    }
+
+    const dueWithinDays = parsePositiveInteger(filters.dueWithinDays || filters.days, 30);
+    const overdue = parseBoolean(filters.overdue);
+    if (overdue === true) {
+      where.push(`${nextDateSql} < CURRENT_DATE`);
+      where.push(`i.status <> 'списано'`);
+    }
+
+    const verificationStatus = filters.verificationStatus || filters.verification_status;
+    if (verificationStatus) {
+      if (verificationStatus === 'overdue') {
+        where.push(`${nextDateSql} < CURRENT_DATE`);
+        where.push(`i.status <> 'списано'`);
+      } else if (verificationStatus === 'upcoming') {
+        where.push(`${nextDateSql} >= CURRENT_DATE`);
+        where.push(`${nextDateSql} <= CURRENT_DATE + ($${idx}::int * INTERVAL '1 day')`);
+        where.push(`i.status <> 'списано'`);
+        values.push(dueWithinDays);
+        idx++;
+      } else if (verificationStatus === 'valid') {
+        where.push(`${nextDateSql} > CURRENT_DATE + ($${idx}::int * INTERVAL '1 day')`);
+        where.push(`i.status <> 'списано'`);
+        values.push(dueWithinDays);
+        idx++;
+      } else if (verificationStatus === 'no_verification') {
+        where.push(`last_cal.calibration_date IS NULL`);
+      } else {
+        throw makeHttpError(`Недопустимый фильтр срока поверки: ${verificationStatus}`);
+      }
+    } else if (filters.dueWithinDays !== undefined) {
+      where.push(`${nextDateSql} >= CURRENT_DATE`);
+      where.push(`${nextDateSql} <= CURRENT_DATE + ($${idx}::int * INTERVAL '1 day')`);
+      where.push(`i.status <> 'списано'`);
+      values.push(dueWithinDays);
+      idx++;
+    }
+
+    const sortMap = {
+      name: 'n.name',
+      tabNumber: 'i.tab_number',
+      tab_number: 'i.tab_number',
+      status: 'i.status',
+      verifier: 'last_cal.calibrator',
+      lastVerificationDate: 'last_cal.calibration_date',
+      last_verification_date: 'last_cal.calibration_date',
+      nextVerificationDate: nextDateSql,
+      next_verification_date: nextDateSql,
+    };
+    const sortBy = sortMap[filters.sortBy] || sortMap[filters.sort_by] || sortMap.name;
+    const sortDir = String(filters.sortDir || filters.sort_dir || 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+
     const result = await pool.query(`
       ${MeasuringInstrument.baseSelect()}
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-      ORDER BY n.name NULLS LAST, i.tab_number
+      ORDER BY ${sortBy} ${sortDir} NULLS LAST, n.name NULLS LAST, i.tab_number
     `, values);
 
     return result.rows.map(normalizeInstrument);
   }
 
+  static async getUpcoming(days = 30) {
+    return MeasuringInstrument.getAll({
+      verificationStatus: 'upcoming',
+      dueWithinDays: parsePositiveInteger(days, 30),
+      sortBy: 'nextVerificationDate',
+      sortDir: 'asc',
+    });
+  }
+
   static async getById(id) {
+    assertUuid(id);
     const result = await pool.query(`
       ${MeasuringInstrument.baseSelect()}
       WHERE n.node_id = $1
@@ -292,6 +473,7 @@ class MeasuringInstrument {
   }
 
   static async getCurrentNode(client, nodeId) {
+    assertUuid(nodeId, 'nodeId');
     const result = await client.query(`
       SELECT *
       FROM equipment.nodes
@@ -303,6 +485,7 @@ class MeasuringInstrument {
   }
 
   static async getCurrentInstrument(client, nodeId) {
+    assertUuid(nodeId, 'nodeId');
     const result = await client.query(`
       SELECT *
       FROM equipment.instruments_history
@@ -330,17 +513,7 @@ class MeasuringInstrument {
 
     if (currentNode?.node_type_id) return currentNode.node_type_id;
 
-    const fallback = await client.query(`
-      SELECT node_type_id
-      FROM equipment.node_types
-      ORDER BY name
-      LIMIT 1
-    `);
-    if (!fallback.rows[0]) {
-      throw makeHttpError('Не найден ни один вид узла для создания СИ');
-    }
-
-    return fallback.rows[0].node_type_id;
+    throw makeHttpError('Укажите вид узла для создания СИ');
   }
 
   static async resolveSubsystemId(client, data, currentNode = null) {
@@ -359,17 +532,7 @@ class MeasuringInstrument {
 
     if (currentNode?.subsystem_id) return currentNode.subsystem_id;
 
-    const fallback = await client.query(`
-      SELECT subsys_id
-      FROM equipment.subsystems
-      ORDER BY name
-      LIMIT 1
-    `);
-    if (!fallback.rows[0]) {
-      throw makeHttpError('Не найдена ни одна подсистема для создания СИ');
-    }
-
-    return fallback.rows[0].subsys_id;
+    throw makeHttpError('Укажите подсистему для создания СИ');
   }
 
   static async buildNodeValues(client, nodeId, data, currentNode = null, userId = null) {
@@ -500,7 +663,15 @@ class MeasuringInstrument {
     ]);
   }
 
+  static assertInstrumentIsActive(instrument) {
+    if (!instrument) throw makeHttpError('СИ не найдено', 404);
+    if (instrument.status === 'списано') {
+      throw makeHttpError('Операция недоступна для списанного СИ', 409);
+    }
+  }
+
   static async addCalibration(client, nodeId, data, userId = null) {
+    validateVerificationInput(data, { create: true });
     const calibrationDate = normalizeDate(data.calibrationDate || data.receiptDate || data.lastVerificationDate || data.transferDate);
     if (!calibrationDate) return null;
 
@@ -544,8 +715,11 @@ class MeasuringInstrument {
   }
 
   static async create(data, userId = null) {
+    validateInstrumentInput(data, { create: true });
     const client = await pool.connect();
-    let nodeId = data.nodeId || data.node_id || uuidv4();
+    let nodeId = data.nodeId || data.node_id;
+    if (nodeId) assertUuid(nodeId, 'nodeId');
+    else nodeId = uuidv4();
 
     try {
       await client.query('BEGIN');
@@ -582,8 +756,8 @@ class MeasuringInstrument {
         ) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, $5)
       `, [
         nodeId,
-        data.tabNumber || data.tab_number,
-        data.verificationInterval || data.calibration_interval || 1,
+        getTabNumber(data),
+        getCalibrationInterval(data),
         normalizeStatus(data.status),
         userId || null,
       ]);
@@ -601,6 +775,8 @@ class MeasuringInstrument {
   }
 
   static async update(id, data, userId = null) {
+    assertUuid(id);
+    validateInstrumentInput(data);
     const client = await pool.connect();
 
     try {
@@ -613,6 +789,7 @@ class MeasuringInstrument {
         await client.query('ROLLBACK');
         return null;
       }
+      MeasuringInstrument.assertInstrumentIsActive(currentInstrument);
 
       if (hasAny(data, [
         'name', 'manufacturer', 'model', 'productionDate', 'manufactured_date',
@@ -652,6 +829,7 @@ class MeasuringInstrument {
   }
 
   static async writeOff(id, userId = null) {
+    assertUuid(id);
     const client = await pool.connect();
 
     try {
@@ -661,6 +839,10 @@ class MeasuringInstrument {
       if (!currentInstrument) {
         await client.query('ROLLBACK');
         return null;
+      }
+      if (currentInstrument.status === 'списано') {
+        await client.query('ROLLBACK');
+        return await MeasuringInstrument.getById(id);
       }
 
       await MeasuringInstrument.replaceInstrumentHistory(client, id, { status: 'списано' }, currentInstrument, userId);
@@ -684,6 +866,7 @@ class MeasuringInstrument {
   }
 
   static async getVerifications(instrumentId) {
+    assertUuid(instrumentId, 'instrumentId');
     const instrument = await MeasuringInstrument.getById(instrumentId);
     if (!instrument) return [];
 
@@ -706,19 +889,31 @@ class MeasuringInstrument {
   }
 
   static async addVerification(instrumentId, data, userId = null) {
+    assertUuid(instrumentId, 'instrumentId');
+    validateVerificationInput(data, { create: true });
     const client = await pool.connect();
 
     try {
       await client.query('BEGIN');
 
       const instrument = await MeasuringInstrument.getCurrentInstrument(client, instrumentId);
-      if (!instrument) throw makeHttpError('СИ не найдено', 404);
+      MeasuringInstrument.assertInstrumentIsActive(instrument);
 
       const verification = await MeasuringInstrument.addCalibration(client, instrumentId, {
         ...data,
         verificationInterval: instrument.calibration_interval,
       }, userId);
       if (!verification) throw makeHttpError('Укажите дату поверки');
+
+      if (normalizeResult(data.result) === 'годен' && instrument.status !== 'в эксплуатации') {
+        await MeasuringInstrument.replaceInstrumentHistory(
+          client,
+          instrumentId,
+          { status: 'в эксплуатации' },
+          instrument,
+          userId
+        );
+      }
 
       await client.query('COMMIT');
       return verification;
@@ -731,13 +926,16 @@ class MeasuringInstrument {
   }
 
   static async updateVerification(instrumentId, verificationId, data, userId = null) {
+    assertUuid(instrumentId, 'instrumentId');
+    assertUuid(verificationId, 'verificationId');
+    validateVerificationInput(data);
     const client = await pool.connect();
 
     try {
       await client.query('BEGIN');
 
       const instrument = await MeasuringInstrument.getCurrentInstrument(client, instrumentId);
-      if (!instrument) throw makeHttpError('СИ не найдено', 404);
+      MeasuringInstrument.assertInstrumentIsActive(instrument);
 
       const current = await client.query(`
         SELECT *
@@ -785,6 +983,16 @@ class MeasuringInstrument {
         verificationId,
         instrumentId,
       ]);
+
+      if (result === 'годен' && instrument.status !== 'в эксплуатации') {
+        await MeasuringInstrument.replaceInstrumentHistory(
+          client,
+          instrumentId,
+          { status: 'в эксплуатации' },
+          instrument,
+          userId
+        );
+      }
 
       await client.query('COMMIT');
       return normalizeVerification(updated.rows[0], instrument.calibration_interval);

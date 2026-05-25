@@ -2,11 +2,11 @@ const bcrypt = require('bcrypt');
 const { Pool } = require('pg');
 
 const pool = new Pool({
-  host: '192.168.1.66',
+  host: 'localhost',
   port: 5432,
   database: 'equipment_nodes',
   user: 'postgres',
-  password: '59Goviso'
+  password: 'mend'
 });
 
 async function hashAndUpdate() {

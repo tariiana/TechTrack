@@ -1,7 +1,10 @@
 <template>
   <div class="modal-overlay" v-if="visible">
     <div class="modal-content" style="width: 700px">
-      <div class="modal-header">{{ isEdit ? 'Редактирование СИ' : 'Добавление СИ' }}</div>
+      <div class="modal-header">
+        <span>{{ isEdit ? 'Редактирование СИ' : 'Добавление СИ' }}</span>
+        <button class="modal-close" @click="close" title="Закрыть">×</button>
+      </div>
 
       <div class="form-row">
         <div class="form-group">
@@ -154,7 +157,6 @@ function paramsFromJson(json: Record<string, any>): ParamItem[] {
     let unit = '';
     
     // Пробуем отделить значение от единицы измерения
-    // Формат: "100 Вт" или "100"
     const match = value.match(/^([\d.,]+)\s*(.+)$/);
     if (match && match[1] && match[2]) {
       value = match[1];
@@ -184,7 +186,6 @@ function paramsToJson(): Record<string, any> {
       if (unit) {
         json[name] = `${value} ${unit}`;
       } else {
-        // Пробуем преобразовать в число
         const numValue = parseFloat(value);
         json[name] = isNaN(numValue) ? value : numValue;
       }
@@ -204,14 +205,6 @@ function addParam() {
 
 function removeParam(index: number) {
   paramsList.value.splice(index, 1);
-}
-
-function getCurrentDate(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
 
 const form = reactive({
@@ -258,8 +251,7 @@ function resetForm() {
 
 function open(editItem?: any) {
   resetForm();
-  const now = getCurrentDate();
-  form.lastVerificationDate = now;
+  // Убрана автоматическая установка даты lastVerificationDate
 
   if (editItem) {
     isEdit.value = true;
@@ -277,7 +269,7 @@ function open(editItem?: any) {
     form.mainParams = editItem.mainParams || {};
     form.verificationInterval = editItem.verificationInterval;
     form.notes = editItem.notes || '';
-    form.lastVerificationDate = editItem.lastVerificationDate || now;
+    form.lastVerificationDate = editItem.lastVerificationDate || '';
     form.productionDate = editItem.productionDate || '';
     form.verifier = editItem.verifier || '';
     paramsList.value = paramsFromJson(form.mainParams);
@@ -314,7 +306,9 @@ async function save() {
   if (!validate()) return;
 
   const mainParams = paramsToJson();
-  const data = {
+  
+  // Для нового СИ не отправляем lastVerificationDate
+  const data: any = {
     name: form.name,
     manufacturer: form.manufacturer,
     model: form.model,
@@ -328,11 +322,15 @@ async function save() {
     mainParams: mainParams,
     verificationInterval: form.verificationInterval,
     notes: form.notes,
-    lastVerificationDate: form.lastVerificationDate,
     productionDate: form.productionDate,
     verifier: form.verifier,
     isDeleted: false,
   };
+  
+  // Добавляем lastVerificationDate только если она есть и это редактирование
+  if (isEdit.value && form.lastVerificationDate) {
+    data.lastVerificationDate = form.lastVerificationDate;
+  }
 
   try {
     if (isEdit.value && editId.value) {
@@ -354,15 +352,6 @@ defineExpose({ open });
 </script>
 
 <style scoped>
-.form-row {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-.form-row .form-group {
-  flex: 1;
-}
-
 /* Стили для параметров */
 .params-container {
   border: 1px solid #e0e4e8;
@@ -370,18 +359,15 @@ defineExpose({ open });
   padding: 12px;
   background: #fafbfc;
 }
-
 .param-row {
   display: flex;
   gap: 8px;
   margin-bottom: 10px;
   align-items: center;
 }
-
 .param-row:last-of-type {
   margin-bottom: 0;
 }
-
 .param-name-input {
   flex: 2;
   padding: 8px 10px;
@@ -389,13 +375,11 @@ defineExpose({ open });
   border-radius: 4px;
   font-size: 13px;
 }
-
 .param-name-input:focus {
   outline: none;
   border-color: #2c5f8a;
   box-shadow: 0 0 0 2px rgba(44, 95, 138, 0.1);
 }
-
 .param-value-input {
   flex: 1;
   padding: 8px 10px;
@@ -403,13 +387,11 @@ defineExpose({ open });
   border-radius: 4px;
   font-size: 13px;
 }
-
 .param-value-input:focus {
   outline: none;
   border-color: #2c5f8a;
   box-shadow: 0 0 0 2px rgba(44, 95, 138, 0.1);
 }
-
 .param-unit-input {
   flex: 1;
   padding: 8px 10px;
@@ -417,13 +399,11 @@ defineExpose({ open });
   border-radius: 4px;
   font-size: 13px;
 }
-
 .param-unit-input:focus {
   outline: none;
   border-color: #2c5f8a;
   box-shadow: 0 0 0 2px rgba(44, 95, 138, 0.1);
 }
-
 .btn-remove {
   background: none;
   border: none;
@@ -439,12 +419,10 @@ defineExpose({ open });
   justify-content: center;
   border-radius: 4px;
 }
-
 .btn-remove:hover {
   background-color: #ffebee;
   color: #a93226;
 }
-
 .btn-add-param {
   width: 100%;
   margin-top: 12px;
@@ -457,54 +435,26 @@ defineExpose({ open });
   font-size: 13px;
   transition: all 0.2s;
 }
-
 .btn-add-param:hover {
   background: #e8f0fe;
   border-color: #2c5f8a;
 }
-
-.error-text {
-  background-color: #f8d7da;
-  border: 1px solid #f5c6cb;
-  color: #c0392b;
-  padding: 8px 12px;
-  border-radius: 4px;
-  margin-bottom: 15px;
-  font-size: 13px;
-}
-
-.modal-footer {
+.modal-header {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-  padding-top: 15px;
-  border-top: 1px solid #e0e4e8;
+  justify-content: space-between;
+  align-items: center;
 }
-
-.btn-secondary {
-  background-color: #e9ecef;
-  color: #2c3e50;
-  border: 1px solid #ced4da;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.btn-secondary:hover {
-  background-color: #dee2e6;
-}
-
-.btn-primary {
-  background-color: #2c5f8a;
-  color: white;
+.modal-close {
+  background: none;
   border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
+  font-size: 24px;
   cursor: pointer;
+  color: #6c757d;
+  padding: 4px 8px;
+  border-radius: 4px;
 }
-
-.btn-primary:hover {
-  background-color: #1e4566;
+.modal-close:hover {
+  background-color: #e9ecef;
+  color: #333;
 }
 </style>

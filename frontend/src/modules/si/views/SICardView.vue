@@ -225,7 +225,6 @@ onMounted(() => {
   padding: 20px;
   border: 1px solid #e0e4e8;
 }
-
 .card-actions {
   display: flex;
   justify-content: flex-end;
@@ -234,24 +233,17 @@ onMounted(() => {
   margin-bottom: 20px;
   flex-wrap: wrap;
 }
-
-.card-actions h2 {
-  margin: 0;
-}
-
 .card-detail-grid {
   background: #f8f9fa;
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 20px;
 }
-
 .detail-col {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
 .detail-row {
   display: grid;
   grid-template-columns: 180px 1fr 180px 1fr;
@@ -260,32 +252,26 @@ onMounted(() => {
   padding: 4px 0;
   border-bottom: 1px solid #e0e4e8;
 }
-
 .detail-row:last-child {
   border-bottom: none;
 }
-
 .detail-label {
   font-weight: 600;
   color: #2c3e50;
   font-size: 13px;
 }
-
 .detail-value {
   color: #1a2a3a;
   font-size: 13px;
 }
-
 .status-disabled {
   color: #999;
   font-style: italic;
 }
-
 .result-bad {
   color: #c0392b;
   font-weight: 500;
 }
-
 .warning-badge {
   background-color: #e67e22;
   color: white;
@@ -294,45 +280,27 @@ onMounted(() => {
   font-size: 10px;
   margin-left: 8px;
 }
-
-/* Стили для параметров */
 .params-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-
 .param-item {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
-
 .param-name {
   font-weight: 500;
   color: #2c3e50;
 }
-
 .param-value {
   color: #1a2a3a;
 }
-
 .param-unit {
   color: #6c757d;
   font-size: 12px;
 }
-
-pre {
-  background: #f8f9fa;
-  padding: 8px;
-  border-radius: 4px;
-  margin: 0;
-  font-size: 12px;
-  overflow-x: auto;
-  max-width: 100%;
-}
-
-/* Контейнер для таблицы с прокруткой */
 .table-scroll-container {
   width: 100%;
   overflow-x: auto;
@@ -342,37 +310,14 @@ pre {
   border-radius: 8px;
   background: white;
 }
-
-.table-scroll-container::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
-
-.table-scroll-container::-webkit-scrollbar-track {
-  background: #e0e4e8;
-  border-radius: 6px;
-}
-
-.table-scroll-container::-webkit-scrollbar-thumb {
-  background: #2c5f8a;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.table-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: #1e4566;
-}
-
 .table-scroll-container .data-table {
   min-width: 600px;
 }
-
 @media (max-width: 768px) {
   .detail-row {
     grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
-  
   .card-actions {
     justify-content: center;
   }

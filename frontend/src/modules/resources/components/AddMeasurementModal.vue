@@ -18,55 +18,30 @@
         <input type="date" v-model="form.measurementDate" class="form-control" />
       </div>
 
-      <!-- Параметры измерения -->
-      <div v-if="currentResource" class="params-section">
+      <!-- Параметры измерения (только те, что есть в таблице параметров) -->
+      <div v-if="currentResource && displayParams.length" class="params-section">
         <h4>Параметры измерения</h4>
         <div class="params-list">
-          <div class="param-row">
+          <div v-for="param in displayParams" :key="param.key" class="param-row">
             <div class="param-info">
-              <span class="param-name">Напряжение (В)</span>
+              <span class="param-name">{{ param.name }}</span>
+              <span class="param-unit" v-if="param.unit">({{ param.unit }})</span>
             </div>
-            <input type="number" step="0.01" v-model="measurementParams.voltage" class="form-control param-input" />
+            <input 
+              type="number" 
+              step="any" 
+              v-model="paramValues[param.key]" 
+              class="form-control param-input"
+              :placeholder="`Текущее: ${param.currentValue || '-'}`"
+            />
             <label class="checkbox-label">
-              <input type="checkbox" v-model="measurementParams.voltage_main" /> Основной
-            </label>
-          </div>
-          <div class="param-row">
-            <div class="param-info">
-              <span class="param-name">Внутреннее сопротивление (Ом)</span>
-            </div>
-            <input type="number" step="0.001" v-model="measurementParams.resistance" class="form-control param-input" />
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="measurementParams.resistance_main" /> Основной
-            </label>
-          </div>
-          <div class="param-row">
-            <div class="param-info">
-              <span class="param-name">Ёмкость (%)</span>
-            </div>
-            <input type="number" step="1" v-model="measurementParams.capacity" class="form-control param-input" />
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="measurementParams.capacity_main" /> Основной
+              <input type="checkbox" v-model="paramIsMain[param.key]" /> Основной
             </label>
           </div>
         </div>
-
-        <!-- Дополнительные параметры -->
-        <div class="custom-params">
-          <div class="custom-param-header">
-            <span>Дополнительные параметры</span>
-            <button type="button" class="btn btn-sm btn-secondary" @click="addCustomParam">+ Добавить параметр</button>
-          </div>
-          <div v-for="(param, idx) in customParams" :key="idx" class="param-row custom-param-row">
-            <input v-model="param.name" placeholder="Название параметра" class="form-control" style="width: 150px" />
-            <input v-model="param.value" placeholder="Значение" class="form-control" style="width: 120px" />
-            <input v-model="param.unit" placeholder="Ед. изм." class="form-control" style="width: 80px" />
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="param.is_main" /> Основной
-            </label>
-            <button type="button" class="btn btn-sm btn-danger" @click="removeCustomParam(idx)">🗑️</button>
-          </div>
-        </div>
+      </div>
+      <div v-else-if="currentResource && displayParams.length === 0" class="empty-params">
+        Нет параметров для измерения
       </div>
 
       <div v-if="error" class="error-text">{{ error }}</div>
@@ -80,13 +55,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { useResourcesStore } from '../stores/resourcesStore';
 
 const store = useResourcesStore();
 const visible = ref(false);
 const editMode = ref(false);
-const editId = ref<number | null>(null);
+const editId = ref<number | string | null>(null);
 const selectedResourceId = ref<string | null>(null);
 const error = ref('');
 const resources = ref<any[]>([]);
@@ -97,16 +72,76 @@ const form = reactive({
   measurementDate: '',
 });
 
-const measurementParams = reactive({
-  voltage: null as number | null,
-  voltage_main: false,
-  resistance: null as number | null,
-  resistance_main: false,
-  capacity: null as number | null,
-  capacity_main: false,
-});
+// Хранилище значений параметров по ключам
+const paramValues = reactive<Record<string, number | null>>({});
+const paramIsMain = reactive<Record<string, boolean>>({});
 
-const customParams = ref<{ name: string; value: string; unit: string; is_main: boolean }[]>([]);
+// Список параметров для отображения (только те, что есть в таблице параметров ресурса)
+const displayParams = computed(() => {
+  if (!currentResource.value) return [];
+  
+  const params = currentResource.value.resource_params || {};
+  const result: any[] = [];
+  
+  // Определяем соответствие ключей и отображаемых имён
+  const paramMapping: Record<string, { name: string; unit: string }> = {
+    'U': { name: 'Напряжение', unit: 'В' },
+    'R': { name: 'Сопротивление', unit: 'Ом' },
+    'E': { name: 'Ёмкость (E)', unit: '%' },
+    'C': { name: 'Ёмкость (C)', unit: '%' },
+  };
+  
+  // Собираем основные параметры (только если они есть в ресурсе)
+  for (const [key, mapping] of Object.entries(paramMapping)) {
+    if (params[key] !== undefined) {
+      const v = params[key];
+      const currentValue = v && typeof v === 'object' && 'value' in v ? v.value : v;
+      const isMain = v && typeof v === 'object' ? v.is_main || v.isMain || false : false;
+      
+      result.push({
+        key: key,
+        name: mapping.name,
+        unit: mapping.unit,
+        currentValue: currentValue,
+        isMain: isMain,
+      });
+    }
+  }
+  
+  // Собираем дополнительные параметры (исключая служебные поля)
+  const excludedKeys = ['measurements', 'status', 'U', 'R', 'E', 'C', 'voltage', 'resistance', 'capacity'];
+  // Служебные поля, которые не должны отображаться
+  const systemKeys = ['mark', 'name', 'type', 'manufacturer', 'model', 'serial_number', 
+                       'inventory_number', 'registration_number', 'location', 'note',
+                       'production_date', 'registration_date', 'last_service_date',
+                       'service_life', 'time_to_service', 'initial_resource', 
+                       'remaining_resource', 'installed_in', 'node_name', 'node_id'];
+  
+  for (const [key, value] of Object.entries(params)) {
+    // Пропускаем служебные ключи
+    if (excludedKeys.includes(key)) continue;
+    if (systemKeys.includes(key)) continue;
+    // Пропускаем русские названия основных параметров
+    if (key === 'Напряжение' || key === 'Сопротивление' || key === 'Ёмкость') continue;
+    
+    const v = value as any;
+    if (v === null || v === undefined) continue;
+    
+    const currentValue = v && typeof v === 'object' && 'value' in v ? v.value : v;
+    const unit = v && typeof v === 'object' ? v.unit || '' : '';
+    const isMain = v && typeof v === 'object' ? v.is_main || v.isMain || false : false;
+    
+    result.push({
+      key: key,
+      name: key,
+      unit: unit,
+      currentValue: currentValue,
+      isMain: isMain,
+    });
+  }
+  
+  return result;
+});
 
 function getCurrentDate(): string {
   const now = new Date();
@@ -129,10 +164,19 @@ async function onResourceSelect() {
   if (selectedResourceId.value) {
     try {
       currentResource.value = await store.fetchResourceById(selectedResourceId.value);
-      const params = currentResource.value.resource_params || {};
-      if (params.voltage) measurementParams.voltage = params.voltage.value;
-      if (params.resistance) measurementParams.resistance = params.resistance.value;
-      if (params.capacity) measurementParams.capacity = params.capacity.value;
+      // Очищаем старые значения
+      Object.keys(paramValues).forEach(key => delete paramValues[key]);
+      Object.keys(paramIsMain).forEach(key => delete paramIsMain[key]);
+      
+      // Инициализируем значения параметров текущими значениями из ресурса
+      for (const param of displayParams.value) {
+        if (paramValues[param.key] === undefined) {
+          paramValues[param.key] = param.currentValue !== null && param.currentValue !== undefined ? Number(param.currentValue) : null;
+        }
+        if (paramIsMain[param.key] === undefined) {
+          paramIsMain[param.key] = param.isMain;
+        }
+      }
     } catch (err) {
       console.error(err);
     }
@@ -143,21 +187,8 @@ async function onResourceSelect() {
 }
 
 function resetParams() {
-  measurementParams.voltage = null;
-  measurementParams.voltage_main = false;
-  measurementParams.resistance = null;
-  measurementParams.resistance_main = false;
-  measurementParams.capacity = null;
-  measurementParams.capacity_main = false;
-  customParams.value = [];
-}
-
-function addCustomParam() {
-  customParams.value.push({ name: '', value: '', unit: '', is_main: false });
-}
-
-function removeCustomParam(idx: number) {
-  customParams.value.splice(idx, 1);
+  Object.keys(paramValues).forEach(key => delete paramValues[key]);
+  Object.keys(paramIsMain).forEach(key => delete paramIsMain[key]);
 }
 
 function reset() {
@@ -181,15 +212,25 @@ async function open(resourceId?: string, measurement?: any) {
     selectedResourceId.value = measurement.resourceId;
     await onResourceSelect();
     form.measurementDate = measurement.measurementDate;
+    
+    // Загружаем значения из существующего измерения
     if (measurement.parameters) {
-      measurementParams.voltage = measurement.parameters.voltage || null;
-      measurementParams.voltage_main = measurement.parameters.voltage_main || false;
-      measurementParams.resistance = measurement.parameters.resistance || null;
-      measurementParams.resistance_main = measurement.parameters.resistance_main || false;
-      measurementParams.capacity = measurement.parameters.capacity || null;
-      measurementParams.capacity_main = measurement.parameters.capacity_main || false;
-      if (measurement.parameters.custom) {
-        customParams.value = [...measurement.parameters.custom];
+      for (const param of displayParams.value) {
+        let value = null;
+        if (param.key === 'U') value = measurement.parameters.U ?? measurement.parameters.voltage;
+        else if (param.key === 'R') value = measurement.parameters.R ?? measurement.parameters.resistance;
+        else if (param.key === 'E') value = measurement.parameters.E;
+        else if (param.key === 'C') value = measurement.parameters.C;
+        else value = measurement.parameters[param.key];
+        
+        if (value !== undefined && value !== null) {
+          paramValues[param.key] = Number(value);
+        }
+        
+        const mainFlag = measurement.parameters[`${param.key}_main`];
+        if (mainFlag !== undefined) {
+          paramIsMain[param.key] = mainFlag;
+        }
       }
     }
   }
@@ -210,21 +251,29 @@ async function save() {
     return;
   }
 
+  // Собираем параметры для измерения (только те, что есть в displayParams)
   const parameters: any = {};
-  if (measurementParams.voltage !== null) {
-    parameters.voltage = measurementParams.voltage;
-    parameters.voltage_main = measurementParams.voltage_main;
-  }
-  if (measurementParams.resistance !== null) {
-    parameters.resistance = measurementParams.resistance;
-    parameters.resistance_main = measurementParams.resistance_main;
-  }
-  if (measurementParams.capacity !== null) {
-    parameters.capacity = measurementParams.capacity;
-    parameters.capacity_main = measurementParams.capacity_main;
-  }
-  if (customParams.value.length > 0) {
-    parameters.custom = customParams.value;
+  for (const param of displayParams.value) {
+    const value = paramValues[param.key];
+    if (value !== null && value !== undefined) {
+      // Сохраняем значение
+      if (param.key === 'U') {
+        parameters.U = value;
+        parameters.voltage = value;
+      } else if (param.key === 'R') {
+        parameters.R = value;
+        parameters.resistance = value;
+      } else if (param.key === 'E') {
+        parameters.E = value;
+      } else if (param.key === 'C') {
+        parameters.C = value;
+      } else {
+        parameters[param.key] = value;
+      }
+      
+      // Сохраняем флаг основного параметра
+      parameters[`${param.key}_main`] = paramIsMain[param.key] || false;
+    }
   }
 
   const newMeasurement = {
@@ -238,7 +287,7 @@ async function save() {
     let measurements = params.measurements || [];
 
     if (editMode.value && editId.value) {
-      const index = measurements.findIndex((m: any) => m.id === editId.value);
+      const index = measurements.findIndex((m: any) => String(m.id) === String(editId.value));
       if (index !== -1) {
         measurements[index] = { ...measurements[index], ...newMeasurement };
       }
@@ -247,7 +296,28 @@ async function save() {
       measurements.push({ id: newId, ...newMeasurement });
     }
 
+    // Обновляем параметры ресурса на основе последнего измерения
     const updatedParams = { ...params, measurements };
+    
+    // Обновляем текущие значения параметров в resource_params
+    for (const param of displayParams.value) {
+      const value = paramValues[param.key];
+      if (value !== null && value !== undefined) {
+        if (param.key === 'U') {
+          updatedParams.U = { value: value, unit: 'В', is_main: paramIsMain[param.key] };
+          updatedParams.voltage = { value: value, unit: 'В', is_main: paramIsMain[param.key] };
+        } else if (param.key === 'R') {
+          updatedParams.R = { value: value, unit: 'Ом', is_main: paramIsMain[param.key] };
+          updatedParams.resistance = { value: value, unit: 'Ом', is_main: paramIsMain[param.key] };
+        } else if (param.key === 'E') {
+          updatedParams.E = { value: value, unit: '%', is_main: paramIsMain[param.key] };
+        } else if (param.key === 'C') {
+          updatedParams.C = { value: value, unit: '%', is_main: paramIsMain[param.key] };
+        } else {
+          updatedParams[param.key] = { value: value, unit: param.unit || '', is_main: paramIsMain[param.key] };
+        }
+      }
+    }
     
     const payload = {
       name: fullResource.name,
@@ -288,6 +358,8 @@ defineExpose({ open });
   color: #2c3e50;
 }
 .params-list {
+  max-height: 400px;
+  overflow-y: auto;
   margin-bottom: 15px;
 }
 .param-row {
@@ -301,9 +373,16 @@ defineExpose({ open });
 }
 .param-info {
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 .param-name {
   font-weight: 500;
+}
+.param-unit {
+  font-size: 12px;
+  color: #6c757d;
 }
 .param-input {
   width: 120px;
@@ -314,23 +393,21 @@ defineExpose({ open });
   gap: 5px;
   white-space: nowrap;
 }
-.custom-params {
-  margin-top: 15px;
-}
-.custom-param-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.custom-param-row {
-  background: #fff;
-  border: 1px solid #e0e4e8;
-}
 .modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 20px;
+}
+.error-text {
+  color: #c0392b;
+  font-size: 12px;
+  margin-top: 8px;
+}
+.empty-params {
+  text-align: center;
+  padding: 20px;
+  color: #999;
+  font-style: italic;
 }
 </style>

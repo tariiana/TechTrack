@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { v4: uuidv4 } = require('uuid');
 
 const RESERVED_PARAM_KEYS = new Set([
   'name',
@@ -14,6 +15,14 @@ const RESERVED_PARAM_KEYS = new Set([
   'installed_in',
   'location',
 ]);
+
+class ResourceError extends Error {
+  constructor(message, status = 400) {
+    super(message);
+    this.name = 'ResourceError';
+    this.status = status;
+  }
+}
 
 function normalizeDate(value) {
   if (!value) return null;
@@ -79,7 +88,7 @@ function buildMeasurement(row, index = 0) {
   const createdAt = row.valid_from || row.registration_date || new Date().toISOString();
 
   return {
-    id: new Date(createdAt).getTime() + index,
+    id: `history-${new Date(createdAt).getTime()}-${index}`,
     measurement_date: measurementDate,
     parameters: {
       ...params,
@@ -95,6 +104,28 @@ function buildMeasurement(row, index = 0) {
     note: row.note || null,
     created_at: createdAt,
   };
+}
+
+function normalizeMeasurement(measurement, existing = null) {
+  const source = normalizeParams(measurement);
+  const measurementDate = normalizeDate(source.measurement_date || existing?.measurement_date || new Date());
+  const parameters = normalizeParams(source.parameters || existing?.parameters);
+
+  return {
+    id: String(source.id || existing?.id || uuidv4()),
+    measurement_date: measurementDate,
+    parameters,
+    note: hasOwn(source, 'note') ? (source.note || null) : (existing?.note || null),
+    created_at: source.created_at || existing?.created_at || new Date().toISOString(),
+  };
+}
+
+function sortMeasurements(measurements) {
+  return [...measurements].sort((a, b) => {
+    const aTime = new Date(a.measurement_date || a.created_at || 0).getTime();
+    const bTime = new Date(b.measurement_date || b.created_at || 0).getTime();
+    return bTime - aTime;
+  });
 }
 
 function mapResource(row) {
@@ -275,6 +306,44 @@ async function attachMeasurements(resources) {
 }
 
 class Resource {
+  static async getActiveRowsForUpdate(client, nodeId) {
+    const result = await client.query(`
+      SELECT registration_date, resource_params, note, valid_from
+      FROM equipment.resources_history
+      WHERE node_id = $1 AND valid_to IS NULL
+      ORDER BY valid_from DESC
+      FOR UPDATE
+    `, [nodeId]);
+
+    return result.rows;
+  }
+
+  static async insertVersion(client, nodeId, registrationDate, params, note, userId) {
+    const result = await client.query(`
+      INSERT INTO equipment.resources_history (
+        node_id,
+        registration_date,
+        resource_params,
+        note,
+        valid_from,
+        created_by_user
+      ) VALUES (
+        $1, $2, $3, $4, CURRENT_TIMESTAMP, $5
+      )
+      RETURNING node_id
+    `, [nodeId, registrationDate, params, note, userId || null]);
+
+    return result.rows[0];
+  }
+
+  static async closeActiveVersions(client, nodeId) {
+    return client.query(`
+      UPDATE equipment.resources_history
+      SET valid_to = CURRENT_TIMESTAMP
+      WHERE node_id = $1 AND valid_to IS NULL
+    `, [nodeId]);
+  }
+
   static async getAll(filters = {}) {
     const where = ['rh.valid_to IS NULL', 'n.write_off_date IS NULL'];
     const values = [];
@@ -333,49 +402,30 @@ class Resource {
       `, [nodeId]);
 
       if (nodeResult.rows.length === 0) {
-        throw new Error('Node was not found or was written off');
+        throw new ResourceError('Узел не найден или списан', 404);
       }
 
-      const currentResult = await client.query(`
-        SELECT registration_date, resource_params, note
-        FROM equipment.resources_history
-        WHERE node_id = $1 AND valid_to IS NULL
-        ORDER BY valid_from DESC
-        LIMIT 1
-        FOR UPDATE
-      `, [nodeId]);
-
-      const current = currentResult.rows[0] || null;
+      const activeRows = await Resource.getActiveRowsForUpdate(client, nodeId);
+      const current = activeRows[0] || null;
       const params = buildParams(data || {}, current?.resource_params, nodeResult.rows[0]);
       const registrationDate = data?.registration_date
         || normalizeDate(current?.registration_date)
         || new Date().toISOString().slice(0, 10);
       const note = hasOwn(data, 'note') ? (data.note || null) : (current?.note || null);
 
-      if (current) {
-        await client.query(`
-          UPDATE equipment.resources_history
-          SET valid_to = CURRENT_TIMESTAMP
-          WHERE node_id = $1 AND valid_to IS NULL
-        `, [nodeId]);
+      if (activeRows.length) {
+        await Resource.closeActiveVersions(client, nodeId);
       }
 
-      const result = await client.query(`
-        INSERT INTO equipment.resources_history (
-          node_id,
-          registration_date,
-          resource_params,
-          note,
-          valid_from,
-          created_by_user
-        ) VALUES (
-          $1, $2, $3, $4, CURRENT_TIMESTAMP, $5
-        )
-        RETURNING node_id
-      `, [nodeId, registrationDate, params, note, userId || null]);
+      const result = await Resource.insertVersion(client, nodeId, registrationDate, params, note, userId);
 
       await client.query('COMMIT');
-      return { node_id: result.rows[0].node_id, resource_id: result.rows[0].node_id };
+      return {
+        node_id: result.node_id,
+        resource_id: result.node_id,
+        created: !current,
+        closed_active_versions: activeRows.length,
+      };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -385,26 +435,121 @@ class Resource {
   }
 
   static async delete(nodeId) {
-    const result = await db.query(`
-      UPDATE equipment.resources_history
-      SET valid_to = CURRENT_TIMESTAMP
-      WHERE node_id = $1 AND valid_to IS NULL
-    `, [nodeId]);
+    const client = await db.getClient();
 
-    return { success: result.rowCount > 0 };
+    try {
+      await client.query('BEGIN');
+      const activeRows = await Resource.getActiveRowsForUpdate(client, nodeId);
+
+      if (!activeRows.length) {
+        await client.query('ROLLBACK');
+        return { success: false };
+      }
+
+      await Resource.closeActiveVersions(client, nodeId);
+      await client.query('COMMIT');
+      return { success: true, closed_active_versions: activeRows.length };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async getMeasurements(nodeId) {
+    const resource = await this.getById(nodeId);
+    if (!resource) throw new ResourceError('Ресурс не найден', 404);
+
+    return sortMeasurements(resource.resource_params?.measurements || []);
+  }
+
+  static async saveMeasurements(nodeId, measurements, userId) {
+    const client = await db.getClient();
+
+    try {
+      await client.query('BEGIN');
+      const activeRows = await Resource.getActiveRowsForUpdate(client, nodeId);
+      const current = activeRows[0] || null;
+
+      if (!current) {
+        throw new ResourceError('Ресурс не найден', 404);
+      }
+
+      const params = {
+        ...normalizeParams(current.resource_params),
+        measurements: sortMeasurements(measurements),
+      };
+
+      await Resource.closeActiveVersions(client, nodeId);
+      await Resource.insertVersion(
+        client,
+        nodeId,
+        normalizeDate(current.registration_date) || new Date().toISOString().slice(0, 10),
+        params,
+        current.note || null,
+        userId
+      );
+
+      await client.query('COMMIT');
+      return params.measurements;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async createMeasurement(nodeId, data, userId) {
+    const measurements = await this.getMeasurements(nodeId);
+    const measurement = normalizeMeasurement(data);
+    measurements.push(measurement);
+    await this.saveMeasurements(nodeId, measurements, userId);
+    return measurement;
+  }
+
+  static async updateMeasurement(nodeId, measurementId, data, userId) {
+    const measurements = await this.getMeasurements(nodeId);
+    const index = measurements.findIndex(measurement => String(measurement.id) === String(measurementId));
+
+    if (index === -1) {
+      throw new ResourceError('Измерение не найдено', 404);
+    }
+
+    measurements[index] = normalizeMeasurement({ ...data, id: measurementId }, measurements[index]);
+    await this.saveMeasurements(nodeId, measurements, userId);
+    return measurements[index];
+  }
+
+  static async deleteMeasurement(nodeId, measurementId, userId) {
+    const measurements = await this.getMeasurements(nodeId);
+    const nextMeasurements = measurements.filter(measurement => String(measurement.id) !== String(measurementId));
+
+    if (nextMeasurements.length === measurements.length) {
+      throw new ResourceError('Измерение не найдено', 404);
+    }
+
+    await this.saveMeasurements(nodeId, nextMeasurements, userId);
+    return { success: true };
   }
 
   static async calculate(nodeId, workHoursPerYear) {
     const resource = await this.getById(nodeId);
-    if (!resource) throw new Error('Resource was not found for this node');
+    if (!resource) throw new ResourceError('Ресурс для этого узла не найден', 404);
 
     const serviceLife = parseNumber(resource.service_life);
     const currentRemaining = parseNumber(resource.remaining_resource);
     const yearlyHours = parseNumber(workHoursPerYear) || 8760;
     const startDate = resource.production_date || resource.registration_date;
+    const params = normalizeParams(resource.resource_params);
+    const measurements = sortMeasurements(params.measurements || []);
+    const latestMeasurement = measurements[0] || null;
+    const latestParams = normalizeParams(latestMeasurement?.parameters);
 
     let calculatedPercent = currentRemaining;
     let timeToService = parseNumber(resource.time_to_service);
+    const factors = [];
 
     if (serviceLife && startDate) {
       const elapsedMs = Date.now() - new Date(startDate).getTime();
@@ -415,6 +560,61 @@ class Resource {
 
       calculatedPercent = Math.round(Math.min(100, Math.max(0, (yearsLeft / serviceLife) * 100)));
       timeToService = Number(yearsLeft.toFixed(2));
+      factors.push({ code: 'service_life', value: calculatedPercent, description: 'Расчет по сроку службы и режиму работы' });
+    }
+
+    const measuredHealth = parseNumber(firstPresent(
+      latestParams.health,
+      latestParams.remaining_resource,
+      latestParams.remaining_life,
+      latestParams.battery_level,
+      pickValue(params, 'health'),
+      pickValue(params, 'battery_level')
+    ));
+    if (measuredHealth !== null) {
+      factors.push({ code: 'measured_health', value: measuredHealth, description: 'Оценка по последнему измеренному состоянию' });
+    }
+
+    const capacityPercent = parseNumber(firstPresent(
+      latestParams.capacity_percent,
+      latestParams.capacityPercent,
+      pickValue(params, 'capacity_percent'),
+      pickValue(params, 'capacityPercent')
+    ));
+    const rawCapacity = parseNumber(firstPresent(latestParams.capacity, latestParams.C, latestParams.E, pickValue(params, 'capacity')));
+    const capacity = capacityPercent !== null
+      ? capacityPercent
+      : (rawCapacity !== null && rawCapacity > 1 && rawCapacity <= 100 ? rawCapacity : null);
+    if (capacity !== null) {
+      factors.push({ code: 'capacity', value: Math.min(100, Math.max(0, capacity)), description: 'Оценка по емкости/запасу параметра' });
+    }
+
+    const packetLoss = parseNumber(firstPresent(latestParams.packet_loss, pickValue(params, 'packet_loss')));
+    if (packetLoss !== null) {
+      factors.push({
+        code: 'packet_loss',
+        value: Math.max(0, 100 - packetLoss * 10),
+        description: 'Снижение ресурса по потерям пакетов',
+      });
+    }
+
+    const cpuLoad = parseNumber(firstPresent(latestParams.cpu_load, pickValue(params, 'cpu_load')));
+    const ramUsage = parseNumber(firstPresent(latestParams.ram_usage, pickValue(params, 'ram_usage')));
+    if (cpuLoad !== null || ramUsage !== null) {
+      const load = Math.max(cpuLoad || 0, ramUsage || 0);
+      factors.push({
+        code: 'server_load',
+        value: Math.max(0, 100 - Math.max(0, load - 70)),
+        description: 'Оценка по нагрузке серверного оборудования',
+      });
+    }
+
+    if (currentRemaining !== null) {
+      factors.push({ code: 'current_remaining', value: currentRemaining, description: 'Текущее значение остаточного ресурса' });
+    }
+
+    if (factors.length) {
+      calculatedPercent = Math.round(Math.min(...factors.map(factor => factor.value)));
     }
 
     return {
@@ -424,6 +624,9 @@ class Resource {
       calculated_resource_percent: calculatedPercent,
       remaining_resource: calculatedPercent,
       time_to_service: timeToService,
+      calculation_method: factors.length ? 'minimum_factor' : 'insufficient_data',
+      factors,
+      latest_measurement: latestMeasurement,
       current_resource_params: resource.resource_params,
     };
   }

@@ -6,7 +6,7 @@ const pool = new Pool({
   port: 5432,
   database: 'equipment_nodes',
   user: 'postgres',
-  password: '0000'
+  password: 'mend'
 });
 
 async function hashAndUpdate() {

@@ -20,6 +20,7 @@
 </template>
 
 <script setup lang="ts">
+import { showToast } from '@/utils/toast';
 import { ref } from 'vue';
 import * as exportUtils from '@/utils/exportUtils';
 
@@ -42,14 +43,16 @@ function close() {
 
 function exportData() {
   if (currentData.length === 0) {
-    alert('Нет данных для экспорта');
+    showToast('Нет данных для экспорта', 'error');
     return;
   }
   
   if (format.value === 'excel') {
     exportUtils.exportToExcel(currentData, currentFilename);
+    showToast('Экспорт в Excel выполнен успешно', 'success');
   } else {
     exportUtils.exportToWord(currentData, currentHeaders, currentFilename);
+    showToast('Экспорт в Word выполнен успешно', 'success');
   }
   close();
 }

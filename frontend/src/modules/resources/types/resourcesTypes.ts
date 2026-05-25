@@ -18,17 +18,17 @@ export interface Resource {
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
+   status?: string;
 }
 
 export interface ResourceParameter {
-  parameter_id: number;
-  resource_id: number;
-  name: string;
+  id: number;
+  resourceId: number;
+  name: string;      // Отображаемое имя
+  key: string;       // Ключ для хранения (U, R, C, E)
   value: string | number;
   unit: string;
-  is_main: boolean;
-  created_at: string;
-  updated_at: string;
+  isMain: boolean;
 }
 
 export interface ResourceMeasurement {

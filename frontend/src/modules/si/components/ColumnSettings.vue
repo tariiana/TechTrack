@@ -164,19 +164,6 @@ defineExpose({ open })
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
 .modal-content {
   background: white;
   border-radius: 8px;
@@ -184,7 +171,6 @@ defineExpose({ open })
   max-width: 90%;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
-
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -194,7 +180,6 @@ defineExpose({ open })
   font-size: 18px;
   font-weight: 600;
 }
-
 .btn-close {
   background: none;
   border: none;
@@ -204,18 +189,15 @@ defineExpose({ open })
   padding: 4px 8px;
   border-radius: 4px;
 }
-
 .btn-close:hover {
   background-color: #e9ecef;
   color: #333;
 }
-
 .column-settings-list {
   max-height: 400px;
   overflow-y: auto;
   padding: 16px 20px;
 }
-
 .column-item {
   display: flex;
   justify-content: space-between;
@@ -247,7 +229,6 @@ defineExpose({ open })
 .drag-handle:active {
   cursor: grabbing;
 }
-
 .modal-footer {
   display: flex;
   justify-content: space-between;
@@ -255,37 +236,8 @@ defineExpose({ open })
   padding: 16px 20px;
   border-top: 1px solid #e0e4e8;
 }
-
 .footer-left {
   display: flex;
   gap: 10px;
-}
-
-.btn {
-  padding: 8px 16px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background-color: #2c5f8a;
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: #1e4566;
-}
-
-.btn-secondary {
-  background-color: #e9ecef;
-  color: #2c3e50;
-  border: 1px solid #ced4da;
-}
-
-.btn-secondary:hover {
-  background-color: #dee2e6;
 }
 </style>

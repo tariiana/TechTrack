@@ -2,7 +2,6 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { apiFetch } from '@/api/client';
 
-// Определение интерфейса для измерения
 interface ResourceMeasurement {
   id: number | string;
   resourceId: string;
@@ -70,13 +69,26 @@ function normalizeResource(resource: any): any {
     ...resource,
     id: String(resource?.id ?? resource?.resource_id ?? resource?.node_id ?? ''),
     resource_id: String(resource?.resource_id ?? resource?.id ?? resource?.node_id ?? ''),
-    node_id: String(resource?.node_id ?? resource?.nodeId ?? ''),
-    nodeId: String(resource?.nodeId ?? resource?.node_id ?? ''),
+    node_id: String(resource?.node_id ?? resource?.nodeId ?? resource?.resource_id ?? ''),
+    nodeId: String(resource?.nodeId ?? resource?.node_id ?? resource?.resource_id ?? ''),
     nodeName: resource?.nodeName ?? resource?.node_name,
+    name: resource?.name || '',
+    mark: resource?.mark || '',
+    type: resource?.type || '',
+    production_date: resource?.production_date || '',
+    registration_date: resource?.registration_date || '',
     registration_number: registrationNumber,
     registrationNumber,
-    initial_resource: toNumber(initial) ?? initial,
+    last_service_date: resource?.last_service_date || '',
+    service_life: resource?.service_life,
+    time_to_service: resource?.time_to_service,
+    initial_resource: toNumber(initial) ?? initial ?? '',
     remaining_resource: remainingNumber,
+    installed_in: resource?.installed_in || '',
+    location: resource?.location || '',
+    status: resource?.status || (resource?.valid_to ? 'Списан' : 'Исправен'),  // 👈 ИСПРАВЛЕНО: по умолчанию 'активный'
+    note: resource?.note || '',
+    is_deleted: resource?.is_deleted || false,
     resource_params: {
       ...params,
       measurements: Array.isArray(params.measurements) ? params.measurements : [],
@@ -101,8 +113,6 @@ export const useResourcesStore = defineStore('resources', () => {
       const response = await apiFetch(`/resources${query}`);
       const data = response.data || response;
       resources.value = Array.isArray(data) ? data.map(normalizeResource) : [];
-      
-      // Загружаем измерения из ресурсов
       loadMeasurementsFromResources();
     } catch (err: any) {
       error.value = err.message;
@@ -111,7 +121,6 @@ export const useResourcesStore = defineStore('resources', () => {
     }
   }
 
-  // Извлечение измерений из ресурсов
   function loadMeasurementsFromResources() {
     const allMeasurements: ResourceMeasurement[] = [];
     for (const res of resources.value) {
@@ -121,8 +130,8 @@ export const useResourcesStore = defineStore('resources', () => {
       for (const m of measurementsList) {
         allMeasurements.push({
           id: m.id,
-          resourceId: String(res.resource_id ?? res.id),
-          nodeId: String(res.node_id ?? res.nodeId),
+          resourceId: String(res.resource_id),
+          nodeId: String(res.node_id),
           nodeName: res.nodeName ?? res.node_name,
           resourceName: res.name,
           mark: res.mark,
@@ -152,60 +161,113 @@ export const useResourcesStore = defineStore('resources', () => {
   }
 
   async function upsertResource(nodeId: string, data: any) {
+    // 👈 ДОБАВЛЕНО: сохраняем статус в resource_params
+    const payload = { 
+      ...data, 
+      node_id: nodeId,
+      resource_params: {
+        ...(data.resource_params || {}),
+        status: data.status,  // сохраняем статус в параметры
+      }
+    };
     const response = await apiFetch(`/resources/${nodeId}`, {
       method: 'POST',
-      body: JSON.stringify(data)
+      body: JSON.stringify(payload),
     });
     await fetchResources();
     return response.data || response;
   }
 
+async function writeOffResource(nodeId: string) {
+  // Находим ресурс по node_id
+  const resource = resources.value.find((r: any) => String(r.node_id) === String(nodeId));
+  if (!resource) return;
+  
+  // Обновляем статус и флаг удаления
+  await upsertResource(nodeId, { 
+    ...resource, 
+    status: 'списан',
+    is_deleted: true 
+  });
+  
+  // Перезагружаем список
+  await fetchResources();
+}
+
   async function deleteResource(nodeId: string) {
-    await apiFetch(`/resources/${nodeId}`, { method: 'DELETE' });
-    await fetchResources();
+    await writeOffResource(nodeId);
   }
 
   async function calculateResource(nodeId: string, workHoursPerYear: number) {
     const response = await apiFetch(`/resources/${nodeId}/calculate`, {
       method: 'POST',
-      body: JSON.stringify({ work_hours_per_year: workHoursPerYear })
+      body: JSON.stringify({ work_hours_per_year: workHoursPerYear }),
     });
     return response.data || response;
   }
 
-  // ========== Измерения (журнал) ==========
   function getMeasurementsForResource(resourceId: number | string): ResourceMeasurement[] {
-    return measurements.value.filter((m: ResourceMeasurement) => String(m.resourceId) === String(resourceId)).sort((a: ResourceMeasurement, b: ResourceMeasurement) =>
-      new Date(b.measurementDate).getTime() - new Date(a.measurementDate).getTime()
-    );
+    return measurements.value
+      .filter((m: ResourceMeasurement) => String(m.resourceId) === String(resourceId))
+      .sort((a, b) => new Date(b.measurementDate).getTime() - new Date(a.measurementDate).getTime());
   }
-
-  // Получить параметры ресурса
-  function getParametersForResource(resourceId: number | string): any[] {
-    const resource = resources.value.find((r: any) => String(r.id) === String(resourceId));
-    if (!resource || !resource.resource_params) return [];
-    const params = resource.resource_params;
-    const result: any[] = [];
-    for (const [key, value] of Object.entries(params)) {
-      if (key !== 'measurements') {
-        const v = value as any;
-        result.push({
-          id: key,
-          name: key,
-          value: v.value !== undefined ? v.value : v,
-          unit: v.unit || '',
-          isMain: v.is_main || false,
-        });
-      }
-    }
-    return result;
+function getParametersForResource(resourceId: number | string): any[] {
+  const resource = resources.value.find((r: any) => String(r.resource_id) === String(resourceId));
+  if (!resource || !resource.resource_params) return [];
+  
+  const result: any[] = [];
+  const seenParams = new Set(); // Для дедупликации
+  
+  for (const [key, value] of Object.entries(resource.resource_params)) {
+    if (key === 'measurements') continue;
+    if (key === 'status') continue;
+    
+    const v = value as any;
+    const valueText = v && typeof v === 'object' && 'value' in v ? v.value : v;
+    const unit = v && typeof v === 'object' ? v.unit || '' : '';
+    const isMain = v && typeof v === 'object' ? v.is_main || v.isMain || false : false;
+    
+    // Определяем отображаемое имя
+    let displayName = '';
+    if (key === 'U' || key === 'voltage') displayName = 'Напряжение';
+    else if (key === 'R' || key === 'resistance') displayName = 'Сопротивление';
+    else if (key === 'C') displayName = 'Ёмкость (C)';
+    else if (key === 'E') displayName = 'Ёмкость (E)';
+    else if (key === 'capacity') displayName = 'Ёмкость';
+    else continue;
+    
+    // Дедупликация: показываем только один параметр каждого типа
+    if (seenParams.has(displayName)) continue;
+    seenParams.add(displayName);
+    
+    result.push({
+      id: key,
+      name: displayName,
+      key: key,
+      value: valueText,
+      unit: unit === 'B' ? 'В' : unit,
+      isMain: isMain,
+    });
   }
-
-  // Обновить ресурс
+  
+  // Сортируем в нужном порядке
+  const order = ['Напряжение', 'Сопротивление', 'Ёмкость (E)', 'Ёмкость (C)', 'Ёмкость'];
+  result.sort((a, b) => {
+    const indexA = order.findIndex(o => a.name.includes(o));
+    const indexB = order.findIndex(o => b.name.includes(o));
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
+    return a.name.localeCompare(b.name);
+  });
+  
+  return result;
+}
   async function updateResource(id: number | string, data: any) {
-    const resource = resources.value.find((r: any) => String(r.id) === String(id));
+    const resource = resources.value.find((r: any) => String(r.resource_id) === String(id));
     if (!resource) return;
-    await upsertResource(String(resource.nodeId), data);
+    // 👈 ДОБАВЛЕНО: передаём статус при обновлении
+    await upsertResource(String(resource.node_id), { ...data, status: data.status });
   }
 
   return {
@@ -218,6 +280,7 @@ export const useResourcesStore = defineStore('resources', () => {
     fetchResourcesForNode,
     upsertResource,
     deleteResource,
+    writeOffResource,
     calculateResource,
     getMeasurementsForResource,
     getParametersForResource,

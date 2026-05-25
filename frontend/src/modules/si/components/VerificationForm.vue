@@ -1,8 +1,10 @@
 <template>
   <div class="modal-overlay" v-if="visible">
     <div class="modal-content" style="width: 500px">
-      <div class="modal-header">{{ editId ? 'Редактирование поверки' : 'Добавление поверки' }}</div>
-
+      <div class="modal-header">
+        <span>{{ editId ? 'Редактирование поверки' : 'Добавление поверки' }}</span>
+        <button class="modal-close" @click="close" title="Закрыть">×</button>
+      </div>
       <div class="form-group">
         <label>Дата передачи*</label>
         <input type="date" v-model="form.transferDate" class="form-control" :class="{ 'is-invalid': errors.transferDate }" @change="validateDates" />
@@ -182,66 +184,25 @@ defineExpose({ open })
 </script>
 
 <style scoped>
-.modal-footer {
+.modal-header {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 15px;
+  justify-content: space-between;
+  align-items: center;
 }
-
-.error-text {
-  color: #c0392b;
-  font-size: 12px;
-  margin-top: 4px;
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 4px 8px;
+  border-radius: 4px;
 }
-
+.modal-close:hover {
+  background-color: #e9ecef;
+  color: #333;
+}
 .is-invalid {
   border-color: #c0392b;
-}
-
-.btn {
-  padding: 8px 16px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.btn-primary {
-  background-color: #2c5f8a;
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: #1e4566;
-}
-
-.btn-secondary {
-  background-color: #e9ecef;
-  color: #2c3e50;
-  border: 1px solid #ced4da;
-}
-
-.btn-secondary:hover {
-  background-color: #dee2e6;
-}
-
-.form-group {
-  margin-bottom: 15px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: 500;
-  color: #2c3e50;
-}
-
-.form-control {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 14px;
 }
 </style>
