@@ -46,19 +46,17 @@ defineEmits(['edit', 'delete', 'goToResource']);
 </script>
 
 <style scoped>
-:deep(.scrollable-table-container) {
-  height: 300px;
-  max-height: 300px;
+.resource-table-wrapper {
+  overflow-x: auto;
+  margin-top: 8px;
 }
-
-:deep(.table-scroll) {
-  overflow-y: auto !important;
+.clickable-link {
+  cursor: pointer;
+  color: #1976d2;
+  text-decoration: none;
 }
-
-:deep(th) {
-  position: sticky;
-  top: 0;
-  background: #f8f9fa;
-  z-index: 10;
+.clickable-link:hover {
+  text-decoration: underline;
 }
+/* .empty-message уже в глобальном стиле, но если нужно, можно оставить (он в глобальном есть) */
 </style>

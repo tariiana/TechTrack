@@ -78,31 +78,8 @@ function close() {
 
 defineExpose({ open });
 </script>
-
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.modal-content {
-  background: white;
-  border-radius: 8px;
-  width: 600px;
-  max-width: 90%;
-}
-.modal-header {
-  padding: 16px;
-  border-bottom: 1px solid #e0e4e8;
-  font-weight: bold;
-}
+/* Локальные стили только для .filter-conditions и .filter-row, .btn-icon */
 .filter-conditions {
   max-height: 400px;
   overflow-y: auto;
@@ -123,28 +100,5 @@ defineExpose({ open });
   cursor: pointer;
   font-size: 16px;
   padding: 4px 8px;
-}
-.modal-footer {
-  padding: 12px 16px;
-  border-top: 1px solid #e0e4e8;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.btn-secondary {
-  background: #e0e4e8;
-  border: 1px solid #cbd5e1;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.btn-primary {
-  background: #1976d2;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
 }
 </style>

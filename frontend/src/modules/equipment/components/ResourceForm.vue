@@ -147,15 +147,5 @@ defineExpose({ open });
 </script>
 
 <style scoped>
-
-.modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; }
-.modal-content { background:white; border-radius:8px; width:500px; max-width:90%; }
-.modal-header { padding:12px 16px; border-bottom:1px solid #e2e8f0; font-weight:600; }
-.modal-footer { padding:10px 16px; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px; }
-.form-group { margin-bottom:12px; padding:0 16px; }
-.form-group label { display:block; margin-bottom:4px; font-weight:500; }
-.form-control { width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; }
-.error-text { color:#c0392b; font-size:12px; margin-top:4px; }
-.btn-primary { background: #2c5f8a;; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; }
-.btn-secondary { background:#e0e4e8; border:1px solid #cbd5e1; padding:6px 12px; border-radius:4px; cursor:pointer; }
+/* Локальных стилей нет – всё из глобального */
 </style>

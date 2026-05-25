@@ -2,12 +2,13 @@
   <div class="card">
     <div style="display: flex; justify-content: space-between; margin-bottom: 20px">
       <h2>Оборудование</h2>
-      <div class="action-buttons">
-        <button v-if="canEdit" class="btn btn-primary btn-fixed" @click="openForm">+ Добавить</button>
-        <button class="btn btn-secondary btn-fixed" @click="showColumnSettings = true">⚙️ Колонки</button>
-        <button class="btn btn-secondary btn-fixed" @click="exportToExcel">📎 Экспорт</button>
-        <button class="btn btn-secondary btn-fixed" @click="openAdvancedFilter">🔍 Расш. фильтр</button>
-      </div>
+     <div class="action-buttons">
+  <button v-if="canEdit" class="btn btn-primary btn-fixed" @click="openForm">+ Добавить</button>
+  <button class="btn btn-secondary btn-fixed" @click="showColumnSettings = true">⚙️ Колонки</button>
+  <button class="btn btn-secondary btn-fixed" @click="exportToExcel">📎 Excel</button>
+  <button class="btn btn-secondary btn-fixed" @click="exportToWord">📄 Word</button>
+  <button class="btn btn-secondary btn-fixed" @click="openAdvancedFilter">🔍 Расш. фильтр</button>
+</div>
     </div>
 
     <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px">
@@ -403,9 +404,12 @@ function exportToExcel() {
     alert('Нет данных для экспорта');
     return;
   }
-  const filename = `Оборудование_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}`;
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const filename = `Оборудование_${dateStr}`;
   exportUtils.exportToExcel(data, filename);
 }
+
 function exportToWord() {
   const data = getExportData();
   if (!data.length) {
@@ -413,10 +417,11 @@ function exportToWord() {
     return;
   }
   const headers = Object.keys(data[0]);
-  const filename = `Оборудование_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}`;
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const filename = `Оборудование_${dateStr}`;
   exportUtils.exportToWord(data, headers, filename);
 }
-
 // Стилизация строк
 function getRowClass(node: any): string {
   if (node.status === 'списан') return 'disabled-row';

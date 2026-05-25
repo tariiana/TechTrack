@@ -387,9 +387,49 @@ watch(() => route.params.id, (newId) => {
   if (newId) loadById(newId as string);
 }, { immediate: true });
 </script>
-
 <style scoped>
-/* стили без изменений, оставлены как в оригинале */
+.parameters-editor {
+  width: 100%;
+  /* убираем max-width: 600px; */
+}
+:deep(.scrollable-table-container) {
+  height: auto !important;
+  max-height: none !important;
+}
+.table-wrapper {
+  overflow-x: auto;
+}
+.data-table {
+  width: 100% !important;      /* вместо width: auto */
+  min-width: 0 !important;
+  border-collapse: collapse;
+}
+.data-table th,
+.data-table td {
+  border: 1px solid #e2e8f0;
+  padding: 6px 8px;
+  text-align: left;
+  /* white-space: nowrap;  можно убрать или оставить, но для широкой таблицы лучше убрать */
+}
+/* Процентное распределение ширины колонок */
+.data-table th:first-child,
+.data-table td:first-child {
+  width: 35%;
+}
+.data-table th:nth-child(2),
+.data-table td:nth-child(2) {
+  width: 35%;
+}
+.data-table th:nth-child(3),
+.data-table td:nth-child(3) {
+  width: 20%;
+}
+.data-table th:last-child,
+.data-table td:last-child {
+  width: 10%;
+  text-align: center;
+}
+/* Локальные стили – только для карточки */
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -400,7 +440,7 @@ watch(() => route.params.id, (newId) => {
 }
 .action-buttons {
   display: flex;
-  gap: 10px;
+  gap: 12px;
 }
 .info-grid {
   display: grid;
@@ -425,32 +465,6 @@ watch(() => route.params.id, (newId) => {
 .info-row strong {
   width: 160px;
 }
-.info-block {
-  margin: 20px 0;
-}
-.info-block table,
-.section table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0;
-}
-.info-block th,
-.info-block td,
-.section th,
-.section td {
-  padding: 8px 12px;
-  border: 1px solid #e2e8f0;
-  text-align: left;
-}
-.info-block th,
-.section th {
-  background-color: #f1f5f9;
-  font-weight: 600;
-}
-.table-wrapper {
-  overflow-x: auto;
-  width: 100%;
-}
 .section {
   margin-top: 32px;
   border-top: 1px solid #e2e8f0;
@@ -464,7 +478,7 @@ watch(() => route.params.id, (newId) => {
 }
 .subsection {
   margin-top: 24px;
-  margin-left: 0;
+  margin-left: 16px;
 }
 .subsection-header {
   display: flex;
@@ -480,67 +494,25 @@ watch(() => route.params.id, (newId) => {
   font-weight: 500;
   color: #334155;
 }
+.table-wrapper {
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+.empty-message {
+  color: #94a3b8;
+  font-style: italic;
+  padding: 12px;
+  text-align: center;
+  background: #f8fafc;
+  border-radius: 6px;
+}
 .clickable-link {
   cursor: pointer;
-  color: #2c5f8a;
+  color: #1976d2;
   text-decoration: none;
 }
 .clickable-link:hover {
   text-decoration: underline;
 }
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.modal-content {
-  background: white;
-  border-radius: 8px;
-  width: 500px;
-  max-width: 90%;
-}
-.modal-header {
-  padding: 16px;
-  border-bottom: 1px solid #e0e4e8;
-  font-weight: bold;
-}
-.modal-body {
-  padding: 16px;
-}
-.modal-footer {
-  padding: 12px 16px;
-  border-top: 1px solid #e0e4e8;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-.form-control {
-  width: 100%;
-  padding: 6px 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-}
 
-:deep(.scrollable-table-container) {
-  height: 400px;
-  max-height: 400px;
-}
-
-:deep(.table-scroll) {
-  overflow-y: auto !important;
-}
-
-:deep(th) {
-  position: sticky;
-  top: 0;
-  background: #f8f9fa;
-  z-index: 10;
-}
 </style>

@@ -312,7 +312,15 @@ watch(() => props.visible, (newVal) => {
 </script>
 
 <style scoped>
-/* стили такие же, как в предыдущей версии, плюс добавить .hint */
-.hint { font-size: 12px; color: #6c757d; margin-top: 4px; display: block; }
-
+/* Локальные стили – только для специфики формы */
+.full-width {
+  grid-column: span 2;
+}
+.hint {
+  font-size: 12px;
+  color: #6c757d;
+  margin-top: 4px;
+  display: block;
+}
+/* Никаких переопределений .btn, .form-group и т.д. – всё из глобального */
 </style>

@@ -60,6 +60,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue';
 import ScrollableTable from '@/components/common/ScrollableTable.vue';
+
 const props = defineProps<{
   modelValue: Record<string, any>;
   template?: Record<string, any> | null;
@@ -173,12 +174,18 @@ watch(localParams, () => syncToExternal(), { deep: true });
 <style scoped>
 .parameters-editor {
   width: 100%;
+  /* убираем max-width: 600px; */
+}
+:deep(.scrollable-table-container) {
+  height: auto !important;
+  max-height: none !important;
 }
 .table-wrapper {
   overflow-x: auto;
 }
 .data-table {
-  width: 100%;
+  width: 100% !important;      /* вместо width: auto */
+  min-width: 0 !important;
   border-collapse: collapse;
 }
 .data-table th,
@@ -186,7 +193,27 @@ watch(localParams, () => syncToExternal(), { deep: true });
   border: 1px solid #e2e8f0;
   padding: 6px 8px;
   text-align: left;
+  /* white-space: nowrap;  можно убрать или оставить, но для широкой таблицы лучше убрать */
 }
+/* Процентное распределение ширины колонок */
+.data-table th:first-child,
+.data-table td:first-child {
+  width: 35%;
+}
+.data-table th:nth-child(2),
+.data-table td:nth-child(2) {
+  width: 35%;
+}
+.data-table th:nth-child(3),
+.data-table td:nth-child(3) {
+  width: 20%;
+}
+.data-table th:last-child,
+.data-table td:last-child {
+  width: 10%;
+  text-align: center;
+}
+/* остальные стили без изменений */
 .center {
   text-align: center;
 }
@@ -261,20 +288,5 @@ watch(localParams, () => syncToExternal(), { deep: true });
   padding: 6px 12px;
   border-radius: 4px;
   cursor: pointer;
-}
-:deep(.scrollable-table-container) {
-  height: 300px;
-  max-height: 300px;
-}
-
-:deep(.table-scroll) {
-  overflow-y: auto !important;
-}
-
-:deep(th) {
-  position: sticky;
-  top: 0;
-  background: #f8f9fa;
-  z-index: 10;
 }
 </style>
