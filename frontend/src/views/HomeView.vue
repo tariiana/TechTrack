@@ -77,7 +77,7 @@
           <div class="module-stats">
             <div class="stat-item">
               <span class="stat-value">{{ stats.resources.total }}</span>
-              <span class="stat-label">Всего ресурсов</span>
+              <span class="stat-label">Всего оборудования</span>
             </div>
             <div class="stat-item">
               <span class="stat-value">{{ stats.resources.critical }}</span>
@@ -126,15 +126,18 @@
       </div>
     </div>
 
-    <!-- Блок срочных уведомлений -->
-    <div class="alerts-section" v-if="urgentAlerts.length > 0">
-      <h3>⚠️ Срочные уведомления</h3>
-      <div class="alerts-list">
-        <div v-for="alert in urgentAlerts" :key="alert.id" class="alert-item" :class="alert.type">
-          {{ alert.message }}
-        </div>
-      </div>
+    <!-- Блок срочных уведомлений (сворачиваемый) -->
+   <div class="alerts-section" v-if="urgentAlerts.length > 0">
+  <div class="alerts-header" @click="alertsCollapsed = !alertsCollapsed">
+    <h3>⚠️ Срочные уведомления ({{ urgentAlerts.length }})</h3>
+  </div>
+  <div v-if="!alertsCollapsed" class="alerts-list">
+    <div v-for="alert in urgentAlerts" :key="alert.id" class="alert-item" :class="alert.type">
+      {{ alert.message }}
     </div>
+  </div>
+</div>
+
   </div>
 </template>
 
@@ -151,6 +154,8 @@ const equipmentStore = useEquipmentStore()
 const siStore = useSIStore()
 const resourcesStore = useResourcesStore()
 const maintenanceStore = useMaintenanceStore()
+
+const alertsCollapsed = ref(false)
 
 const stats = ref({
   equipment: { total: 0, aggregates: 0, blocks: 0 },
@@ -174,12 +179,17 @@ function getDaysUntil(dateStr: string): number {
 }
 
 function getRemainingLife(res: any): number {
+  const status = (res.status || '').toLowerCase()
+  if (status === 'списан' || res.is_deleted === true) {
+    return NaN
+  }
+  
   const params = res.resource_params || {}
   const raw = res.remaining_resource ?? params.remaining_resource ?? params.remaining_life ?? params.remainingLife ?? params.health ?? params.battery_level
   const value = typeof raw === 'object' && raw !== null && 'value' in raw ? raw.value : raw
-  if (value === null || value === undefined || value === '') return Number.NaN
+  if (value === null || value === undefined || value === '') return NaN
   const result = parseFloat(String(value).replace(',', '.'))
-  return Number.isFinite(result) ? result : Number.NaN
+  return Number.isFinite(result) ? result : NaN
 }
 
 async function loadDashboardData() {
@@ -221,10 +231,19 @@ async function loadStats() {
   stats.value.si.expired = expired
 
   const resourcesList = resourcesStore.resources || []
-  stats.value.resources.total = resourcesList.length
+  
+  // Фильтруем списанные ресурсы
+  const activeResources = resourcesList.filter((res: any) => {
+    const status = (res.status || '').toLowerCase()
+    const isDeleted = res.is_deleted === true
+    return status !== 'списан' && !isDeleted
+  })
+  
+  stats.value.resources.total = activeResources.length
+  
   let critical = 0
   let warning = 0
-  for (const res of resourcesList) {
+  for (const res of activeResources) {
     const remaining = getRemainingLife(res)
     if (!Number.isFinite(remaining)) continue
     if (remaining <= 20) critical++
@@ -236,6 +255,7 @@ async function loadStats() {
   const plansList = maintenanceStore.plans || []
   stats.value.maintenance.plansCount = plansList.length
 
+  // Формируем уведомления
   urgentAlerts.value = []
 
   for (const si of siList) {
@@ -250,13 +270,13 @@ async function loadStats() {
     }
   }
 
-  for (const res of resourcesList) {
+  for (const res of activeResources) {
     const remaining = getRemainingLife(res)
     if (!Number.isFinite(remaining)) continue
     if (remaining <= 20) {
       urgentAlerts.value.push({
         id: res.resource_id,
-        type: 'warning',
+        type: 'danger',  // 👈 ИЗМЕНЕНО С 'warning' НА 'danger' (КРАСНЫЙ)
         message: `Ресурс "${res.name}" для узла "${res.node_name}": остаточный ресурс критический (${remaining}%)!`,
       })
     }
