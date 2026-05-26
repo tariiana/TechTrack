@@ -184,6 +184,62 @@ function getCurrentDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function parseFormNumber(value: any): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const match = String(value).replace(',', '.').match(/-?\d+(\.\d+)?/);
+  if (!match) return null;
+  const result = Number(match[0]);
+  return Number.isFinite(result) ? result : null;
+}
+
+function calculateFromForm(hours: number) {
+  const serviceLife = parseFormNumber(form.service_life);
+  const currentRemaining = parseFormNumber(form.remaining_resource);
+  const timeToService = parseFormNumber(form.time_to_service);
+  const startDate = form.production_date || form.registration_date || getCurrentDate();
+  const startTime = new Date(startDate).getTime();
+
+  if (serviceLife && timeToService !== null) {
+    return {
+      remaining_resource: Math.round(Math.min(100, Math.max(0, (timeToService / serviceLife) * 100))),
+      time_to_service: timeToService,
+    };
+  }
+
+  if (!serviceLife || !Number.isFinite(startTime)) {
+    if (currentRemaining !== null) {
+      return {
+        remaining_resource: currentRemaining,
+        time_to_service: timeToService,
+      };
+    }
+    throw new Error('Укажите срок службы и дату производства или регистрации');
+  }
+
+  const yearsPassed = Math.max(0, (Date.now() - startTime) / (365.25 * 24 * 60 * 60 * 1000));
+  const usageFactor = Math.max(hours, 0) / 8760;
+  const yearsLeft = Math.max(0, serviceLife - yearsPassed * usageFactor);
+  const remaining = Math.round(Math.min(100, Math.max(0, (yearsLeft / serviceLife) * 100)));
+
+  return {
+    remaining_resource: remaining,
+    time_to_service: Number(yearsLeft.toFixed(2)),
+  };
+}
+
+function applyCalculationResult(result: any) {
+  const remaining = result?.remaining_resource ?? result?.calculated_resource_percent;
+  if (remaining !== undefined && remaining !== null) {
+    calcResult.value = Number(remaining);
+    form.remaining_resource = String(remaining);
+    if (!form.initial_resource) form.initial_resource = '100';
+  }
+  if (result?.time_to_service !== undefined && result.time_to_service !== null) {
+    form.time_to_service = result.time_to_service;
+  }
+}
+
 function reset() {
   isEdit.value = false;
   form.node_id = null;
@@ -232,31 +288,7 @@ async function calculateResource() {
   }
 
   try {
-    const result = await store.calculateResource(form.node_id, workHours.value, {
-      name: form.name,
-      mark: form.mark,
-      type: form.type,
-      production_date: form.production_date,
-      registration_date: form.registration_date || getCurrentDate(),
-      registration_number: form.registration_number,
-      last_service_date: form.last_service_date,
-      service_life: form.service_life,
-      time_to_service: form.time_to_service,
-      initial_resource: form.initial_resource,
-      remaining_resource: form.remaining_resource,
-      installed_in: form.installed_in,
-      location: form.location,
-      note: form.note,
-      status: form.status,
-    });
-    const remaining = result?.remaining_resource ?? result?.calculated_resource_percent;
-    if (remaining !== undefined && remaining !== null) {
-      calcResult.value = Number(remaining);
-      form.remaining_resource = String(remaining);
-    }
-    if (result?.time_to_service !== undefined && result.time_to_service !== null) {
-      form.time_to_service = result.time_to_service;
-    }
+    applyCalculationResult(calculateFromForm(Number(workHours.value)));
   } catch (err: any) {
     error.value = err.message || 'Ошибка расчета ресурса';
   }

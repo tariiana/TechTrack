@@ -534,7 +534,9 @@ class Resource {
 
     const startTime = startDate ? new Date(startDate).getTime() : null;
 
-    if (serviceLife && Number.isFinite(startTime)) {
+    if (serviceLife && timeToService !== null) {
+      calculatedPercent = Math.round(Math.min(100, Math.max(0, (timeToService / serviceLife) * 100)));
+    } else if (serviceLife && Number.isFinite(startTime)) {
       const elapsedMs = Date.now() - startTime;
       const yearsPassed = Math.max(0, elapsedMs / (365.25 * 24 * 60 * 60 * 1000));
       const usageFactor = Math.max(yearlyHours, 0) / 8760;
