@@ -527,10 +527,7 @@ onMounted(async () => {
 }
 
 /* Стили для ScrollableTable */
-:deep(.scrollable-table-container) {
-  height: 650px;
-  max-height: calc(100vh - 250px);
-}
+
 
 :deep(.table-scroll) {
   overflow-y: auto !important;
