@@ -4,9 +4,10 @@
   "description": "API для системы учета оборудования",
   "main": "server.js",
   "scripts": {
+    "build": "node -e \"console.log('Backend uses plain Node.js; no build step required')\"",
     "dev": "nodemon server.js",
     "start": "node server.js"
-},
+  },
   "dependencies": {
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",

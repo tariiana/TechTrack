@@ -9,6 +9,8 @@ const { pool, initDatabase } = require('./src/config/db');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.set('trust proxy', 1);
+
 // Безопасность
 app.use(helmet());
 
@@ -100,9 +102,12 @@ async function start() {
 
 start();
 
-// Graceful shutdown
-process.on('SIGINT', async () => {
-    console.log('Shutting down gracefully...');
+async function shutdown(signal) {
+    console.log(`Received ${signal}. Shutting down gracefully...`);
     await pool.end();
     process.exit(0);
-});
+}
+
+// Graceful shutdown
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

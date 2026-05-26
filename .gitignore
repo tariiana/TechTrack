@@ -1,0 +1,21 @@
+node_modules/
+
+# Local environment files with secrets.
+.env
+.env.*
+!.env.example
+
+# Build output.
+dist/
+frontend/dist/
+backend/dist/
+
+# Logs and runtime state.
+logs/
+*.log
+.pm2/
+
+# OS/editor noise.
+.DS_Store
+Thumbs.db
+.vscode/
