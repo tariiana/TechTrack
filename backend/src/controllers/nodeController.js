@@ -36,6 +36,18 @@ async function getById(req, res, next) {
   }
 }
 
+async function getByIdWithExpiry(req, res, next) {
+  try {
+    const node = await Node.getByIdWithExpiry(req.params.id);
+    if (!node) {
+      return res.status(404).json(ResponseFormatter.error('Узел не найден', 404));
+    }
+    return res.json(node);
+  } catch (err) {
+    return next(err);
+  }
+}
+
 async function getChildren(req, res, next) {
   try {
     const children = await Node.getChildren(req.params.id);
@@ -105,6 +117,7 @@ module.exports = {
   getAll,
   getTree,
   getById,
+  getByIdWithExpiry,
   getChildren,
   getMovementHistory,
   create,

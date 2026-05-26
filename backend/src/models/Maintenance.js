@@ -51,6 +51,12 @@ function normalizeDate(value) {
   return value;
 }
 
+function maxDateKey(...values) {
+  const dates = values.map(normalizeDate).filter(Boolean);
+  if (dates.length === 0) return null;
+  return dates.sort().at(-1);
+}
+
 function getApiStatus(dbStatus) {
   return STATUS_FROM_DB[dbStatus] || dbStatus;
 }
@@ -370,6 +376,7 @@ class Maintenance {
   }
 
   static async getEquipmentNodes() {
+    const baseDateSql = `COALESCE(GREATEST(last_done.last_completed_date, n.commission_date), last_done.last_completed_date, n.commission_date)`;
     const result = await pool.query(`
       SELECT
         n.node_id,
@@ -377,6 +384,10 @@ class Maintenance {
         n.location,
         n.status,
         n.commission_date,
+        last_done.last_completed_date,
+        ${baseDateSql} AS expiry_base_date,
+        last_cal.last_calibration_date,
+        last_cal.next_calibration_date,
         nt.name AS node_type_name,
         ${aggregateCondition} AS is_aggregate,
         EXISTS (
@@ -385,11 +396,44 @@ class Maintenance {
         ) AS has_children
       FROM equipment.nodes n
       LEFT JOIN equipment.node_types nt ON nt.node_type_id = n.node_type_id
+      LEFT JOIN equipment.instruments_history i
+        ON i.node_id = n.node_id
+       AND i.valid_to IS NULL
+      LEFT JOIN LATERAL (
+        SELECT MAX(t.completed_date) AS last_completed_date
+        FROM equipment.maintenance_tasks t
+        JOIN equipment.maintenance_statuses done_status ON done_status.status_id = t.status_id
+        WHERE t.node_id = n.node_id
+          AND t.completed_date IS NOT NULL
+          AND done_status.name = 'выполнено'
+      ) last_done ON true
+      LEFT JOIN LATERAL (
+        SELECT
+          ch.calibration_date AS last_calibration_date,
+          (ch.calibration_date + (i.calibration_interval * INTERVAL '1 year'))::date AS next_calibration_date
+        FROM equipment.calibration_history ch
+        WHERE ch.node_id = n.node_id
+        ORDER BY ch.calibration_date DESC, ch.performed_at DESC
+        LIMIT 1
+      ) last_cal ON true
       WHERE ${aggregateCondition}
       ORDER BY n.name NULLS LAST, n.model NULLS LAST
     `);
 
-    return result.rows;
+    return result.rows.map((node) => {
+      const expiryBaseDate = normalizeDate(node.expiry_base_date);
+      const maintenanceExpiryDate = calculateMaintenanceExpiryDate(expiryBaseDate);
+      const calibrationExpiryDate = normalizeDate(node.next_calibration_date);
+      return {
+        ...node,
+        commission_date: normalizeDate(node.commission_date),
+        last_completed_date: normalizeDate(node.last_completed_date),
+        expiry_base_date: expiryBaseDate,
+        last_calibration_date: normalizeDate(node.last_calibration_date),
+        next_calibration_date: calibrationExpiryDate,
+        expiry_date: maxDateKey(maintenanceExpiryDate, calibrationExpiryDate),
+      };
+    });
   }
 
   static async generatePlan(startDate, endDate, nodeIds = null, planId = null) {

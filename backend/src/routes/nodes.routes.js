@@ -8,6 +8,7 @@ router.use(authMiddleware);
 
 router.get('/', checkPermission(['node:view']), nodeController.getAll);
 router.get('/tree', checkPermission(['node:view']), nodeController.getTree);
+router.get('/:id/with-expiry', checkPermission(['node:view']), validateUuidParam('id'), nodeController.getByIdWithExpiry);
 router.get('/:id', checkPermission(['node:view']), validateUuidParam('id'), nodeController.getById);
 router.get('/:id/children', checkPermission(['node:view']), validateUuidParam('id'), nodeController.getChildren);
 router.get('/:id/movement-history', checkPermission(['node:view']), validateUuidParam('id'), nodeController.getMovementHistory);

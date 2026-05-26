@@ -1,5 +1,6 @@
 const { pool } = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
+const { calculateMaintenanceExpiryDate } = require('../utils/businessCalendar');
 
 const AGGREGATE_RU_PATTERN = '%\u0430\u0433\u0440\u0435\u0433\u0430\u0442%';
 const AGGREGATE_EN_PATTERN = '%aggregate%';
@@ -13,8 +14,19 @@ function makeHttpError(message, status = 400) {
 function normalizeDate(value) {
   if (!value) return null;
   if (typeof value === 'string') return value.slice(0, 10);
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
   return value;
+}
+
+function maxDateKey(...values) {
+  const dates = values.map(normalizeDate).filter(Boolean);
+  if (dates.length === 0) return null;
+  return dates.sort().at(-1);
 }
 
 function normalizeNode(row) {
@@ -49,7 +61,9 @@ class Node {
     `;
   }
 
-  static baseSelect() {
+  static baseSelect(options = {}) {
+    const { extraColumns = '', extraJoins = '' } = options;
+
     return `
       SELECT
         n.node_id,
@@ -84,10 +98,12 @@ class Node {
           SELECT 1 FROM equipment.resources_history rh
           WHERE rh.node_id = n.node_id AND rh.valid_to IS NULL
         ) AS has_resource
+        ${extraColumns}
       FROM equipment.nodes n
       LEFT JOIN equipment.node_types nt ON nt.node_type_id = n.node_type_id
       LEFT JOIN equipment.subsystems s ON s.subsys_id = n.subsystem_id
       LEFT JOIN equipment.nodes p ON p.node_id = n.installed_in_node
+      ${extraJoins}
     `;
   }
 
@@ -164,6 +180,56 @@ class Node {
     `, [id]);
 
     return normalizeNode(result.rows[0]);
+  }
+
+  static async getByIdWithExpiry(id) {
+    const expiryBaseDateSql = `COALESCE(GREATEST(last_done.last_completed_date, n.commission_date), last_done.last_completed_date, n.commission_date)`;
+    const result = await pool.query(`
+      ${Node.baseSelect({
+        extraColumns: `,
+        last_done.last_completed_date,
+        ${expiryBaseDateSql} AS expiry_base_date,
+        last_cal.last_calibration_date,
+        last_cal.next_calibration_date`,
+        extraJoins: `
+      LEFT JOIN equipment.instruments_history i
+        ON i.node_id = n.node_id
+       AND i.valid_to IS NULL
+      LEFT JOIN LATERAL (
+        SELECT MAX(t.completed_date) AS last_completed_date
+        FROM equipment.maintenance_tasks t
+        JOIN equipment.maintenance_statuses done_status ON done_status.status_id = t.status_id
+        WHERE t.node_id = n.node_id
+          AND t.completed_date IS NOT NULL
+          AND done_status.name = 'выполнено'
+      ) last_done ON true
+      LEFT JOIN LATERAL (
+        SELECT
+          ch.calibration_date AS last_calibration_date,
+          (ch.calibration_date + (i.calibration_interval * INTERVAL '1 year'))::date AS next_calibration_date
+        FROM equipment.calibration_history ch
+        WHERE ch.node_id = n.node_id
+        ORDER BY ch.calibration_date DESC, ch.performed_at DESC
+        LIMIT 1
+      ) last_cal ON true`,
+      })}
+      WHERE n.node_id = $1
+    `, [id]);
+
+    const node = normalizeNode(result.rows[0]);
+    if (!node) return null;
+
+    const expiryBaseDate = normalizeDate(node.expiry_base_date);
+    const maintenanceExpiryDate = calculateMaintenanceExpiryDate(expiryBaseDate);
+    const calibrationExpiryDate = normalizeDate(node.next_calibration_date);
+    return {
+      ...node,
+      last_completed_date: normalizeDate(node.last_completed_date),
+      expiry_base_date: expiryBaseDate,
+      last_calibration_date: normalizeDate(node.last_calibration_date),
+      next_calibration_date: calibrationExpiryDate,
+      expiry_date: maxDateKey(maintenanceExpiryDate, calibrationExpiryDate),
+    };
   }
 
   static async getChildren(id) {
