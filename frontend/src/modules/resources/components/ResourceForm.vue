@@ -232,7 +232,23 @@ async function calculateResource() {
   }
 
   try {
-    const result = await store.calculateResource(form.node_id, workHours.value);
+    const result = await store.calculateResource(form.node_id, workHours.value, {
+      name: form.name,
+      mark: form.mark,
+      type: form.type,
+      production_date: form.production_date,
+      registration_date: form.registration_date || getCurrentDate(),
+      registration_number: form.registration_number,
+      last_service_date: form.last_service_date,
+      service_life: form.service_life,
+      time_to_service: form.time_to_service,
+      initial_resource: form.initial_resource,
+      remaining_resource: form.remaining_resource,
+      installed_in: form.installed_in,
+      location: form.location,
+      note: form.note,
+      status: form.status,
+    });
     const remaining = result?.remaining_resource ?? result?.calculated_resource_percent;
     if (remaining !== undefined && remaining !== null) {
       calcResult.value = Number(remaining);

@@ -50,10 +50,13 @@ async function deleteResource(req, res, next) {
 
 async function calculate(req, res, next) {
   try {
-    const { work_hours_per_year } = req.body;
-    const result = await Resource.calculate(req.params.nodeId, work_hours_per_year);
+    const { work_hours_per_year, resource_data } = req.body || {};
+    const result = await Resource.calculate(req.params.nodeId, work_hours_per_year, resource_data || req.body || {});
     res.json(ResponseFormatter.success(result));
   } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json(ResponseFormatter.error(err.message, err.status));
+    }
     next(err);
   }
 }

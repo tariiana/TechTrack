@@ -204,10 +204,13 @@ async function writeOffResource(nodeId: string) {
     await writeOffResource(nodeId);
   }
 
-  async function calculateResource(nodeId: string, workHoursPerYear: number) {
+  async function calculateResource(nodeId: string, workHoursPerYear: number, resourceData?: Record<string, any>) {
     const response = await apiFetch(`/resources/${nodeId}/calculate`, {
       method: 'POST',
-      body: JSON.stringify({ work_hours_per_year: workHoursPerYear }),
+      body: JSON.stringify({
+        work_hours_per_year: workHoursPerYear,
+        ...(resourceData ? { resource_data: resourceData } : {}),
+      }),
     });
     return response.data || response;
   }
