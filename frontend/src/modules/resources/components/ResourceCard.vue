@@ -6,7 +6,7 @@
       <div class="action-buttons">
         <button class="btn btn-secondary" @click="goBack">← Назад</button>
         <button v-if="canEdit" class="btn btn-primary" @click="editResource">Редактировать</button>
-        <button v-if="canEdit && resource.status !== 'списан'" class="btn btn-danger" @click="writeOffResource">📝 Списать</button>
+   
         <div class="dropdown"> 
           <button class="btn btn-secondary" @click="toggleExportDropdown">📎 Экспорт</button>
           <div v-if="exportDropdownOpen" class="dropdown-menu">
