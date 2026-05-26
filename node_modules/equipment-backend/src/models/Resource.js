@@ -61,6 +61,12 @@ function firstPresent(...values) {
   return null;
 }
 
+function makeHttpError(message, status = 400) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
 function normalizeText(value) {
   return String(value || '').trim().toLocaleLowerCase('ru-RU');
 }
@@ -479,20 +485,57 @@ class Resource {
     return { success: true };
   }
 
-  static async calculate(nodeId, workHoursPerYear) {
+  static async calculate(nodeId, workHoursPerYear, resourceData = {}) {
     const resource = await this.getById(nodeId);
-    if (!resource) throw new Error('Resource was not found for this node');
+    const overrides = normalizeParams(resourceData);
+    const overrideParams = normalizeParams(overrides.resource_params);
+    const hasOverrides = Object.keys(overrides).some(key => (
+      key !== 'work_hours_per_year' && key !== 'resource_data'
+    )) || Object.keys(overrideParams).length > 0;
 
-    const serviceLife = parseNumber(resource.service_life);
-    const currentRemaining = parseNumber(resource.remaining_resource);
+    if (!resource && !hasOverrides) {
+      throw makeHttpError('Resource was not found for this node', 404);
+    }
+
+    const resourceParams = normalizeParams(resource?.resource_params);
+    const calculationSource = {
+      ...(resource || {}),
+      ...overrides,
+      resource_params: {
+        ...resourceParams,
+        ...overrideParams,
+      },
+    };
+
+    const serviceLife = parseNumber(firstPresent(
+      calculationSource.service_life,
+      pickValue(calculationSource.resource_params, 'service_life')
+    ));
+    const currentRemaining = parseNumber(firstPresent(
+      calculationSource.remaining_resource,
+      pickValue(calculationSource.resource_params, 'remaining_resource'),
+      pickValue(calculationSource.resource_params, 'remaining_life'),
+      pickValue(calculationSource.resource_params, 'remainingLife'),
+      pickValue(calculationSource.resource_params, 'health'),
+      pickValue(calculationSource.resource_params, 'battery_level')
+    ));
     const yearlyHours = parseNumber(workHoursPerYear) || 8760;
-    const startDate = resource.production_date || resource.registration_date;
+    const startDate = firstPresent(
+      calculationSource.production_date,
+      pickValue(calculationSource.resource_params, 'production_date'),
+      calculationSource.registration_date
+    );
 
     let calculatedPercent = currentRemaining;
-    let timeToService = parseNumber(resource.time_to_service);
+    let timeToService = parseNumber(firstPresent(
+      calculationSource.time_to_service,
+      pickValue(calculationSource.resource_params, 'time_to_service')
+    ));
 
-    if (serviceLife && startDate) {
-      const elapsedMs = Date.now() - new Date(startDate).getTime();
+    const startTime = startDate ? new Date(startDate).getTime() : null;
+
+    if (serviceLife && Number.isFinite(startTime)) {
+      const elapsedMs = Date.now() - startTime;
       const yearsPassed = Math.max(0, elapsedMs / (365.25 * 24 * 60 * 60 * 1000));
       const usageFactor = Math.max(yearlyHours, 0) / 8760;
       const effectiveYearsPassed = yearsPassed * usageFactor;
@@ -509,7 +552,7 @@ class Resource {
       calculated_resource_percent: calculatedPercent,
       remaining_resource: calculatedPercent,
       time_to_service: timeToService,
-      current_resource_params: resource.resource_params,
+      current_resource_params: calculationSource.resource_params,
     };
   }
 }
