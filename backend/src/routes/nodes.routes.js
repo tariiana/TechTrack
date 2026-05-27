@@ -4,6 +4,8 @@ const { authMiddleware } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 const { validateUuidParam } = require('../middleware/nodeValidation');
 
+// Маршруты узлов оборудования. Порядок важен: /tree и /:id/with-expiry должны
+// стоять выше общего /:id.
 router.use(authMiddleware);
 
 router.get('/', checkPermission(['node:view']), nodeController.getAll);

@@ -1,10 +1,14 @@
 import { query, getClient } from '../config/db.js';
 import { auditLog } from '../middleware/audit.js';
 
+// TypeScript-сервис узлов. Он похож на CommonJS-модель Node, но работает с
+// прямыми CRUD-операциями и явным auditLog.
 const AGGREGATE_RU_PATTERN = '%\u0430\u0433\u0440\u0435\u0433\u0430\u0442%';
 const AGGREGATE_EN_PATTERN = '%aggregate%';
 
 function aggregateCondition(alias = 'n', nodeTypeAlias = 'nt') {
+  // Узел считается агрегатом, если тип похож на агрегат, разрешает детей или
+  // уже имеет установленные дочерние узлы.
   return `
     (
       LOWER(COALESCE(${nodeTypeAlias}.name, '')) LIKE '${AGGREGATE_RU_PATTERN}'
@@ -118,6 +122,7 @@ export async function getNodeTree() {
   );
   
   // Построение дерева
+  // Плоский результат рекурсивного CTE превращается в вложенный children.
   const nodesMap = new Map();
   const roots: any[] = [];
   
@@ -173,6 +178,8 @@ export async function createNode(
   const client = await getClient();
   try {
     await client.query('BEGIN');
+    // Создание узла и аудит должны пройти атомарно относительно самой записи
+    // оборудования, поэтому используем явную транзакцию.
     
     // Проверяем, существует ли подсистема
     const subsystemCheck = await client.query(

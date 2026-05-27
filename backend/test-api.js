@@ -1,4 +1,5 @@
 // test-auth.js
+// Ручной smoke-тест логина: ожидает запущенный backend на localhost:3000.
 const http = require('http');
 
 async function testAuth() {
@@ -8,7 +9,7 @@ async function testAuth() {
     { login: 'admin', password: 'admin123', role: 'admin' },
     { login: 'operator', password: 'operator123', role: 'operator' },
     { login: 'observer', password: 'observer123', role: 'observer' },
-    { login: 'wrong', password: 'wrong', role: 'none' } // Негативный тест
+    { login: 'wrong', password: 'wrong', role: 'none' } // Негативный тест: должен вернуть 401.
   ];
   
   for (const test of tests) {

@@ -4,6 +4,8 @@ const {
   daysBetween,
 } = require('../utils/businessCalendar');
 
+// Модель ТО: планы состоят из задач, а рекомендуемые даты считаются от даты
+// ввода в эксплуатацию или последнего выполненного обслуживания.
 const STATUS_TO_DB = {
   pending: 'ожидает',
   in_progress: 'в работе',
@@ -84,6 +86,7 @@ function mapPlan(row) {
 }
 
 function mapTask(row) {
+  // Приводит БД-значения к API-формату и добавляет вычисленные признаки просрочки.
   const expiryDate = normalizeDate(row.expiry_date);
 
   return {
@@ -114,6 +117,8 @@ const aggregateCondition = `
 `;
 
 function applyTaskDates(row) {
+  // Если задача еще не выполнена, показываем расчетную дату как recommended_date
+  // и считаем просрочку относительно нее.
   const expiryDate = calculateMaintenanceExpiryDate(row.expiry_base_date);
   const storedCompletedDate = normalizeDate(row.completed_date);
   const completedDate = storedCompletedDate || expiryDate;
@@ -132,6 +137,8 @@ function applyTaskDates(row) {
 
 class Maintenance {
   static async getTypeId(serviceType) {
+    // Справочник типов пополняется автоматически, чтобы новые подписи из UI не
+    // ломали создание задачи.
     const dbType = getDbType(serviceType);
     const existing = await pool.query(
       `SELECT type_id FROM equipment.maintenance_types WHERE name = $1`,
@@ -164,6 +171,7 @@ class Maintenance {
   }
 
   static async findPlanId(startDate, endDate, explicitPlanId = null) {
+    // Генератор может получить plan_id явно или найти план по тому же диапазону.
     if (explicitPlanId) return explicitPlanId;
 
     const result = await pool.query(`
@@ -213,6 +221,8 @@ class Maintenance {
     if (result.rows.length === 0) return null;
 
     const plan = mapPlan(result.rows[0]);
+    // Задачи плана обогащаются последним выполненным ТО, чтобы рассчитать
+    // expiry_date без отдельного запроса на каждую строку.
     const baseDateSql = `COALESCE(GREATEST(prev.last_completed_date, n.commission_date), prev.last_completed_date, n.commission_date)`;
 
     const tasksResult = await pool.query(`
@@ -346,6 +356,8 @@ class Maintenance {
 
     if (updates.length === 0) return null;
 
+    // Обновляем только переданные поля, чтобы ручные правки задачи не теряли
+    // остальные значения.
     updates.push(`updated_at = CURRENT_TIMESTAMP`);
     values.push(id);
 
@@ -376,6 +388,8 @@ class Maintenance {
   }
 
   static async getEquipmentNodes() {
+    // Возвращает только агрегаты: именно по ним строится план технического
+    // обслуживания.
     const baseDateSql = `COALESCE(GREATEST(last_done.last_completed_date, n.commission_date), last_done.last_completed_date, n.commission_date)`;
     const result = await pool.query(`
       SELECT
@@ -437,6 +451,8 @@ class Maintenance {
   }
 
   static async generatePlan(startDate, endDate, nodeIds = null, planId = null) {
+    // Генерация идемпотентна для автосозданных задач: сначала удаляет старые
+    // автоматические черновики, потом вставляет недостающие кандидаты.
     const targetPlanId = await Maintenance.findPlanId(startDate, endDate, planId);
     if (!targetPlanId) {
       throw new Error('Maintenance plan was not found for task generation');

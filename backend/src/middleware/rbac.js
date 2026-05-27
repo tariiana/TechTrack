@@ -1,3 +1,5 @@
+// Простая матрица прав в коде. Если роли станут настраиваемыми, этот объект
+// можно заменить чтением из БД, не меняя checkPermission.
 const roles = {
   admin: ['*'],
   operator: [
@@ -37,6 +39,8 @@ const roles = {
 };
 
 function checkPermission(required) {
+  // required принимает массив: доступ разрешен, если у роли есть хотя бы одно
+  // из перечисленных прав.
   return (req, res, next) => {
     const userRole = req.user?.role_name || req.user?.role;
 

@@ -1,5 +1,7 @@
 import { query } from '../config/db.js';
 
+// Сервис чтения аудита строит SQL динамически, но все значения передает через
+// параметры PostgreSQL, а не через конкатенацию пользовательского ввода.
 export async function getAuditLog(filters?: {
   user_id?: string;
   entity_type?: string;
@@ -17,6 +19,8 @@ export async function getAuditLog(filters?: {
     WHERE 1=1
   `;
   
+  // conditions и values собираются синхронно, чтобы номера $1, $2, ...
+  // совпадали с порядком параметров.
   const conditions: string[] = [];
   const values: any[] = [];
   let paramIndex = 1;

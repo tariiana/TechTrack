@@ -1,6 +1,8 @@
 const bcrypt = require('bcrypt');
 const { Pool } = require('pg');
 
+// TypeScript-копия одноразового скрипта для восстановления пароля администратора
+// в локальной БД.
 const pool = new Pool({
   host: 'localhost',
   port: 5432,
@@ -10,6 +12,7 @@ const pool = new Pool({
 });
 
 async function hashAndUpdate() {
+  // Если пароль меняется, измените password здесь и повторно запустите скрипт.
   const password = 'admin123';
   const saltRounds = 10;
   const hash = await bcrypt.hash(password, saltRounds);
@@ -17,6 +20,7 @@ async function hashAndUpdate() {
   console.log('Хеш пароля:', hash);
   
   // Обновить пароль администратора
+  // В БД сохраняется только bcrypt-хеш, не открытый пароль.
   await pool.query(
     `UPDATE equipment.users SET password_hash = $1 WHERE login = 'admin'`,
     [hash]

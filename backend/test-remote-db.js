@@ -1,4 +1,6 @@
 // test-remote-db.js
+// Диагностика удаленной БД по настройкам из .env: соединение, SSL и типичные
+// сетевые/pg_hba ошибки.
 require('dotenv').config();
 const { Pool } = require('pg');
 
@@ -12,6 +14,7 @@ const config = {
 };
 
 if (process.env.DB_SSL === 'require') {
+  // Для managed PostgreSQL часто нужен SSL без проверки локального CA.
   config.ssl = { rejectUnauthorized: false };
 }
 

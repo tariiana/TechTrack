@@ -1,5 +1,7 @@
 const { validate: isUuid } = require('uuid');
 
+// Допускаются как нормальные русские статусы, так и унаследованные строки,
+// которые уже могли попасть в БД из-за проблем с кодировкой.
 const NODE_STATUSES = new Set([
   'получен',
   'исправен',
@@ -51,6 +53,8 @@ function validateDate(value, field, errors) {
 }
 
 function validateParameters(value, field, errors) {
+  // parameters хранится как JSONB, поэтому проверяем только форму объекта и
+  // опасные ключи, не ограничивая предметные параметры.
   if (value === undefined || value === null) return;
   if (typeof value !== 'object' || Array.isArray(value)) {
     errors.push(`${field} должен быть объектом JSON`);
@@ -64,6 +68,7 @@ function validateParameters(value, field, errors) {
 }
 
 function validateNodePayload({ partial = false } = {}) {
+  // partial=true используется при PATCH/PUT, где можно прислать только часть полей.
   return (req, res, next) => {
     const data = req.body || {};
     const errors = [];
@@ -110,6 +115,7 @@ function validateNodePayload({ partial = false } = {}) {
 }
 
 function validateNodeTypePayload({ partial = false } = {}) {
+  // Тип узла может задавать список допустимых дочерних типов.
   return (req, res, next) => {
     const data = req.body || {};
     const errors = [];

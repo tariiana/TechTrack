@@ -1,5 +1,7 @@
 const db = require('../config/db');
 
+// Ресурс оборудования хранится как версионная запись в resources_history.
+// resource_id в API фактически равен node_id, потому что ресурс привязан к узлу.
 const RESERVED_PARAM_KEYS = new Set([
   'name',
   'mark',
@@ -91,6 +93,8 @@ function getMeasurementValue(params, ...keys) {
 }
 
 function buildMeasurement(row, index = 0) {
+  // Старые версии ресурса используются как история измерений, если явный массив
+  // measurements еще не сохранен в JSONB.
   const params = normalizeParams(row.resource_params);
   const voltage = getMeasurementValue(params, 'voltage', 'U');
   const resistance = getMeasurementValue(params, 'resistance', 'R');
@@ -119,6 +123,8 @@ function buildMeasurement(row, index = 0) {
 }
 
 function mapResource(row) {
+  // Сводит поля из resources_history, nodes и JSONB resource_params в один DTO,
+  // который ожидает фронтенд.
   if (!row) return null;
 
   const params = normalizeParams(row.resource_params);
@@ -246,6 +252,8 @@ function baseSelect() {
 }
 
 function buildParams(data, existingParams, node) {
+  // При полном resource_params сохраняем служебные поля из старой версии, чтобы
+  // UI не потерял статус списания и историю измерений.
   const existing = normalizeParams(existingParams);
   const incomingParams = normalizeParams(data.resource_params);
   const hasResourceParams = hasOwn(data, 'resource_params');
@@ -317,6 +325,8 @@ function buildParams(data, existingParams, node) {
 }
 
 async function attachMeasurements(resources) {
+  // Подмешивает measurements ко всем ресурсам одним запросом, чтобы список не
+  // делал N дополнительных обращений к БД.
   if (!resources.length) return resources;
 
   const ids = [...new Set(resources.map(resource => resource.node_id))];
@@ -407,6 +417,8 @@ class Resource {
 
     try {
       await client.query('BEGIN');
+      // Блокируем текущую активную версию FOR UPDATE, закрываем ее и вставляем
+      // новую запись истории в одной транзакции.
 
       const nodeResult = await client.query(`
         SELECT node_id, name, model, location
@@ -467,6 +479,7 @@ class Resource {
   }
 
   static async delete(nodeId, userId = null) {
+    // Физического удаления нет: ресурс помечается списанным новой версией.
     const resource = await this.getById(nodeId);
     if (!resource) return { success: false };
 
@@ -486,6 +499,8 @@ class Resource {
   }
 
   static async calculate(nodeId, workHoursPerYear, resourceData = {}) {
+    // Расчет поддерживает два сценария: по сохраненному ресурсу или по временным
+    // значениям из формы, еще не записанным в БД.
     const resource = await this.getById(nodeId);
     const overrides = normalizeParams(resourceData);
     const overrideParams = normalizeParams(overrides.resource_params);

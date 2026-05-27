@@ -3,6 +3,8 @@ const { v4: uuidv4 } = require('uuid');
 
 const pool = db.pool || db;
 
+// Средство измерений состоит из обычного узла equipment.nodes и активной записи
+// instruments_history. Поверки хранятся отдельно в calibration_history.
 const DB_TO_CLIENT_STATUS = {
   'в эксплуатации': 'в эксплуатации',
   'на поверке': 'на поверке',
@@ -73,6 +75,8 @@ function toClientResult(result) {
 }
 
 function parseVerificationNotes(notes, fallbackDate = null) {
+  // Новые записи хранят transfer/receipt даты в JSON, но старые могли содержать
+  // простой текст. Поэтому парсер оставляет обратную совместимость.
   const fallback = normalizeDate(fallbackDate);
   if (!notes) {
     return {
@@ -113,6 +117,8 @@ function serializeVerificationNotes(data) {
 }
 
 function normalizeInstrument(row) {
+  // Один ответ поддерживает snake_case и camelCase, потому что разные части
+  // фронтенда используют разные соглашения именования.
   if (!row) return null;
 
   const status = toClientStatus(row.dbStatus);
@@ -203,6 +209,8 @@ function hasAny(data, fields) {
 
 class MeasuringInstrument {
   static baseSelect() {
+    // Базовый SELECT соединяет текущую версию узла, активную запись СИ и
+    // последнюю поверку через LATERAL.
     return `
       SELECT
         n.node_id AS "id",
@@ -314,6 +322,7 @@ class MeasuringInstrument {
   }
 
   static async resolveNodeTypeId(client, data, currentNode = null) {
+    // При создании СИ тип можно передать id, названием или взять из текущего узла.
     const explicit = data.node_type_id || data.nodeTypeId || data.typeId;
     if (explicit) return explicit;
 
@@ -373,6 +382,8 @@ class MeasuringInstrument {
   }
 
   static async buildNodeValues(client, nodeId, data, currentNode = null, userId = null) {
+    // СИ редактирует и данные узла, и собственные поля прибора; здесь собирается
+    // новая версия nodes_history.
     const nodeTypeId = await MeasuringInstrument.resolveNodeTypeId(client, data, currentNode);
     const subsystemId = await MeasuringInstrument.resolveSubsystemId(client, data, currentNode);
 
@@ -469,6 +480,8 @@ class MeasuringInstrument {
   }
 
   static async replaceInstrumentHistory(client, nodeId, data, currentInstrument = null, userId = null) {
+    // Историчность прибора: закрываем активную строку instruments_history и
+    // вставляем новую с измененным табельным номером/интервалом/статусом.
     const instrument = currentInstrument || await MeasuringInstrument.getCurrentInstrument(client, nodeId);
     if (!instrument) throw makeHttpError('СИ не найдено', 404);
 
@@ -501,6 +514,8 @@ class MeasuringInstrument {
   }
 
   static async addCalibration(client, nodeId, data, userId = null) {
+    // Поверка добавляется только если в запросе есть дата; create/update СИ могут
+    // пройти без создания записи calibration_history.
     const calibrationDate = normalizeDate(data.calibrationDate || data.receiptDate || data.lastVerificationDate || data.transferDate);
     if (!calibrationDate) return null;
 
@@ -550,6 +565,8 @@ class MeasuringInstrument {
     try {
       await client.query('BEGIN');
 
+      // Если nodeId уже существует, СИ привязывается к нему; иначе создается
+      // новый узел и сразу активная запись прибора.
       let currentNode = await MeasuringInstrument.getCurrentNode(client, nodeId);
       if (!currentNode) {
         nodeId = nodeId || uuidv4();
@@ -614,6 +631,8 @@ class MeasuringInstrument {
         return null;
       }
 
+      // Данные узла и данные СИ версионируются независимо, чтобы не писать
+      // лишние history-строки при изменении только поверки.
       if (hasAny(data, [
         'name', 'manufacturer', 'model', 'productionDate', 'manufactured_date',
         'serialNumber', 'serial_number', 'inventoryNumber', 'inventory_number',
@@ -747,6 +766,8 @@ class MeasuringInstrument {
       `, [verificationId, instrumentId]);
       if (!current.rows[0]) throw makeHttpError('Поверка не найдена', 404);
 
+      // При обновлении поверки сохраняем старые transfer/notes, если пользователь
+      // изменил только часть формы.
       const oldNotes = parseVerificationNotes(current.rows[0].notes, current.rows[0].calibration_date);
       const receiptDate = normalizeDate(data.receiptDate || data.calibrationDate || current.rows[0].calibration_date);
       const transferDate = normalizeDate(data.transferDate || oldNotes.transferDate || receiptDate);

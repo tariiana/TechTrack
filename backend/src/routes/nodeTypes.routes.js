@@ -4,6 +4,7 @@ const { authMiddleware } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 const { validateUuidParam, validateNodeTypePayload } = require('../middleware/nodeValidation');
 
+// Типы узлов управляют шаблонами параметров и допустимой иерархией оборудования.
 router.use(authMiddleware);
 
 router.get('/', checkPermission(['nodeType:view']), nodeTypeController.getAll);

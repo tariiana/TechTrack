@@ -4,6 +4,8 @@ const { pool } = require('../config/db');
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key';
 const TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 
+// JWT содержит только публичную идентичность и роль. Актуальность пользователя
+// все равно проверяется в БД при каждом защищенном запросе.
 function generateToken(user) {
   return jwt.sign(
     {
@@ -27,6 +29,7 @@ async function authMiddleware(req, res, next) {
       return res.status(401).json({ error: 'Требуется авторизация' });
     }
 
+    // Bearer token разбираем вручную, чтобы middleware не зависел от passport.
     const token = authHeader.slice('Bearer '.length).trim();
     const decoded = jwt.verify(token, JWT_SECRET);
     const userId = decoded.userId || decoded.user_id;
@@ -47,6 +50,7 @@ async function authMiddleware(req, res, next) {
       return res.status(401).json({ error: 'Пользователь не найден' });
     }
 
+    // req.user нужен контроллерам, а current_user_id нужен триггерам БД.
     req.user = result.rows[0];
     await pool.query(`SELECT set_config('myapp.current_user_id', $1, true)`, [req.user.user_id]);
     return next();

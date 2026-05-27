@@ -1,3 +1,5 @@
+# OpenAPI-описание публичных backend-маршрутов. Файл можно открыть в Swagger UI
+# для ручной проверки контрактов API.
 openapi: 3.0.0
 info:
   title: Equipment Management API

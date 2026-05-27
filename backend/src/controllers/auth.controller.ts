@@ -3,6 +3,8 @@ import { Request, Response } from 'express';
 import { login, changePassword } from '../services/auth.service.js';
 import { AuthenticatedRequest } from '../types/index.js';
 
+// TypeScript-контроллер авторизации для сервисного слоя: возвращает JWT и
+// публичные данные пользователя, но не отдает password_hash.
 export async function loginController(req: Request, res: Response) {
   try {
     const { login: userLogin, password } = req.body;
@@ -28,6 +30,7 @@ export async function loginController(req: Request, res: Response) {
 
 export async function changePasswordController(req: AuthenticatedRequest, res: Response) {
   try {
+    // Смена пароля доступна только авторизованному пользователю из req.user.
     const { oldPassword, newPassword } = req.body;
     const userId = req.user?.user_id;
     const ipAddress = req.ip || req.socket.remoteAddress || null;

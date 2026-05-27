@@ -1,6 +1,8 @@
 import { query, getClient } from '../config/db.js';
 import { auditLog } from '../middleware/audit.js';
 
+// TypeScript-сервис ТО: управляет планами, задачами и автогенерацией плана по
+// агрегатам/выбранным узлам.
 export async function getAllMaintenancePlans() {
   const result = await query(
     `SELECT plan_id, name, start_date, end_date, created_at, updated_at,
@@ -25,6 +27,8 @@ export async function getMaintenancePlanById(planId: string) {
   const plan = result.rows[0];
   
   // Получаем задачи плана
+  // Задачи подтягиваются отдельным запросом, чтобы вернуть план вместе с
+  // удобным массивом tasks.
   const tasksResult = await query(
     `SELECT m.maintenance_id, m.node_id, m.completed_date, m.type_id, m.status_id, m.notes,
             n.name as node_name, n.location as node_location,
@@ -304,6 +308,7 @@ export async function deleteMaintenanceTask(taskId: string, userId: string | nul
 // Связывание задач с планами
 export async function addTaskToPlan(planId: string, taskId: string, userId: string | null, ipAddress: string | null, userAgent: string | null) {
   // Проверяем существование плана и задачи
+  // ON CONFLICT делает операцию идемпотентной: повторное добавление не падает.
   const planCheck = await query(`SELECT plan_id FROM equipment.maintenance_plans WHERE plan_id = $1`, [planId]);
   const taskCheck = await query(`SELECT maintenance_id FROM equipment.maintenance WHERE maintenance_id = $1`, [taskId]);
   
@@ -340,6 +345,8 @@ export async function generateMaintenancePlan(
   ipAddress: string | null = null,
   userAgent: string | null = null
 ) {
+  // Если список узлов не задан, сервис сам выбирает активные агрегаты и создает
+  // по одной плановой задаче на каждый узел.
   // Если узлы не указаны, берём все активные агрегаты (узлы, у которых есть дочерние)
   let targetNodes: any[];
   

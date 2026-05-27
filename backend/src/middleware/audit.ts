@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { query } from '../config/db.js';
 import { AuthenticatedRequest } from '../types/index.js';
 
+// TypeScript-вариант аудита сохраняет старые/новые данные операции. Он не
+// прерывает основной запрос, если запись в audit_log завершилась ошибкой.
 export async function auditLog(
   userId: string | null,
   action: string,
@@ -32,6 +34,8 @@ function normalizeEntityId(id: string | string[] | null): string | null {
 
 export function auditMiddleware(entityType: string, getEntityId?: (req: Request) => string | null) {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    // Сохраняем тело ответа в res.body на случай, если обработчику аудита
+    // понадобится результат контроллера.
     const oldSend = res.send;
     const oldJson = res.json;
     
@@ -51,6 +55,7 @@ export function auditMiddleware(entityType: string, getEntityId?: (req: Request)
     const userAgent = req.headers['user-agent'] || null;
     
     // Для PUT/POST/DELETE операций логируем изменения
+    // Читающие запросы не пишем в аудит, чтобы журнал оставался про изменения.
     if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
       const rawEntityId = getEntityId ? getEntityId(req) : req.params.id || null;
       const entityId = normalizeEntityId(rawEntityId);  // Преобразуем в строку

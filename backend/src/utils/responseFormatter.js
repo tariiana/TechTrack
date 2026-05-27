@@ -1,3 +1,5 @@
+// Небольшой форматтер, чтобы контроллеры возвращали ответы одинаковой формы:
+// success/error, статус, данные и timestamp.
 class ResponseFormatter {
   static success(data, message = null) {
     return { success: true, status: 200, data, message, timestamp: new Date().toISOString() };

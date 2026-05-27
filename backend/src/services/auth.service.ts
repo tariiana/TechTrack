@@ -3,6 +3,8 @@ import bcrypt from 'bcrypt';
 import { generateToken } from '../middleware/auth.js';
 import { auditLog } from '../middleware/audit.js';
 
+// Сервис авторизации для TypeScript-контроллеров: проверяет пароль, выдает JWT
+// и пишет события входа/смены пароля в аудит.
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '10');
 
 export interface LoginResult {
@@ -18,6 +20,7 @@ export interface LoginResult {
 }
 
 export async function login(login: string, password: string, ipAddress: string | null, userAgent: string | null): Promise<LoginResult> {
+  // Ищем активного пользователя вместе с ролью, чтобы токен сразу содержал права.
   // Ищем пользователя
   const result = await query(
     `SELECT u.user_id, u.login, u.password_hash, u.full_name, u.is_active, r.name as role_name
@@ -73,6 +76,8 @@ export async function changePassword(
   ipAddress: string | null,
   userAgent: string | null
 ): Promise<{ success: boolean; error?: string }> {
+  // Старый пароль проверяется перед записью нового хеша; это защищает сессию,
+  // если токен пользователя был получен кем-то еще.
   // Получаем текущий хеш пароля
   const result = await query(
     `SELECT password_hash FROM equipment.users WHERE user_id = $1`,

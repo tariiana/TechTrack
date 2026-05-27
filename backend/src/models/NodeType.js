@@ -1,6 +1,8 @@
 const { pool } = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 
+// Вид узла версионируется через node_types_history: update не меняет строку
+// напрямую, а закрывает старую версию и вставляет новую.
 class NodeType {
   static async getAll() {
     const result = await pool.query(`
@@ -23,6 +25,8 @@ class NodeType {
   static async create(data, userId) {
     const { name, parameters, allowed_child_types, note, parent_node_type_id } = data;
     const id = uuidv4();
+    // Актуальное состояние читается из view/table node_types, но запись идет в
+    // history-таблицу, чтобы сохранить изменение во времени.
     await pool.query(`
       INSERT INTO equipment.node_types_history (node_type_id, parent_node_type_id, name, parameters, allowed_child_types, note, valid_from, created_by_user)
       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, $7)
@@ -43,6 +47,7 @@ class NodeType {
   }
 
   static async delete(id) {
+    // Удаление тоже закрывает активную версию, если тип не используется узлами.
     // проверяем, используются ли типы в узлах
     const nodes = await pool.query(`SELECT COUNT(*) FROM equipment.nodes WHERE node_type_id = $1`, [id]);
     if (parseInt(nodes.rows[0].count) > 0) throw new Error('Нельзя удалить вид узла, так как он используется в оборудовании');

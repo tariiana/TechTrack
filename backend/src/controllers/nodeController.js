@@ -1,6 +1,8 @@
 const Node = require('../models/Node');
 const ResponseFormatter = require('../utils/responseFormatter');
 
+// Контроллер оборудования покрывает и плоский список узлов, и дерево установки
+// "агрегат -> вложенные блоки".
 function getRequestUserId(req) {
   return req.user?.user_id || req.user?.id || null;
 }
@@ -38,6 +40,7 @@ async function getById(req, res, next) {
 
 async function getByIdWithExpiry(req, res, next) {
   try {
+    // Версия with-expiry дополняет карточку расчетной датой следующего ТО/поверки.
     const node = await Node.getByIdWithExpiry(req.params.id);
     if (!node) {
       return res.status(404).json(ResponseFormatter.error('Узел не найден', 404));
@@ -95,6 +98,7 @@ async function writeOff(req, res, next) {
 
 async function install(req, res, next) {
   try {
+    // install меняет только родительский узел; модель дополнительно запрещает циклы.
     const { parentId, childId } = req.params;
     await Node.install(childId, parentId, getRequestUserId(req));
     res.json(ResponseFormatter.success(null, 'Узел установлен в агрегат'));

@@ -1,6 +1,8 @@
 import { query, getClient } from '../config/db.js';
 import { auditLog } from '../middleware/audit.js';
 
+// TypeScript-сервис подсистем: базовые CRUD-операции и дерево без расширенного
+// поиска содержимого, который реализован в CommonJS-модели Subsystem.
 export async function getAllSubsystems() {
   const result = await query(
     `SELECT subsys_id, name, location, note, parent_id, created_at, updated_at
@@ -39,6 +41,8 @@ export async function getSubsystemTree() {
   );
   
   // Построение дерева
+  // Рекурсивный SQL возвращает порядок и уровни, а здесь формируется структура
+  // children, ожидаемая фронтендом.
   const nodesMap = new Map();
   const roots: any[] = [];
   
@@ -150,6 +154,8 @@ export async function deleteSubsystem(subsysId: string, userId: string | null, i
   }
   
   // Проверяем, есть ли дочерние подсистемы или узлы
+  // Удаление мягкое, но запрещено для непустой подсистемы, чтобы не оставить
+  // оборудование без валидной привязки.
   const childrenCheck = await query(
     `SELECT 
        (SELECT COUNT(*) FROM equipment.subsystems WHERE parent_id = $1 AND is_active = true) as child_subsystems,

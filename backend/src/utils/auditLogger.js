@@ -1,5 +1,7 @@
 const { pool } = require('../config/db');
 
+// Утилита аудита для CommonJS-роутов: пишет факт успешного изменения после
+// завершения ответа, не ломая основной запрос при ошибке записи лога.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function truncate(value, maxLength) {
@@ -19,6 +21,8 @@ function getRequestUserId(req) {
 }
 
 function getRequestEntityId(req) {
+  // Разные маршруты называют идентификатор по-разному; аудит приводит их к
+  // одному полю entity_id.
   return normalizeUuid(
     req.params.id
       || req.params.nodeId
@@ -58,6 +62,8 @@ async function auditLog({
   userAgent = null,
 }) {
   try {
+    // Ошибка аудита не должна отменять пользовательскую операцию, поэтому
+    // catch ниже только логирует проблему.
     await pool.query(`
       INSERT INTO equipment.audit_log (
         log_id,
@@ -89,6 +95,8 @@ function auditMiddleware(entityType) {
       return next();
     }
 
+    // Перехватываем res.json, чтобы при необходимости взять entity_id из тела
+    // успешного ответа, если его нет в URL.
     let responsePayload = null;
     const originalJson = res.json.bind(res);
     res.json = (payload) => {

@@ -1,6 +1,7 @@
 const NodeType = require('../models/NodeType');
 const ResponseFormatter = require('../utils/responseFormatter');
 
+// Виды узлов описывают шаблон параметров и допустимые дочерние типы.
 function getRequestUserId(req) {
   return req.user?.user_id || req.user?.id || null;
 }

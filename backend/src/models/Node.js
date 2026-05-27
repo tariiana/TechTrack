@@ -2,6 +2,8 @@ const { pool } = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 const { calculateMaintenanceExpiryDate } = require('../utils/businessCalendar');
 
+// Модель оборудования. Узлы хранятся версионно через nodes_history, а view/table
+// equipment.nodes показывает текущую активную версию.
 const AGGREGATE_RU_PATTERN = '%\u0430\u0433\u0440\u0435\u0433\u0430\u0442%';
 const AGGREGATE_EN_PATTERN = '%aggregate%';
 
@@ -30,6 +32,7 @@ function maxDateKey(...values) {
 }
 
 function normalizeNode(row) {
+  // Приводит даты к YYYY-MM-DD и добавляет фронтенд-поле type.
   if (!row) return row;
 
   return {
@@ -48,6 +51,8 @@ function normalizeNodes(rows) {
 
 class Node {
   static aggregateCondition() {
+    // Узел считается агрегатом по названию типа, allowed_child_types или наличию
+    // уже установленных дочерних узлов.
     return `
       (
         LOWER(COALESCE(nt.name, '')) LIKE '${AGGREGATE_RU_PATTERN}'
@@ -62,6 +67,8 @@ class Node {
   }
 
   static baseSelect(options = {}) {
+    // Базовый SELECT переиспользуется списком, карточкой, деревом и расчетом
+    // сроков, чтобы поля узла не расходились между endpoint'ами.
     const { extraColumns = '', extraJoins = '' } = options;
 
     return `
@@ -158,6 +165,8 @@ class Node {
     const map = new Map();
     const roots = [];
 
+    // Дерево строится в памяти из плоского списка, потому что UI ожидает
+    // вложенные children, а фильтры уже применены в getAll().
     for (const node of nodes) {
       map.set(node.node_id, { ...node, children: [] });
     }
@@ -183,6 +192,8 @@ class Node {
   }
 
   static async getByIdWithExpiry(id) {
+    // expiry_date выбирается как более поздняя из дат ТО и поверки, чтобы карточка
+    // агрегата показывала ближайший критичный срок обслуживания.
     const expiryBaseDateSql = `COALESCE(GREATEST(last_done.last_completed_date, n.commission_date), last_done.last_completed_date, n.commission_date)`;
     const result = await pool.query(`
       ${Node.baseSelect({
@@ -296,6 +307,8 @@ class Node {
   }
 
   static async buildHistoryValues(id, data, old = null, userId = null) {
+    // Для новой версии объединяем старые значения и входящий patch, затем
+    // резолвим обязательные ссылки на тип узла и подсистему.
     const merged = { ...(old || {}), ...data };
     const nodeTypeId = await Node.resolveNodeTypeId(merged);
     const subsystemId = await Node.resolveSubsystemId(merged);
@@ -394,6 +407,7 @@ class Node {
 
     const values = await Node.buildHistoryValues(id, data, old, userId);
 
+    // Закрываем текущую версию и вставляем следующую, сохраняя историю изменений.
     await pool.query(`
       UPDATE equipment.nodes_history
       SET valid_to = CURRENT_TIMESTAMP
@@ -422,6 +436,8 @@ class Node {
   }
 
   static async assertNoCycle(childId, parentId) {
+    // Рекурсивно поднимаемся по родителям будущего parentId: childId не должен
+    // встретиться среди предков.
     const result = await pool.query(`
       WITH RECURSIVE ancestors AS (
         SELECT node_id, installed_in_node

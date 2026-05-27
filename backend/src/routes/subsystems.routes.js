@@ -3,8 +3,11 @@ const subsystemController = require('../controllers/subsystemController');
 const { authMiddleware } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 
+// Все маршруты подсистем закрыты авторизацией; права проверяются точечно на
+// чтение, создание, обновление и удаление.
 router.use(authMiddleware);
 
+// Важно: специальные пути объявлены до '/:id', иначе Express принял бы их за id.
 router.get('/', checkPermission(['subsystem:view']), subsystemController.getAll);
 router.get('/tree', checkPermission(['subsystem:view']), subsystemController.getTree);
 router.get('/content/search', checkPermission(['subsystem:view']), subsystemController.searchContent);

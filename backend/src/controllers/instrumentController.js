@@ -1,6 +1,8 @@
 const MeasuringInstrument = require('../models/MeasuringInstrument');
 const ResponseFormatter = require('../utils/responseFormatter');
 
+// Контроллеры средств измерений тонкие: достают параметры HTTP-запроса,
+// передают их в модель и переводят доменные ошибки в HTTP-ответы.
 function getRequestUserId(req) {
   return req.user?.user_id || req.user?.id || null;
 }
@@ -23,6 +25,7 @@ async function getById(req, res, next) {
 
 async function create(req, res, next) {
   try {
+    // userId передается в модель, чтобы новая версия истории знала автора.
     const instrument = await MeasuringInstrument.create(req.body, getRequestUserId(req));
     res.status(201).json(instrument);
   } catch (err) {
@@ -86,6 +89,7 @@ async function addVerification(req, res, next) {
 
 async function updateVerification(req, res, next) {
   try {
+    // Поверка принадлежит конкретному СИ, поэтому проверяем оба id на уровне модели.
     const verification = await MeasuringInstrument.updateVerification(
       req.params.id,
       req.params.verificationId,

@@ -1,6 +1,7 @@
 import { body, param, query, validationResult } from 'express-validator';
 import { Request, Response, NextFunction } from 'express';
 
+// Общий обработчик express-validator: все валидаторы ниже заканчиваются им.
 export const handleValidationErrors = (req: Request, res: Response, next: NextFunction) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -9,6 +10,8 @@ export const handleValidationErrors = (req: Request, res: Response, next: NextFu
   next();
 };
 
+// Валидаторы для различных сущностей. Часть маршрутов сейчас использует
+// специализированные JS-validator'ы, но этот файл оставлен для TS-слоя.
 // Валидаторы для различных сущностей
 export const validateLogin = [
   body('login').notEmpty().withMessage('Логин обязателен'),

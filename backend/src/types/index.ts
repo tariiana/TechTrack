@@ -1,5 +1,7 @@
 import { Request } from 'express';
 
+// Общие backend-типы: описывают пользователя в req.user и основные сущности,
+// которыми обмениваются контроллеры, сервисы и фронтенд.
 export interface JWTPayload {
   user_id: string;
   login: string;

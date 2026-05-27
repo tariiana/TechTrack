@@ -1,6 +1,8 @@
 const Maintenance = require('../models/Maintenance');
 const ResponseFormatter = require('../utils/responseFormatter');
 
+// Контроллер обслуживания разделяет планы ТО и отдельные задачи ТО.
+// Вся расчетная логика сроков находится в модели Maintenance.
 async function getAllPlans(req, res, next) {
   try {
     const plans = await Maintenance.getAllPlans();
@@ -75,6 +77,7 @@ async function getEquipmentNodes(req, res, next) {
 
 async function generatePlan(req, res, next) {
   try {
+    // Генерация добавляет в существующий план только подходящие задачи по датам.
     const { start_date, end_date, node_ids, plan_id } = req.body;
     const result = await Maintenance.generatePlan(start_date, end_date, node_ids, plan_id);
     res.json(ResponseFormatter.success(result, 'План сгенерирован'));

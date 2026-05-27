@@ -3,9 +3,12 @@ const resourceController = require('../controllers/resourceController');
 const { authMiddleware } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 
+// Ресурсы привязаны к nodeId, поэтому создание и обновление используют URL
+// /:nodeId, а не отдельный resource_id.
 router.use(authMiddleware);
 
 router.get('/', checkPermission(['resource:view']), resourceController.getAll);
+// Алиас для фронтенда: превращает nodeId из URL в обычный фильтр node_id.
 router.get('/by-node/:nodeId', checkPermission(['resource:view']), (req, res, next) => {
   req.query.node_id = req.params.nodeId;
   return resourceController.getAll(req, res, next);

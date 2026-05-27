@@ -1,6 +1,8 @@
 const Resource = require('../models/Resource');
 const ResponseFormatter = require('../utils/responseFormatter');
 
+// Ресурс хранится как версия характеристик узла в resources_history.
+// Контроллер оставляет моделью нормализацию параметров и расчеты остатка.
 function getRequestUserId(req) {
   return req.headers['x-user-id'] || req.user?.user_id || null;
 }
@@ -29,6 +31,7 @@ async function getById(req, res, next) {
 
 async function upsert(req, res, next) {
   try {
+    // POST и PUT используют один путь upsert: закрыть старую версию и создать новую.
     const result = await Resource.upsert(req.params.nodeId, req.body, getRequestUserId(req));
     res.json(ResponseFormatter.success(result, 'Resource saved'));
   } catch (err) {
@@ -50,6 +53,7 @@ async function deleteResource(req, res, next) {
 
 async function calculate(req, res, next) {
   try {
+    // Расчет может использовать сохраненные параметры ресурса и переопределения из body.
     const { work_hours_per_year } = req.body;
     const result = await Resource.calculate(req.params.nodeId, work_hours_per_year);
     res.json(ResponseFormatter.success(result));

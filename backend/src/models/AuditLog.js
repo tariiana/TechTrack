@@ -1,5 +1,7 @@
 const { pool } = require('../config/db');
 
+// Читает журнал аудита с фильтрами и ограничением размера страницы, чтобы
+// админский экран не выгружал всю историю разом.
 class AuditLog {
   static async getAll(filters = {}) {
     const where = [];
@@ -36,6 +38,7 @@ class AuditLog {
       values.push(filters.end_date);
     }
 
+    // Жесткий потолок 500 защищает БД и UI от слишком тяжелых запросов.
     const limit = Number(filters.limit) > 0 ? Math.min(Number(filters.limit), 500) : 100;
     const offset = Number(filters.offset) > 0 ? Number(filters.offset) : 0;
 

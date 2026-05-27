@@ -1,6 +1,8 @@
 import { query } from '../config/db.js';
 import { auditLog } from '../middleware/audit.js';
 
+// TypeScript-сервис видов узлов: хранит шаблоны параметров и допустимые дочерние
+// типы, а также проверяет, можно ли удалить тип.
 export async function getAllNodeTypes() {
   const result = await query(
     `SELECT node_type_id, name, parameters, allowed_child_types, note, parent_node_type_id
@@ -47,6 +49,8 @@ export async function updateNodeType(
   ipAddress: string | null,
   userAgent: string | null
 ) {
+  // Динамический UPDATE позволяет менять только переданные поля без перезаписи
+  // parameters/allowed_child_types пустыми значениями.
   const oldData = await getNodeTypeById(nodeTypeId);
   if (!oldData) {
     throw new Error('Вид узла не найден');
@@ -102,6 +106,7 @@ export async function deleteNodeType(nodeTypeId: string, userId: string | null, 
   }
   
   // Проверяем, есть ли узлы этого типа
+  // Тип нельзя удалить, пока есть активные узлы этого типа.
   const nodesCheck = await query(
     `SELECT COUNT(*) FROM equipment.nodes WHERE node_type_id = $1 AND write_off_date IS NULL`,
     [nodeTypeId]

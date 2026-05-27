@@ -1,5 +1,7 @@
 const { pool } = require('../config/db');
 
+// Роли читаются из БД и используются UI для формы пользователя. Проверка прав
+// сейчас находится в middleware/rbac.js.
 class Role {
   static async getAll() {
     const result = await pool.query(`

@@ -1,5 +1,6 @@
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Белый список полей защищает upsert ресурса от случайной записи мусора в JSONB.
 const RESOURCE_FIELDS = new Set([
   'node_id',
   'name',
@@ -60,6 +61,8 @@ function isNumericValue(value) {
 }
 
 function collectParamErrors(value, path, errors) {
+  // JSON-параметры ресурса допускают произвольные ключи, но блокируют прототипные
+  // поля и undefined, чтобы избежать prototype pollution и неожиданных JSONB.
   if (!isPlainObject(value)) {
     errors.push(`${path} должен быть объектом`);
     return;
@@ -92,6 +95,8 @@ function validateUuidParam(name) {
 }
 
 function validateResourcePayload(req, res, next) {
+  // Валидирует тело целиком: известные top-level поля, даты, числа и вложенные
+  // измерения в resource_params.measurements.
   const data = req.body || {};
   const errors = [];
 
@@ -139,6 +144,8 @@ function validateResourcePayload(req, res, next) {
 }
 
 function validateMeasurementShape(measurement, path, errors, requireDate) {
+  // Используется и для массива измерений внутри ресурса, и для отдельного
+  // POST/PUT измерения.
   if (!isPlainObject(measurement)) {
     errors.push(`${path} должно быть объектом`);
     return;

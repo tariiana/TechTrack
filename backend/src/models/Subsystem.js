@@ -4,6 +4,8 @@ const { v4: uuidv4, validate: isUuid } = require('uuid');
 const AGGREGATE_RU_PATTERN = '%\u0430\u0433\u0440\u0435\u0433\u0430\u0442%';
 const AGGREGATE_EN_PATTERN = '%aggregate%';
 
+// Подсистема - иерархический каталог. Содержимое подсистемы хранится в разных
+// таблицах, но большинство сущностей можно перемещать через связанный node_id.
 const CONTENT_TYPES = new Set(['equipment', 'instrument', 'resource', 'maintenance', 'plan']);
 const MOVABLE_TYPES = new Set(['equipment', 'instrument', 'resource', 'maintenance']);
 
@@ -76,6 +78,8 @@ function normalizeSearchText(value) {
 }
 
 function contentSearchPattern(search) {
+  // Экранируем wildcard-символы ILIKE, чтобы пользовательский текст не менял
+  // смысл поиска.
   return `%${search.replace(/[%_]/g, '\\$&')}%`;
 }
 
@@ -95,6 +99,8 @@ class Subsystem {
     const map = new Map();
     const roots = [];
 
+    // Дерево собирается в памяти: таблица уже отдает текущие версии подсистем,
+    // а фронтенду нужен вложенный children.
     for (const subsystem of all) {
       map.set(subsystem.subsys_id, { ...subsystem, children: [] });
     }
@@ -166,6 +172,8 @@ class Subsystem {
     const subsystem = await this.getById(id);
     if (!subsystem) throw makeHttpError('Подсистема не найдена', 404);
 
+    // Содержимое читается параллельно из разных доменных таблиц: каждая выборка
+    // возвращает единый type/id/title/subtitle для карточек UI.
     const [equipment, instruments, resources, maintenance, plans] = await Promise.all([
       this.getEquipmentContent(id),
       this.getInstrumentContent(id),
@@ -372,6 +380,8 @@ class Subsystem {
   }
 
   static async searchContent({ query = '', type = 'all', limit = 20 } = {}) {
+    // Общий поиск используется перед привязкой: возвращает только первые safeLimit
+    // результатов, чтобы модальное окно не загружало огромные списки.
     const search = normalizeSearchText(query);
     const normalizedType = type === 'all' || !type ? 'all' : normalizeContentType(type);
     const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
@@ -547,6 +557,8 @@ class Subsystem {
   }
 
   static async resolveNodeIdForContent(client, type, objectId) {
+    // У оборудования, СИ, ресурса и задачи ТО разные id, но перемещается всегда
+    // узел. Этот метод находит соответствующий node_id.
     normalizeContentType(type);
     assertUuid(objectId, 'Некорректный ID объекта');
 
@@ -596,6 +608,8 @@ class Subsystem {
   }
 
   static async moveNodeToSubsystem(client, nodeId, subsystemId, userId = null) {
+    // Перемещение узла тоже версионное: закрываем активную nodes_history и
+    // вставляем новую версию с другим subsystem_id.
     const subsystem = await this.getById(subsystemId, client);
     if (!subsystem) throw makeHttpError('Целевая подсистема не найдена', 404);
 
@@ -715,6 +729,8 @@ class Subsystem {
   }
 
   static async detachContent() {
+    // У узла subsystem_id обязательный, поэтому "удалить из подсистемы" без
+    // выбора новой подсистемы невозможно.
     throw makeHttpError(
       'Удаление из подсистемы недоступно без целевой подсистемы: в БД у узла поле subsystem_id обязательно. Используйте перемещение.',
       409
@@ -722,6 +738,7 @@ class Subsystem {
   }
 
   static async ensureParentIsValid(client, subsystemId, parentId) {
+    // Проверяет существование родителя и запрещает циклы в дереве подсистем.
     if (!parentId) return;
 
     if (subsystemId && parentId === subsystemId) {
@@ -803,6 +820,8 @@ class Subsystem {
 
       await this.ensureParentIsValid(client, id, values.parent_id);
 
+      // Подсистемы тоже хранятся в history-таблице: update закрывает старую
+      // активную версию и вставляет новую.
       const closed = await client.query(
         `
           UPDATE equipment.subsystems_history

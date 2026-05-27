@@ -2,6 +2,8 @@ import { query } from '../config/db.js';
 import bcrypt from 'bcrypt';
 import { auditLog } from '../middleware/audit.js';
 
+// TypeScript-сервис пользователей: используется сервисным слоем и дополнительно
+// пишет старые/новые значения в audit_log.
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '10');
 
 export async function getAllUsers() {
@@ -37,6 +39,8 @@ export async function createUser(
   ipAddress: string | null,
   userAgent: string | null
 ) {
+  // Проверяем уникальность логина до вставки, чтобы контроллер мог вернуть
+  // понятную доменную ошибку.
   // Проверяем, существует ли пользователь с таким логином
   const existing = await query(`SELECT user_id FROM equipment.users WHERE login = $1`, [login]);
   if (existing.rows.length > 0) {
@@ -66,6 +70,7 @@ export async function updateUser(
   ipAddress: string | null,
   userAgent: string | null
 ) {
+  // oldData нужен для аудита и для возврата без изменений, если тело пустое.
   // Получаем старые данные для аудита
   const oldData = await getUserById(userId);
   

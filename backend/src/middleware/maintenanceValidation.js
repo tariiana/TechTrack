@@ -3,6 +3,7 @@ const ResponseFormatter = require('../utils/responseFormatter');
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// Валидатор принимает внутренние API-статусы и русские подписи из UI/БД.
 const ALLOWED_STATUSES = new Set([
   'pending',
   'in_progress',
@@ -50,6 +51,7 @@ function isValidDate(value) {
 }
 
 function normalizeBodyStrings(req, fields) {
+  // Перед проверками обрезаем пробелы только у известных строковых полей.
   for (const field of fields) {
     if (Object.prototype.hasOwnProperty.call(req.body, field)) {
       req.body[field] = trimString(req.body[field]);
@@ -74,6 +76,7 @@ function validateUuidParam(paramName) {
 }
 
 function validatePlanBody({ partial = false } = {}) {
+  // partial=true позволяет обновлять только измененные поля плана.
   return (req, res, next) => {
     normalizeBodyStrings(req, ['name', 'start_date', 'end_date']);
 
@@ -111,6 +114,7 @@ function validatePlanBody({ partial = false } = {}) {
 }
 
 function validateTaskBody({ partial = false } = {}) {
+  // Задача ТО может быть плановой или внеплановой, с привязкой к плану или без.
   return (req, res, next) => {
     normalizeBodyStrings(req, ['node_id', 'plan_id', 'service_type', 'status_name', 'completed_date', 'notes']);
 
@@ -164,6 +168,7 @@ function validateTaskBody({ partial = false } = {}) {
 }
 
 function validateGeneratePlanBody(req, res, next) {
+  // Генерация требует диапазон дат и опционально ограничивается списком node_ids.
   normalizeBodyStrings(req, ['start_date', 'end_date', 'plan_id']);
 
   const errors = [];

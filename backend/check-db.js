@@ -1,5 +1,7 @@
 const { Pool } = require('pg');
 
+// Быстрый локальный скрипт диагностики: проверяет подключение к PostgreSQL и
+// показывает таблицы схемы equipment. Не используется сервером.
 const pool = new Pool({
   host: '192.168.1.66',
   port: 5432,
@@ -10,10 +12,12 @@ const pool = new Pool({
 
 async function check() {
   try {
+    // SELECT NOW() подтверждает, что соединение и учетные данные рабочие.
     const res = await pool.query('SELECT NOW()');
     console.log('✅ База данных подключена:', res.rows[0]);
     
     // Проверка наличия таблиц
+    // Список таблиц помогает понять, применена ли схема БД.
     const tables = await pool.query(`
       SELECT table_name 
       FROM information_schema.tables 

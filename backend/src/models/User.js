@@ -2,6 +2,8 @@ const { pool } = require('../config/db');
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
 
+// Модель пользователей для административных маршрутов. Возвращает только
+// публичные поля, а пароли всегда сохраняет как bcrypt-хеш.
 class User {
   static async getAll(filters = {}) {
     let sql = `
@@ -69,6 +71,8 @@ class User {
 
   static async create(data, userId) {
     const { login, password, full_name, role_id, is_active } = data;
+    // Проверяем логин до INSERT, чтобы вернуть понятную ошибку вместо
+    // низкоуровневого unique-constraint из PostgreSQL.
     // Проверка уникальности логина
     const existing = await this.getByLogin(login);
     if (existing) throw new Error('Пользователь с таким логином уже существует');
@@ -96,6 +100,8 @@ class User {
     const updates = [];
     const values = [];
     let idx = 1;
+    // Собираем UPDATE только из реально переданных полей. Так PUT может
+    // работать как частичное обновление без перезаписи пустыми значениями.
     if (login !== undefined) { updates.push(`login = $${idx++}`); values.push(login); }
     if (full_name !== undefined) { updates.push(`full_name = $${idx++}`); values.push(full_name); }
     if (role_id !== undefined) { updates.push(`role_id = $${idx++}`); values.push(role_id); }

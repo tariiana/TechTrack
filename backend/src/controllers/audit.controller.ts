@@ -2,6 +2,8 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../types/index.js';
 import { getAuditLog, getEntityAuditHistory } from '../services/audit.service.js';
 
+// TypeScript-контроллер аудита: принимает query-параметры фильтрации и
+// передает их в сервис без знания SQL-деталей.
 export async function getAuditLogController(req: AuthenticatedRequest, res: Response) {
   try {
     const user_id = req.query.user_id as string;
@@ -29,6 +31,7 @@ export async function getAuditLogController(req: AuthenticatedRequest, res: Resp
 
 export async function getEntityAuditHistoryController(req: AuthenticatedRequest, res: Response) {
   try {
+    // История сущности выбирается по паре entity_type + entity_id.
     // Простое приведение к строке
     const entityType = req.params.entityType as string;
     const entityId = req.params.entityId as string;

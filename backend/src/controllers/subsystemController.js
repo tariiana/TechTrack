@@ -1,12 +1,16 @@
 const { validate: isUuid } = require('uuid');
 const Subsystem = require('../models/Subsystem');
 
+// Подсистемы работают как каталог/дерево, к которому можно привязывать
+// оборудование, СИ, ресурсы и задачи ТО через их node_id.
 function getRequestUserId(req) {
   const candidate = req.user?.user_id || req.user?.id || req.headers['x-user-id'];
   return candidate && isUuid(candidate) ? candidate : null;
 }
 
 function sendError(res, error) {
+  // Модель бросает ошибки со status; контроллер оставляет наружу только
+  // ожидаемые сообщения, а 500 маскирует общим текстом.
   const status = error.status || 500;
   res.status(status).json({
     error: status === 500 ? 'Внутренняя ошибка сервера' : error.message,
@@ -33,6 +37,8 @@ async function getTree(req, res) {
 
 async function searchContent(req, res) {
   try {
+    // Поиск объединяет несколько таблиц и возвращает элементы в формате,
+    // удобном для модального окна привязки содержимого.
     const items = await Subsystem.searchContent({
       query: req.query.query || req.query.q || '',
       type: req.query.type || 'all',
@@ -96,6 +102,7 @@ async function addContent(req, res) {
 
 async function moveContent(req, res) {
   try {
+    // Фактически перемещается узел, на котором основан выбранный объект.
     const result = await Subsystem.moveContent(
       req.params.type,
       req.params.objectId,

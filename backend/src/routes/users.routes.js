@@ -3,6 +3,7 @@ const userController = require('../controllers/userController');
 const { authMiddleware } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 
+// Раздел пользователей доступен только администраторам.
 router.use(authMiddleware);
 router.use(checkPermission(['user:admin']));
 

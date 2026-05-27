@@ -7,6 +7,7 @@ const { authMiddleware } = require('../middleware/auth');
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key';
 const TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 
+// Оставляет в ответе только безопасные поля пользователя.
 function toPublicUser(user) {
   return {
     id: user.user_id,
@@ -43,6 +44,8 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({ error: 'Пользователь заблокирован' });
     }
 
+    // Поддержка старых записей с открытым паролем оставлена для миграционного
+    // периода; новые пароли должны храниться bcrypt-хешами.
     const isValidPassword = user.password_hash?.startsWith('$2')
       ? await bcrypt.compare(password, user.password_hash)
       : password === user.password_hash;
@@ -75,6 +78,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Проверяет JWT и возвращает пользователя из authMiddleware.
 router.get('/me', authMiddleware, (req, res) => {
   return res.json({
     success: true,

@@ -1,3 +1,5 @@
+// Производственный календарь для расчета дат ТО. Содержит фиксированные
+// праздники, дополнительные выходные и рабочие переносы на ближайшие годы.
 const FIXED_HOLIDAYS = [
   '01-01',
   '01-02',
@@ -92,6 +94,7 @@ function isFixedHoliday(dateKey) {
 }
 
 function isWorkingDay(value) {
+  // Перенесенные рабочие субботы важнее правила "суббота/воскресенье".
   const dateKey = normalizeDateKey(value);
   if (!dateKey) return false;
   if (includesDate(WORKING_WEEKEND_DAYS, dateKey)) return true;
@@ -101,6 +104,8 @@ function isWorkingDay(value) {
 }
 
 function shiftToPreviousWorkingDay(value) {
+  // Если расчетная дата попала на выходной/праздник, сдвигаем срок назад,
+  // чтобы дедлайн ТО оставался рабочим днем.
   let dateKey = normalizeDateKey(value);
   if (!dateKey) return null;
 
@@ -134,6 +139,7 @@ function getBundledCalendarRows(years = []) {
 }
 
 function calculateMaintenanceExpiryDate(baseDate) {
+  // Бизнес-правило: очередное ТО через 365 календарных дней от базовой даты.
   const rawExpiryDate = addDays(baseDate, 365);
   return shiftToPreviousWorkingDay(rawExpiryDate);
 }

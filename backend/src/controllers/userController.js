@@ -2,6 +2,8 @@ const User = require('../models/User');
 const Role = require('../models/Role');
 const ResponseFormatter = require('../utils/responseFormatter');
 
+// Административный контроллер пользователей: наружу не отдает хеши паролей,
+// а создание/обновление делегирует модели User.
 function getRequestUserId(req) {
   return req.user?.user_id || req.user?.id || null;
 }

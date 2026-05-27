@@ -1,6 +1,8 @@
 const AuditLog = require('../models/AuditLog');
 const ResponseFormatter = require('../utils/responseFormatter');
 
+// CommonJS-контроллер аудита используется текущими routes/audit.routes.js.
+// TypeScript-версия рядом оставлена для сервисного слоя.
 async function getAll(req, res, next) {
   try {
     const logs = await AuditLog.getAll(req.query);

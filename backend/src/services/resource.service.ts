@@ -2,6 +2,8 @@
 import Resource from '../models/Resource.js';
 import { auditLog } from '../middleware/audit.js';
 
+// Тонкая TypeScript-обертка над CommonJS-моделью Resource. Нужна там, где
+// контроллеры хотят аудит со старыми/новыми данными.
 type ResourceFilters = {
   node_id?: string;
   search?: string;
@@ -33,6 +35,8 @@ export async function createResource(
   ipAddress: string | null,
   userAgent: string | null
 ) {
+  // Модель делает upsert по node_id; после записи перечитываем ресурс, чтобы
+  // аудит получил нормализованный DTO.
   const result = await Resource.upsert(data.node_id, data, userId);
   const newResource = await Resource.getById(data.node_id);
 
