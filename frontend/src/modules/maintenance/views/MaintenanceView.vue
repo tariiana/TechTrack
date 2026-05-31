@@ -66,9 +66,23 @@
             <td>{{ formatDate(plan.start_date) }}</td>
             <td>{{ plan.end_date ? formatDate(plan.end_date) : '—' }}</td>
             <td>
-              <button class="btn btn-sm btn-secondary" @click="viewPlan(plan.plan_id)">Открыть</button>
-              <button v-if="canEdit" class="btn btn-sm btn-secondary" @click="editPlan(plan)">✏️</button>
-              <button v-if="canEdit" class="btn btn-sm btn-danger" @click="deletePlan(plan.plan_id)">🗑️</button>
+              <button 
+                class="btn btn-sm btn-secondary" 
+                @click="viewPlan(plan.plan_id)"
+                title="Открыть план"
+              >Открыть</button>
+              <button 
+                v-if="canEdit" 
+                class="btn btn-sm btn-secondary" 
+                @click="editPlan(plan)"
+                title="Редактировать план"
+              >✏️</button>
+              <button 
+                v-if="canEdit" 
+                class="btn btn-sm btn-danger" 
+                @click="deletePlan(plan.plan_id)"
+                title="Удалить план"
+              >🗑️</button>
             </td>
           </tr>
           <tr v-if="filteredAndSortedPlans.length === 0">

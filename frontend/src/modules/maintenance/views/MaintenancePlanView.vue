@@ -108,8 +108,14 @@
             
             <td>{{ task.notes || '-' }}</td>
             <td v-if="canEdit">
-              <button class="btn btn-sm btn-secondary" @click="openEditTaskForm(task)">✏️</button>
-              <button class="btn btn-sm btn-danger" @click="deleteTask(task.maintenance_id)">🗑️</button>
+              <button 
+                class="btn btn-sm btn-secondary" 
+                @click="openEditTaskForm(task)"
+                title="Редактировать мероприятие"> ✏️ </button>
+              <button 
+                class="btn btn-sm btn-danger" 
+                @click="deleteTask(task.maintenance_id)"
+                title="Удалить мероприятие">🗑️ </button>
             </td>
           </tr>
           <tr v-if="filteredAndSortedTasks.length === 0">
