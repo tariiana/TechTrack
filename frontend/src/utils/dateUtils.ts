@@ -12,10 +12,12 @@ export function addYears(dateStr: string | undefined, years: number): string {
 
   const date = new Date(dateStr)
   if (isNaN(date.getTime())) return ''
-
-  date.setFullYear(date.getFullYear() + years)
-
-  // Форматируем дату в YYYY-MM-DD напрямую, без parseToYMD
+  const yearsInt = Math.floor(years)
+  const monthsToAdd = Math.round((years - yearsInt) * 12)
+  date.setFullYear(date.getFullYear() + yearsInt)
+  if (monthsToAdd > 0) {
+    date.setMonth(date.getMonth() + monthsToAdd)
+  }
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')

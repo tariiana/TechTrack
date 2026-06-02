@@ -24,12 +24,7 @@
         </div>
         <div class="form-group">
           <label>Тип <span class="required">*</span></label>
-          <select v-model="form.typeName" class="form-control">
-            <option value="" disabled>Выберите тип</option>
-            <option v-for="type in store.nodeTypes" :key="type.node_type_id" :value="type.name">
-              {{ type.name }}
-            </option>
-          </select>
+          <input v-model="form.typeName" class="form-control" placeholder="Например: Дозиметр" />
         </div>
       </div>
 
@@ -131,9 +126,6 @@ interface ParamItem {
 
 const paramsList = ref<ParamItem[]>([]);
 
-onMounted(() => {
-  store.fetchNodeTypes();
-});
 
 function paramsFromJson(json: Record<string, any>): ParamItem[] {
   const list: ParamItem[] = [];
@@ -228,7 +220,7 @@ function open(editItem?: any) {
     form.status = editItem.status;
     form.location = editItem.location || '';
     form.mainParams = editItem.mainParams || {};
-    form.verificationInterval = editItem.verificationInterval;
+    form.verificationInterval = Number(editItem.verificationInterval) || 1;
     form.notes = editItem.notes || '';
     form.lastVerificationDate = editItem.lastVerificationDate || '';
     form.productionDate = editItem.productionDate || '';
@@ -302,7 +294,7 @@ async function save() {
     status: form.status,
     location: form.location,
     mainParams: mainParams,
-    verificationInterval: form.verificationInterval,
+    verificationInterval: Number(form.verificationInterval),
     notes: form.notes,
     productionDate: form.productionDate,
     isDeleted: false,
