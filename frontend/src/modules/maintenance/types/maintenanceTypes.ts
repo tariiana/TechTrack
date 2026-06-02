@@ -3,11 +3,11 @@ export interface MaintenancePlan {
   name: string // Название плана-графика
   startDate: string // Дата начала (YYYY-MM-DD)
   endDate: string // Дата окончания
-  description?: string
+  /*description?: string
   createdAt: string
   updatedAt: string
   isDeleted: boolean
-  subsystemId: number
+  subsystemId: number*/
 }
 
 export interface MaintenanceTask {
