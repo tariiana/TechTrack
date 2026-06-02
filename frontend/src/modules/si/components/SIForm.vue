@@ -3,7 +3,7 @@
     <div class="modal-content" style="width: 750px">
       <div class="modal-header">
         <span>{{ isEdit ? 'Редактирование СИ' : 'Добавление СИ' }}</span>
-        <button class="modal-close" @click="close" title="Закрыть">×</button>
+        <button class="modal-close" @click="confirmClose" title="Закрыть">×</button>
       </div>
 
       <div class="form-row">
@@ -102,23 +102,26 @@
       <div v-if="error" class="error-text">{{ error }}</div>
 
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="close">Отмена</button>
+        <button class="btn btn-secondary" @click="confirmClose">Отмена</button>
         <button class="btn btn-primary" @click="save">Сохранить</button>
       </div>
     </div>
   </div>
+  <ConfirmDialog ref="confirmDialog" />
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed  } from 'vue';
 import { useSIStore } from '../stores/siStore';
 import { showToast } from '@/utils/toast';
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 
 const store = useSIStore();
 const visible = ref(false);
 const isEdit = ref(false);
 const editId = ref<string | null>(null);
 const error = ref('');
+const confirmDialog = ref();
 
 interface ParamItem {
   name: string;
@@ -234,6 +237,28 @@ function open(editItem?: any) {
   visible.value = true;
 }
 
+const hasChanges = computed(() => {
+  return form.name || form.manufacturer || form.model || form.typeName ||
+         form.serialNumber || form.inventoryNumber || form.tabNumber ||
+         form.location || form.verificationInterval || form.notes ||
+         form.productionDate || paramsList.value.length > 0
+})
+
+async function confirmClose() {
+  // Если есть введённые данные, показываем подтверждение
+  if (hasChanges.value) {
+    const confirmed = await confirmDialog.value?.show(
+      'Подтверждение закрытия',
+      'Вы уверены что хотите закрыть окно?'
+    )
+    if (confirmed) {
+      close()
+    }
+  } else {
+    close()
+  }
+}
+
 function close() {
   visible.value = false;
 }
@@ -305,7 +330,6 @@ defineExpose({ open });
 </script>
 
 <style scoped>
-/* Только уникальные стили, которых нет в style.css */
 
 .required {
   color: var(--danger-color);
@@ -319,7 +343,6 @@ defineExpose({ open });
   margin-top: 8px;
 }
 
-/* Стили для параметров (уникальные для этой формы) */
 .params-container {
   border: 1px solid var(--border-color);
   border-radius: 6px;
@@ -395,6 +418,15 @@ defineExpose({ open });
   background: var(--primary-light);
 }
 
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 20px;
+}
+
 .modal-close {
   background: none;
   border: none;
@@ -408,5 +440,14 @@ defineExpose({ open });
 .modal-close:hover {
   background-color: var(--secondary-color);
   color: var(--text-secondary);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
 }
 </style>

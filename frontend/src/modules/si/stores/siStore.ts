@@ -118,12 +118,19 @@ export const useSIStore = defineStore('si', () => {
   function getNextVerificationDate(siId: EntityId): string {
     const lastDate = getLastVerificationDate(siId);
     const si = instruments.value.find(s => String(s.id) === String(siId));
+    
+    // Сначала считаем по последней поверке и интервалу
+    if (lastDate && si?.verificationInterval) {
+      const calculatedDate = addYears(lastDate, si.verificationInterval);
+      // Если есть расчётная дата - возвращаем её (она самая точная)
+      return calculatedDate;
+    }
+    
+    // Если нет последней поверки, возвращаем сохранённую дату (если есть)
     if (si?.nextVerificationDate || si?.next_verification_date) {
       return si.nextVerificationDate || si.next_verification_date;
     }
-    if (lastDate && si?.verificationInterval) {
-      return addYears(lastDate, si.verificationInterval);
-    }
+    
     return '';
   }
 
@@ -156,6 +163,7 @@ export const useSIStore = defineStore('si', () => {
   async function updateVerification(siId: EntityId, verificationId: EntityId, data: any) {
     const updated = await apiFetch(`/instruments/${siId}/verifications/${verificationId}`, { method: 'PUT', body: JSON.stringify(data) });
     await fetchVerifications(siId);
+    const si = await fetchInstrumentById(siId);
     return updated;
   }
 

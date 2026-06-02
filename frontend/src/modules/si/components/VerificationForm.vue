@@ -1,9 +1,9 @@
 <template>
-  <div class="modal-overlay" v-if="visible">
+ <div class="modal-overlay" v-if="visible">
     <div class="modal-content" style="width: 500px">
       <div class="modal-header">
         <span>{{ editId ? 'Редактирование поверки' : 'Добавление поверки' }}</span>
-        <button class="modal-close" @click="close" title="Закрыть">×</button>
+        <button class="modal-close" @click="confirmClose" title="Закрыть">×</button>
       </div>
 
       <div class="form-group">
@@ -40,7 +40,7 @@
       <div v-if="error" class="error-text">{{ error }}</div>
 
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="close">Отмена</button>
+        <button class="btn btn-secondary" @click="confirmClose">Отмена</button>
         <button class="btn btn-primary" @click="save">Сохранить</button>
       </div>
     </div>
@@ -51,6 +51,7 @@
 import { ref, reactive, computed } from 'vue'
 import { useSIStore } from '../stores/siStore'
 import { showToast } from '@/utils/toast';
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import type { Verification } from '../types/siTypes'
 
 const store = useSIStore()
@@ -60,6 +61,7 @@ const visible = ref(false)
 const instrumentId = ref<string | null>(null)
 const editId = ref<string | null>(null)
 const error = ref('')
+const confirmDialog = ref()
 
 // Проверка прав доступа
 const canEdit = computed(() => {
@@ -139,8 +141,26 @@ function reset() {
   instrumentId.value = null
 }
 
+const hasChanges = computed(() => {
+  return form.transferDate || form.receiptDate || form.verifier || form.notes
+})
+
+async function confirmClose() {
+  // Если есть введённые данные, показываем подтверждение
+  if (hasChanges.value) {
+    const confirmed = await confirmDialog.value?.show(
+      'Подтверждение закрытия',
+      'У вас есть несохранённые изменения. Закрыть окно?'
+    )
+    if (confirmed) {
+      close()
+    }
+  } else {
+    close()
+  }
+}
+
 function open(instrId: string, existing?: Verification) {
-  // Проверка прав - observer не может открыть форму добавления/редактирования
   if (!canEdit.value) {
     showToast('Недостаточно прав для выполнения действия', 'error');
     return;
@@ -203,6 +223,9 @@ defineExpose({ open })
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 20px;
 }
 
 .modal-close {
@@ -210,14 +233,14 @@ defineExpose({ open })
   border: none;
   font-size: 24px;
   cursor: pointer;
-  color: #6c757d;
+  color: var(--text-muted);
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--border-radius-small);
 }
 
 .modal-close:hover {
-  background-color: #e9ecef;
-  color: #333;
+  background-color: var(--secondary-color);
+  color: var(--text-secondary);
 }
 
 .is-invalid {
@@ -227,8 +250,10 @@ defineExpose({ open })
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 15px;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
 }
 
 .error-text {
